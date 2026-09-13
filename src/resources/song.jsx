@@ -1,5 +1,5 @@
 import {
-  List, Datagrid, TextField, NumberField, ReferenceField,
+  List, Datagrid, TextField, NumberField, BooleanField, ReferenceField,
   SearchInput, Edit, Create, TabbedForm, TextInput, NumberInput,
   BooleanInput, DateInput, SelectInput, ArrayInput, SimpleFormIterator,
   ReferenceInput, AutocompleteInput, ReferenceArrayInput,
@@ -40,6 +40,7 @@ const SongList = () => (
     <Datagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="iswc" label="ISWC" emptyText="—" />
+      <BooleanField source="is_cover" label="Cover" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
       <ReferenceField source="language_code" reference="language"
@@ -55,20 +56,21 @@ const SongForm = () => (
     <TabbedForm.Tab label="Details">
       <TextInput source="title" required fullWidth />
       <TextInput source="iswc" label="ISWC" helperText="T followed by 10 digits" />
-      <ReferenceInput source="status_id" reference="asset_status"
+      <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
         <SelectInput optionText="name" label="Status" />
       </ReferenceInput>
-      <ReferenceInput source="language_code" reference="language" perPage={25}
+      <ReferenceInput source="language_code" reference="language" perPage={300}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Language"
                            filterToQuery={byName} />
       </ReferenceInput>
-      <ReferenceInput source="key_signature" reference="key_signature" perPage={40}
+      <ReferenceInput source="key_signature" reference="key_signature" perPage={50}
                       sort={{ field: 'accidentals', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Key"
                            filterToQuery={byName} />
       </ReferenceInput>
+      <BooleanInput source="is_cover" label="Cover version" />
       <BooleanInput source="exclusive_p" label="Exclusive" />
       <BooleanInput source="one_stop_p" label="One stop"
                     helperText="All shares controlled, licensable without third-party clearance" />
@@ -78,34 +80,37 @@ const SongForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Tags">
-      <ReferenceArrayInput source="genre_ids" reference="genre" perPage={25}
+      <ReferenceArrayInput source="genre_ids" reference="genre" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteArrayInput optionText="name" label="Genres"
                                 filterToQuery={byName}
-                                create={<QuickCreateName resource="genre" />} />
+                                create={<QuickCreateName resource="genre" />}
+                                createLabel="Type to search or add a genre" />
       </ReferenceArrayInput>
-      <ReferenceArrayInput source="mood_ids" reference="mood" perPage={25}
+      <ReferenceArrayInput source="mood_ids" reference="mood" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteArrayInput optionText="name" label="Moods"
                                 filterToQuery={byName}
-                                create={<QuickCreateName resource="mood" />} />
+                                create={<QuickCreateName resource="mood" />}
+                                createLabel="Type to search or add a mood" />
       </ReferenceArrayInput>
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Writers">
       <ArrayInput source="writers" label={false}>
         <SimpleFormIterator>
-          <ReferenceInput source="contact_id" reference="contact" perPage={25}
+          <ReferenceInput source="contact_id" reference="contact" perPage={200}
                           sort={{ field: 'sort_name', order: 'ASC' }}>
             <AutocompleteInput optionText="sort_name" label="Writer"
                                filterToQuery={bySortName}
-                               create={<QuickCreateContact />} />
+                               create={<QuickCreateContact />}
+                               createLabel="Type to search or add a person" />
           </ReferenceInput>
           <ReferenceInput source="role_id" reference="role" perPage={50}
                           sort={{ field: 'name', order: 'ASC' }}>
             <SelectInput optionText="name" label="Role" />
           </ReferenceInput>
-          <ReferenceInput source="pro_code" reference="pro" perPage={25}
+          <ReferenceInput source="pro_code" reference="pro" perPage={500}
                           sort={{ field: 'code', order: 'ASC' }}>
             <AutocompleteInput
               label="PRO"
@@ -126,11 +131,12 @@ const SongForm = () => (
     <TabbedForm.Tab label="Publishers">
       <ArrayInput source="publishers" label={false}>
         <SimpleFormIterator>
-          <ReferenceInput source="organization_id" reference="organization" perPage={25}
+          <ReferenceInput source="organization_id" reference="organization" perPage={200}
                           sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteInput optionText="name" label="Publisher"
                                filterToQuery={byName}
-                               create={<QuickCreateName resource="organization" />} />
+                               create={<QuickCreateName resource="organization" />}
+                               createLabel="Type to search or add a company" />
           </ReferenceInput>
           <ReferenceInput source="role_id" reference="role" perPage={50}
                           sort={{ field: 'name', order: 'ASC' }}>
@@ -147,7 +153,7 @@ const SongForm = () => (
     <TabbedForm.Tab label="Registrations">
       <ArrayInput source="registrations" label={false}>
         <SimpleFormIterator inline>
-          <ReferenceInput source="pro_code" reference="pro" perPage={25}
+          <ReferenceInput source="pro_code" reference="pro" perPage={500}
                           sort={{ field: 'code', order: 'ASC' }}>
             <AutocompleteInput
               label="Society"
@@ -169,7 +175,7 @@ const SongForm = () => (
           <TextInput source="title" label="Title" />
           <SelectInput source="title_type" choices={titleTypes}
                        label="Type" defaultValue="alternate" />
-          <ReferenceInput source="language_code" reference="language" perPage={25}
+          <ReferenceInput source="language_code" reference="language" perPage={300}
                           sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteInput optionText="name" label="Language"
                                filterToQuery={byName} />
@@ -183,7 +189,7 @@ const SongForm = () => (
       <TextInput source="copyright_number" label="Copyright number" />
       <DateInput source="reversion_date" label="Reversion date" />
       <NumberInput source="reversion_lead" label="Reversion lead (years)" />
-      <ReferenceInput source="derived_from_id" reference="song" perPage={25}
+      <ReferenceInput source="derived_from_id" reference="song" perPage={500}
                       sort={{ field: 'title', order: 'ASC' }}>
         <AutocompleteInput optionText="title" label="Derived from"
                            filterToQuery={byTitle} />

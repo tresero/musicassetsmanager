@@ -2,6 +2,17 @@ import { Admin, Resource } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 
+import song from './resources/song';
+import recording from './resources/recording';
+import contact from './resources/contact';
+import organization from './resources/organization';
+import artist from './resources/artist';
+import artistMember from './resources/artistMember';
+
+import songSplitCheck from './resources/songSplitCheck';
+import songUnregistered from './resources/songUnregistered';
+import emailDuplicate from './resources/emailDuplicate';
+
 import country from './resources/country';
 import pro from './resources/pro';
 import proTerritory from './resources/proTerritory';
@@ -16,20 +27,11 @@ import role from './resources/role';
 import vocabulary from './resources/vocabulary';
 import schemaType from './resources/schemaType';
 
-import contact from './resources/contact';
-import organization from './resources/organization';
-import artist from './resources/artist';
-import artistMember from './resources/artistMember';
-import emailDuplicate from './resources/emailDuplicate';
-
-import song from './resources/song';
-import songSplitCheck from './resources/songSplitCheck';
-import songUnregistered from './resources/songUnregistered';
-
 export default function App() {
   return (
     <Admin dataProvider={dataProvider} authProvider={authProvider}>
       <Resource name="song" {...song} />
+      <Resource name="recording" {...recording} />
       <Resource name="contact" {...contact} />
       <Resource name="organization" {...organization} />
       <Resource name="artist" {...artist} />

@@ -33,7 +33,7 @@ const ContactForm = () => (
     <TabbedForm.Tab label="Details">
       <TextInput source="first_name" />
       <TextInput source="last_name" />
-      <ReferenceInput source="pro_code" reference="pro" perPage={25}
+      <ReferenceInput source="pro_code" reference="pro" perPage={500}
                       sort={{ field: 'code', order: 'ASC' }}>
         <AutocompleteInput
           label="PRO"
@@ -72,11 +72,12 @@ const ContactForm = () => (
     <TabbedForm.Tab label="Companies">
       <ArrayInput source="organizations" label={false}>
         <SimpleFormIterator inline>
-          <ReferenceInput source="organization_id" reference="organization" perPage={25}
+          <ReferenceInput source="organization_id" reference="organization" perPage={200}
                           sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteInput optionText="name" label="Company"
                                filterToQuery={byName}
-                               create={<QuickCreateName resource="organization" />} />
+                               create={<QuickCreateName resource="organization" />}
+                               createLabel="Type to search or add a company" />
           </ReferenceInput>
           <TextInput source="title" label="Title" />
           <BooleanInput source="is_primary" label="Primary" />

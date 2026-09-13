@@ -29,7 +29,7 @@ const OrgList = () => (
 const OrgForm = () => (
   <SimpleForm toolbar={<EditToolbar />}>
     <TextInput source="name" required />
-    <ReferenceInput source="pro_code" reference="pro" perPage={25}
+    <ReferenceInput source="pro_code" reference="pro" perPage={500}
                     sort={{ field: 'code', order: 'ASC' }}>
       <AutocompleteInput
         label="PRO"
@@ -40,7 +40,7 @@ const OrgForm = () => (
     </ReferenceInput>
     <TextInput source="member_ipi" label="IPI name number" />
     <TextInput source="isni" label="ISNI" />
-    <ReferenceInput source="country" reference="country" perPage={25}
+    <ReferenceInput source="country" reference="country" perPage={500}
                     sort={{ field: 'name', order: 'ASC' }}>
       <AutocompleteInput optionText="name" filterToQuery={byName} />
     </ReferenceInput>
