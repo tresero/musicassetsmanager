@@ -105,6 +105,16 @@ const SongForm = () => (
                           sort={{ field: 'name', order: 'ASC' }}>
             <SelectInput optionText="name" label="Role" />
           </ReferenceInput>
+          <ReferenceInput source="pro_code" reference="pro" perPage={25}
+                          sort={{ field: 'code', order: 'ASC' }}>
+            <AutocompleteInput
+              label="PRO"
+              optionText={proOptionText}
+              inputText={proInputText}
+              filterToQuery={byCode}
+              helperText="Blank fills from the writer's contact record"
+            />
+          </ReferenceInput>
           <NumberInput source="share" label="Share %" step={0.0001} />
           <BooleanInput source="controlled" label="Controlled"
                         helperText="You can license this share" />
