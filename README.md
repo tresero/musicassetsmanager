@@ -64,6 +64,110 @@ There's no hosted version and no plan for one.
 
 ---
 
+# Storage
+
+Files live outside the database. The database stores where a file is, not the
+file itself.
+
+Two kinds of file, and they have different requirements:
+
+**Documents.** Split sheets, contracts, W-9s, registration confirmations. Small,
+read rarely, never streamed.
+
+**Audio.** Masters, stems, mixes, reference MP3s. Large, streamed to a browser,
+sometimes multi-gigabyte on upload.
+
+## What works
+
+| Backend | Documents | Audio | Notes |
+|---|---|---|---|
+| Local disk | Yes | Yes | Simplest. One server, one filesystem. |
+| S3-compatible | Yes | Yes | Presigned uploads and downloads. |
+| WebDAV | Yes | Poor | No presigned URLs, so everything proxies through the app. |
+| SFTP | Yes | No | Same problem, worse latency. |
+
+S3-compatible covers more than AWS. Hetzner Object Storage, Backblaze B2,
+Cloudflare R2, Wasabi, DigitalOcean Spaces, MinIO, Ceph RGW all speak the same
+API. Set the endpoint and it works.
+
+Hetzner Storage Box is **not** S3. It speaks SFTP, WebDAV, and rsync. Fine for
+documents, wrong for audio, because without presigned URLs every byte of every
+master has to pass through your server twice.
+
+## Why presigned URLs matter
+
+A multi-gigabyte master uploaded through the application is transferred twice:
+browser to server, server to storage. It ties up a worker for the duration and
+burns bandwidth you're paying for on both legs.
+
+With a presigned PUT the browser talks directly to the bucket. The application
+issues a signed URL, the transfer happens without touching your server, and the
+client reports back when it's done.
+
+The same applies in reverse for downloads of original files.
+
+## Streaming is different
+
+Playback can't use presigned URLs.
+
+A presigned URL is unforgeable but freely shareable. Once it's issued, anyone
+with the string can fetch the file until it expires, and you have no idea who.
+For a tracked share link that defeats the point.
+
+So streaming proxies through the application: validate the share token, check
+expiry, log the play, then serve the bytes with Range support. The file being
+streamed is a transcoded MP3 rather than the master, so the volume is
+manageable.
+
+Original-file downloads can still use presigned URLs, logged at the moment the
+URL is issued.
+
+## Self-hosting
+
+Local disk is the default and the simplest thing that works. Point `base_path`
+at a directory, make sure it's backed up, done.
+
+Move to S3-compatible storage when the catalog outgrows the server's disk, or
+when you want uploads to stop competing with everything else for bandwidth.
+Hetzner Object Storage and Backblaze B2 are the cheap options; Cloudflare R2
+has no egress fees, which matters if audio gets served publicly.
+
+Everything else on this list works, with the caveats in the table.
+
+## Multi-tenant
+
+Storage is configured per account, not globally. One row in
+`music.account_storage` per account: the backend kind, the endpoint, the bucket,
+the path prefix.
+
+That means a hosted deployment doesn't have to hold anyone's masters. A client
+points the install at their own bucket, keeps their own credentials, and pays
+their own storage bill. The database records where their files are; the files
+stay theirs.
+
+An operator who does want to host files can run one bucket with a per-account
+key prefix, and the same config table handles it.
+
+Credentials are not stored in the database. They live in the upload service's
+config, keyed by account id, so a database dump doesn't hand over anyone's
+bucket.
+
+## The upload service
+
+PostgREST can't accept a multipart upload, so this is a separate small service.
+It:
+
+- validates the JWT and reads the account's storage config
+- issues presigned PUT URLs, or accepts a direct upload for backends that can't
+  presign
+- queues transcoding for audio
+- proxies authenticated streams and logs playback events
+
+Self-hosters who only want to reference files by URI can skip it entirely. The
+schema works without it; you paste in a path and nothing uploads.
+
+---
+
 ## Documentation
 
 | | |

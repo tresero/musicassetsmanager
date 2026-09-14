@@ -4,6 +4,7 @@ import {
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
+import { DocumentsInput } from './documentsTab';
 
 const filters = [<SearchInput source="name@ilike" alwaysOn />];
 
@@ -44,6 +45,7 @@ const OrgForm = () => (
                     sort={{ field: 'name', order: 'ASC' }}>
       <AutocompleteInput optionText="name" filterToQuery={byName} />
     </ReferenceInput>
+    <DocumentsInput />
     <RichTextInput source="notes" />
   </SimpleForm>
 );
@@ -52,7 +54,7 @@ const strip = ({ created_at, updated_at, account_id, ...rest }) => rest;
 
 export default {
   list: OrgList,
-  edit: () => <Edit transform={strip}><OrgForm /></Edit>,
+  edit: () => <Edit transform={strip} mutationMode="pessimistic"><OrgForm /></Edit>,
   create: () => <Create transform={strip}><OrgForm /></Create>,
   recordRepresentation: 'name',
 };

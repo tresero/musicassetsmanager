@@ -22,6 +22,7 @@ export default postgrestRestProvider({
     ['email_duplicate', ['email']],
         ['contact_organization', ['contact_id', 'organization_id']],
     ['artist_member', ['artist_id', 'contact_id']],
+    ['account_storage', ['account_id']],
   ]),
   schema: defaultSchema,
 });

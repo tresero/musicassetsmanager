@@ -84,6 +84,10 @@ const ContactForm = () => (
         </SimpleFormIterator>
       </ArrayInput>
     </TabbedForm.Tab>
+    <TabbedForm.Tab label="Documents">
+      <DocumentsInput label="Attached documents" />
+    </TabbedForm.Tab>
+
   </TabbedForm>
 );
 

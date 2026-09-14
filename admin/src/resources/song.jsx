@@ -8,6 +8,7 @@ import {
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
+import { DocumentsInput } from './documentsTab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -204,6 +205,9 @@ const SongForm = () => (
 
     <TabbedForm.Tab label="Notes">
       <RichTextInput source="notes" />
+    </TabbedForm.Tab>
+    <TabbedForm.Tab label="Documents">
+      <DocumentsInput label="Attached documents" />
     </TabbedForm.Tab>
   </TabbedForm>
 );

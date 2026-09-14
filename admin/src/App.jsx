@@ -8,9 +8,11 @@ import contact from './resources/contact';
 import organization from './resources/organization';
 import artist from './resources/artist';
 import artistMember from './resources/artistMember';
+import document from './resources/document';
 
 import songSplitCheck from './resources/songSplitCheck';
 import songUnregistered from './resources/songUnregistered';
+import documentExpiring from './resources/documentExpiring';
 import emailDuplicate from './resources/emailDuplicate';
 
 import country from './resources/country';
@@ -22,16 +24,19 @@ import instrument from './resources/instrument';
 import genre from './resources/genre';
 import language from './resources/language';
 import assetStatus from './resources/assetStatus';
+import documentType from './resources/documentType';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
 import vocabulary from './resources/vocabulary';
 import schemaType from './resources/schemaType';
+import accountStorage from './resources/accountStorage';
 
 export default function App() {
   return (
     <Admin dataProvider={dataProvider} authProvider={authProvider}>
       <Resource name="song" {...song} />
       <Resource name="recording" {...recording} />
+      <Resource name="document" {...document} />
       <Resource name="contact" {...contact} />
       <Resource name="organization" {...organization} />
       <Resource name="artist" {...artist} />
@@ -39,6 +44,7 @@ export default function App() {
 
       <Resource name="song_split_check" {...songSplitCheck} />
       <Resource name="song_unregistered" {...songUnregistered} />
+      <Resource name="document_expiring" {...documentExpiring} />
       <Resource name="email_duplicate" {...emailDuplicate} />
 
       <Resource name="country" {...country} />
@@ -50,10 +56,12 @@ export default function App() {
       <Resource name="genre" {...genre} />
       <Resource name="language" {...language} />
       <Resource name="asset_status" {...assetStatus} />
+      <Resource name="document_type" {...documentType} />
       <Resource name="role_group" {...roleGroup} />
       <Resource name="role" {...role} />
       <Resource name="vocabulary" {...vocabulary} />
       <Resource name="schema_type" {...schemaType} />
+      <Resource name="account_storage" {...accountStorage} />
     </Admin>
   );
 }
