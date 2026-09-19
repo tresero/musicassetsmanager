@@ -1,6 +1,9 @@
-import { Admin, Resource } from 'react-admin';
+import { Admin, Resource, defaultTheme } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
+
+import './forms.css';
+import { i18nProvider } from './i18n';
 
 import song from './resources/song';
 import recording from './resources/recording';
@@ -32,9 +35,19 @@ import schemaType from './resources/schemaType';
 import accountStorage from './resources/accountStorage';
 import documentOrphan from './resources/documentOrphan';
 
+const theme = {
+  ...defaultTheme,
+  components: {
+    ...defaultTheme.components,
+    MuiTextField:   { defaultProps: { size: 'small', variant: 'outlined' } },
+    MuiFormControl: { defaultProps: { size: 'small' } },
+  },
+};
+
 export default function App() {
   return (
-    <Admin dataProvider={dataProvider} authProvider={authProvider}>
+        <Admin dataProvider={dataProvider} authProvider={authProvider}
+           theme={theme} i18nProvider={i18nProvider}>
       <Resource name="song" {...song} />
       <Resource name="recording" {...recording} />
       <Resource name="document" {...document} />

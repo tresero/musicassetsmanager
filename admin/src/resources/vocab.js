@@ -13,7 +13,6 @@ export const tempos = list(
 );
 
 export const derivationTypes = [
-  { id: 'cover',       name: 'Cover' },
   { id: 'arrangement', name: 'Arrangement' },
   { id: 'translation', name: 'Translation' },
   { id: 'adaptation',  name: 'Adaptation' },
@@ -28,9 +27,18 @@ export const titleTypes = [
   { id: 'part',       name: 'Part' },
 ];
 
+export const storageKinds = [
+  { id: 'local', name: 'Local file' },
+  { id: 's3',    name: 'S3 / object storage' },
+  { id: 'url',   name: 'URL' },
+];
+
 export const freeText = (v) => ({ id: v, name: v });
 
 export const byName     = (q) => ({ 'name@ilike': `*${q}*` });
 export const bySortName = (q) => ({ 'sort_name@ilike': `*${q}*` });
 export const byTitle    = (q) => ({ 'title@ilike': `*${q}*` });
 export const byCode     = (q) => ({ 'code@ilike': `*${q}*` });
+
+export const proOptionText = (r) => (r ? `${r.code} — ${r.name}` : '');
+export const proInputText  = (r) => (r ? r.code : '');
