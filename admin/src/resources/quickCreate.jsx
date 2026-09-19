@@ -1,57 +1,75 @@
 import { useState } from 'react';
-import { useCreate, useCreateSuggestionContext } from 'react-admin';
+import { useCreate, useCreateSuggestionContext, useNotify } from 'react-admin';
 import {
   Dialog, DialogActions, DialogContent, DialogTitle,
   Button, TextField, Stack,
 } from '@mui/material';
 
-/* one-field create: genre, mood, instrument, organization, document_type */
+/*
+ * Quick-create dialogs for the autocomplete inputs.
+ *
+ * Each sends the minimum the record needs. Everything else comes from
+ * column defaults and the INSTEAD OF triggers, so a change to a view's
+ * column set cannot break these.
+ */
+
+const useQuickCreate = (resource) => {
+  const [create] = useCreate();
+  const notify = useNotify();
+
+  return (data, onCreate) =>
+    create(resource, { data }, {
+      onSuccess: (created) => onCreate(created),
+      onError: (err) => {
+        console.error(`${resource} create failed`, err);
+        notify(err?.message || `Could not create the ${resource}`,
+               { type: 'error' });
+      },
+    });
+};
+
+/* one field: genre, mood, instrument, organization, document_type */
 export const QuickCreateName = ({ resource }) => {
   const { filter, onCancel, onCreate } = useCreateSuggestionContext();
   const [value, setValue] = useState(filter || '');
-  const [create] = useCreate();
+  const save = useQuickCreate(resource);
 
   const submit = (e) => {
     e.preventDefault();
-    create(resource, { data: { name: value } }, {
-      onSuccess: (data) => { setValue(''); onCreate(data); },
-    });
+    save({ name: value.trim() }, (created) => { setValue(''); onCreate(created); });
   };
 
   return (
     <Dialog open onClose={onCancel}>
       <form onSubmit={submit}>
-        <DialogTitle>New {resource.replace('_', ' ')}</DialogTitle>
+        <DialogTitle>New {resource.replace(/_/g, ' ')}</DialogTitle>
         <DialogContent>
-          <TextField autoFocus label="Name" value={value}
-                     onChange={(e) => setValue(e.target.value)} fullWidth />
+          <TextField autoFocus label="Name" value={value} fullWidth
+                     onChange={(e) => setValue(e.target.value)} />
         </DialogContent>
         <DialogActions>
           <Button onClick={onCancel}>Cancel</Button>
-          <Button type="submit">Save</Button>
+          <Button type="submit" disabled={!value.trim()}>Save</Button>
         </DialogActions>
       </form>
     </Dialog>
   );
 };
 
-/* two-field create: contact */
+/* two fields: a person */
 export const QuickCreateContact = () => {
   const { filter, onCancel, onCreate } = useCreateSuggestionContext();
   const parts = (filter || '').trim().split(/\s+/);
   const [first, setFirst] = useState(parts[0] || '');
   const [last, setLast] = useState(parts.slice(1).join(' '));
-  const [create] = useCreate();
+  const save = useQuickCreate('contact');
 
   const submit = (e) => {
     e.preventDefault();
-    create('contact', {
-      data: {
-        first_name: first || null,
-        last_name: last || null,
-        emails: [], phones: [], organizations: [], document_ids: [],
-      },
-    }, { onSuccess: (data) => onCreate(data) });
+    save({
+      first_name: first.trim() || null,
+      last_name: last.trim() || null,
+    }, onCreate);
   };
 
   return (
@@ -68,31 +86,29 @@ export const QuickCreateContact = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={onCancel}>Cancel</Button>
-          <Button type="submit">Save</Button>
+          <Button type="submit" disabled={!first.trim() && !last.trim()}>
+            Save
+          </Button>
         </DialogActions>
       </form>
     </Dialog>
   );
 };
 
-/* document: needs a title and a location */
+/* a document needs a title and somewhere it lives */
 export const QuickCreateDocument = () => {
   const { filter, onCancel, onCreate } = useCreateSuggestionContext();
   const [title, setTitle] = useState(filter || '');
   const [uri, setUri] = useState('');
-  const [create] = useCreate();
+  const save = useQuickCreate('document');
 
   const submit = (e) => {
     e.preventDefault();
-    create('document', {
-      data: {
-        title,
-        storage_kind: 'url',
-        storage_uri: uri,
-        song_ids: [], recording_ids: [],
-        contact_ids: [], organization_ids: [],
-      },
-    }, { onSuccess: (data) => onCreate(data) });
+    save({
+      title: title.trim(),
+      storage_kind: 'url',
+      storage_uri: uri.trim(),
+    }, onCreate);
   };
 
   return (
@@ -110,7 +126,9 @@ export const QuickCreateDocument = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={onCancel}>Cancel</Button>
-          <Button type="submit" disabled={!title || !uri}>Save</Button>
+          <Button type="submit" disabled={!title.trim() || !uri.trim()}>
+            Save
+          </Button>
         </DialogActions>
       </form>
     </Dialog>

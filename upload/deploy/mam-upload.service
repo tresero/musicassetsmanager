@@ -1,0 +1,23 @@
+[Unit]
+Description=Music Assets Manager upload service
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+ExecStart=/usr/local/bin/mam-upload
+Restart=always
+RestartSec=5
+User=mamupload
+EnvironmentFile=/etc/mam-upload.env
+
+# the local backend writes here; harmless when using s3
+StateDirectory=mam
+ReadWritePaths=/var/lib/mam/files
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

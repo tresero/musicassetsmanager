@@ -9,12 +9,11 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
+import {
+  versionLabels, tempos, freeText, byName, bySortName, byTitle,
+} from './vocab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
-
-const byName     = (q) => ({ 'name@ilike': `*${q}*` });
-const bySortName = (q) => ({ 'sort_name@ilike': `*${q}*` });
-const byTitle    = (q) => ({ 'title@ilike': `*${q}*` });
 
 const storageKinds = [
   { id: 'local', name: 'Local file' },
@@ -31,6 +30,7 @@ const RecordingList = () => (
       <TextField source="duration_display" label="Length" emptyText="—" />
       <NumberField source="bpm" label="BPM" emptyText="—" />
       <BooleanField source="is_instrumental" label="Instr." />
+      <BooleanField source="is_cover" label="Cover" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
     </Datagrid>
@@ -41,18 +41,25 @@ const RecordingForm = () => (
   <TabbedForm toolbar={<EditToolbar />}>
     <TabbedForm.Tab label="Details">
       <TextInput source="title" required fullWidth />
-      <TextInput source="version_label" label="Version"
-                 helperText="Radio edit, instrumental, Atmos mix" />
+      <AutocompleteInput source="version_label" label="Version"
+                         choices={versionLabels}
+                         onCreate={freeText}
+                         helperText="Release is the commercial version" />
       <TextInput source="isrc" label="ISRC"
                  helperText="Two-letter country, three-character registrant, seven digits" />
       <NumberInput source="duration_ms" label="Duration (ms)" />
       <NumberInput source="bpm" label="BPM" step={0.01} />
-      <TextInput source="tempo" label="Tempo" helperText="Andante, mid-tempo, etc." />
+      <AutocompleteInput source="tempo" label="Tempo"
+                         choices={tempos}
+                         onCreate={freeText}
+                         helperText="How it feels, not the BPM" />
       <ReferenceInput source="key_signature" reference="key_signature" perPage={50}
                       sort={{ field: 'accidentals', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Key" filterToQuery={byName} />
       </ReferenceInput>
       <BooleanInput source="is_instrumental" label="Instrumental" />
+      <BooleanInput source="is_cover" label="Cover"
+                    helperText="A recording of someone else's composition" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
         <SelectInput optionText="name" label="Status" />
@@ -156,7 +163,7 @@ const RecordingForm = () => (
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Country recorded"
                            filterToQuery={byName}
-                           helperText="Determines neighbouring rights eligibility" />
+                           helperText="Determines neighboring rights eligibility" />
       </ReferenceInput>
       <TextInput source="studio" label="Studio" fullWidth />
       <NumberInput source="p_line_year" label="℗ year" />
@@ -170,8 +177,9 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Notes">
       <RichTextInput source="notes" />
     </TabbedForm.Tab>
+
     <TabbedForm.Tab label="Documents">
-      <DocumentsInput label="Attached documents" />
+      <DocumentsInput />
     </TabbedForm.Tab>
   </TabbedForm>
 );

@@ -30,6 +30,7 @@ import role from './resources/role';
 import vocabulary from './resources/vocabulary';
 import schemaType from './resources/schemaType';
 import accountStorage from './resources/accountStorage';
+import documentOrphan from './resources/documentOrphan';
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
       <Resource name="vocabulary" {...vocabulary} />
       <Resource name="schema_type" {...schemaType} />
       <Resource name="account_storage" {...accountStorage} />
+      <Resource name="document_orphan" {...documentOrphan} />
     </Admin>
   );
 }

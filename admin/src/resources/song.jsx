@@ -1,5 +1,5 @@
 import {
-  List, Datagrid, TextField, NumberField, BooleanField, ReferenceField,
+  List, Datagrid, TextField, NumberField, ReferenceField,
   SearchInput, Edit, Create, TabbedForm, TextInput, NumberInput,
   BooleanInput, DateInput, SelectInput, ArrayInput, SimpleFormIterator,
   ReferenceInput, AutocompleteInput, ReferenceArrayInput,
@@ -9,39 +9,20 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
+import {
+  derivationTypes, titleTypes, byName, bySortName, byTitle, byCode,
+} from './vocab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
-const byName     = (q) => ({ 'name@ilike': `*${q}*` });
-const bySortName = (q) => ({ 'sort_name@ilike': `*${q}*` });
-const byTitle    = (q) => ({ 'title@ilike': `*${q}*` });
-const byCode     = (q) => ({ 'code@ilike': `*${q}*` });
-
 const proOptionText = (r) => (r ? `${r.code} — ${r.name}` : '');
 const proInputText  = (r) => (r ? r.code : '');
-
-const derivationTypes = [
-  { id: 'cover',       name: 'Cover' },
-  { id: 'arrangement', name: 'Arrangement' },
-  { id: 'translation', name: 'Translation' },
-  { id: 'adaptation',  name: 'Adaptation' },
-  { id: 'sample',      name: 'Sample' },
-];
-
-const titleTypes = [
-  { id: 'alternate',  name: 'Alternate' },
-  { id: 'translated', name: 'Translated' },
-  { id: 'working',    name: 'Working' },
-  { id: 'formal',     name: 'Formal' },
-  { id: 'part',       name: 'Part' },
-];
 
 const SongList = () => (
   <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
     <Datagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="iswc" label="ISWC" emptyText="—" />
-      <BooleanField source="is_cover" label="Cover" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
       <ReferenceField source="language_code" reference="language"
@@ -71,7 +52,6 @@ const SongForm = () => (
         <AutocompleteInput optionText="name" label="Key"
                            filterToQuery={byName} />
       </ReferenceInput>
-      <BooleanInput source="is_cover" label="Cover version" />
       <BooleanInput source="exclusive_p" label="Exclusive" />
       <BooleanInput source="one_stop_p" label="One stop"
                     helperText="All shares controlled, licensable without third-party clearance" />
@@ -193,7 +173,8 @@ const SongForm = () => (
       <ReferenceInput source="derived_from_id" reference="song" perPage={500}
                       sort={{ field: 'title', order: 'ASC' }}>
         <AutocompleteInput optionText="title" label="Derived from"
-                           filterToQuery={byTitle} />
+                           filterToQuery={byTitle}
+                           helperText="Only for a new work built on another: an arrangement, translation, or sample. A cover is a recording, not a new composition." />
       </ReferenceInput>
       <SelectInput source="derivation_type" choices={derivationTypes}
                    label="Derivation type" />
@@ -206,8 +187,9 @@ const SongForm = () => (
     <TabbedForm.Tab label="Notes">
       <RichTextInput source="notes" />
     </TabbedForm.Tab>
+
     <TabbedForm.Tab label="Documents">
-      <DocumentsInput label="Attached documents" />
+      <DocumentsInput />
     </TabbedForm.Tab>
   </TabbedForm>
 );
