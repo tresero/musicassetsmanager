@@ -1,10 +1,25 @@
 # Future features
 
-Ideas and planned work. Anything actually scheduled lives in
-[roadmap.md](roadmap.md); this is the longer list, including things that may
-never get built.
+This file is the roadmap.
 
 Ordered roughly by value against effort.
+
+---
+
+## Built since the last revision
+
+**Recordings**, with credits carrying roles and instruments per party, audio
+file references, session detail, and neighboring rights fields.
+
+**Documents**, stored as references rather than bytes, attachable from either
+direction, with expiry and orphan reports.
+
+**The upload service.** A small Go binary that issues presigned PUT URLs for
+S3-compatible storage or proxies the body for local disk. Drag and drop in the
+form, progress bar, and a presigned GET for opening files back.
+
+**Per-account storage configuration**, so a hosted deployment does not have to
+hold anyone's files.
 
 ---
 
@@ -29,16 +44,6 @@ optional stem access.
 Events logged per link: opened, played, played to completion, downloaded track,
 downloaded all.
 
-### Upload service
-
-The one piece PostgREST cannot do. Validates the JWT, reads the account's
-storage config, issues presigned PUT URLs for S3-compatible backends or accepts
-a direct upload for the rest.
-
-Written in Go. Single binary, no runtime to install.
-
-Self-hosters who only want to reference files by URI can skip it entirely.
-
 ### Pitch tracking
 
 Opportunities, briefs, submissions, status, history. Which tracks went where,
@@ -56,6 +61,12 @@ a presigned URL is shareable and would defeat the tracking. Range requests
 supported so scrubbing works.
 
 The largest single piece of work on this list.
+
+### Role-based access
+
+Postgres roles are already how PostgREST switches identity per request, so this
+is grants and JWT claims rather than schema. An editor can maintain the catalog
+without reaching storage settings or deleting works.
 
 ---
 
@@ -139,10 +150,10 @@ Same reasoning. The model supports it; generating the XML is its own project.
 
 ### Similarity search
 
-Audio embeddings and nearest-neighbour search over the catalog. pgvector makes
+Audio embeddings and nearest-neighbor search over the catalog. pgvector makes
 the storage side straightforward; the embedding model is the question.
 
-### Inbox / submissions
+### Inbox and submissions
 
 Receive files from collaborators or from a brief, with metadata, into a holding
 area. The reverse of sharing.
@@ -162,6 +173,12 @@ an escape hatch for anyone leaving.
 
 Speech to text on the master, populating the lyric table. Cheap once audio is
 reachable and an AI provider is configured.
+
+### User manual
+
+The docs here explain the model. A separate manual would explain the workflow:
+how to enter a session, when a cover is a cover, what controlled means in
+practice, how to run a registration gap report before a quarterly filing.
 
 ---
 

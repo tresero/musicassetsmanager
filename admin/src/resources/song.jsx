@@ -170,14 +170,18 @@ const SongForm = () => (
       <TextInput source="copyright_number" label="Copyright number" />
       <DateInput source="reversion_date" label="Reversion date" />
       <NumberInput source="reversion_lead" label="Reversion lead (years)" />
+
+      <TextInput source="based_on" label="Based on" fullWidth
+                 helperText="A source not in this catalog, e.g. America the Beautiful (Bates/Ward, PD). Leave blank for a cover: the song row is the original." />
       <ReferenceInput source="derived_from_id" reference="song" perPage={500}
                       sort={{ field: 'title', order: 'ASC' }}>
         <AutocompleteInput optionText="title" label="Derived from"
                            filterToQuery={byTitle}
-                           helperText="Only for a new work built on another: an arrangement, translation, or sample. A cover is a recording, not a new composition." />
+                           helperText="Only when the source is a row in this catalog" />
       </ReferenceInput>
       <SelectInput source="derivation_type" choices={derivationTypes}
-                   label="Derivation type" />
+                   label="Derivation type"
+                   helperText="Only when new authorship exists. A cover is a recording, not a new composition." />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Lyrics">
