@@ -2,7 +2,6 @@ import { Admin, Resource, defaultTheme } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 
-import './forms.css';
 import { i18nProvider } from './i18n';
 
 import song from './resources/song';

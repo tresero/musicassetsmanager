@@ -40,14 +40,10 @@ export const ForWriterInput = () => {
       value={value}
       onChange={(e) =>
         setValue(path('for_writer_id'),
-                 e.target.value === '' ? null : Number(e.target.value),
-                 { shouldDirty: true })}
+          e.target.value === '' ? null : Number(e.target.value),
+          { shouldDirty: true })}
       sx={{ minWidth: 220 }}
-      helperText={
-        saved.length === 0
-          ? 'Save the writers first'
-          : 'Whose share this publisher administers'
-      }
+      helperText={saved.length === 0 ? 'Save the writers first' : false}
     >
       <MenuItem value="">
         <em>Not specified</em>

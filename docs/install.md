@@ -15,6 +15,18 @@ psql -d music_assets -f db/roles.sql
 psql -d music_assets -f db/schema.sql
 psql -d music_assets -f db/seed/reference.sql
 ```
+## Extensions
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+```
+
+`pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
+login function. `unaccent` is used when matching titles against society
+exports, where the same work appears as both "Que Pena" and "Qué Pena".
+
+Both ship with PostgreSQL and nomrally don't need a separate install.
 
 `roles.sql` creates `authenticator`, `app_user`, and `web_anon`. Set a real
 password on `authenticator` before going further:

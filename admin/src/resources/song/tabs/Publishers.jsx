@@ -16,18 +16,21 @@ const PublishersFields = () => (
                            filterToQuery={byName}
                            create={<QuickCreateName resource="organization" />}
                            createLabel="Type to search or add a company"
-                           sx={{ width: 240 }} />
+                           helperText={false}
+                           sx={{ width: 260 }} />
       </ReferenceInput>
       <PublisherProField />
       <ReferenceInput source="role_id" reference="role" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <SelectInput optionText="name" label="Role" sx={{ width: 150 }} />
+        <SelectInput optionText="name" label="Role" helperText={false}
+                     sx={{ width: 150 }} />
       </ReferenceInput>
       <ForWriterInput />
       <NumberInput source="share" label="Share %" step={0.0001}
-                   sx={{ width: 110 }} />
-      <BooleanInput source="controlled" label="Controlled" />
-      <TextInput source="notes" label="Note" sx={{ width: 200 }} />
+                   helperText={false} sx={{ width: 110 }} />
+      <BooleanInput source="controlled" label="Controlled" helperText={false} />
+      <TextInput source="notes" label="Note" helperText={false}
+                 sx={{ width: 220 }} />
     </SimpleFormIterator>
   </ArrayInput>
 );

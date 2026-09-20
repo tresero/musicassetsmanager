@@ -13,11 +13,15 @@ const RegistrationsFields = () => (
                            optionText={proOptionText}
                            inputText={proInputText}
                            filterToQuery={byCode}
-                           sx={{ width: 140 }} />
+                           helperText={false}
+                           sx={{ width: 160 }} />
       </ReferenceInput>
-      <TextInput source="work_number" label="Work number" sx={{ width: 160 }} />
-      <DateInput source="registered_on" label="Registered" />
-      <TextInput source="notes" label="Note" sx={{ width: 240 }} />
+      <TextInput source="work_number" label="Work number" helperText={false}
+                 sx={{ width: 170 }} />
+      <DateInput source="registered_on" label="Registered" helperText={false}
+                 sx={{ width: 170 }} />
+      <TextInput source="notes" label="Note" helperText={false}
+                 sx={{ width: 260 }} />
     </SimpleFormIterator>
   </ArrayInput>
 );
