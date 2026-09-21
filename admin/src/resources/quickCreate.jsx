@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useCreate, useCreateSuggestionContext, useNotify } from 'react-admin';
 import {
   Dialog, DialogActions, DialogContent, DialogTitle,
-  Button, TextField, Stack,
+  Button, TextField, Stack, MenuItem,
 } from '@mui/material';
 
 /*
@@ -89,6 +89,43 @@ export const QuickCreateContact = () => {
           <Button type="submit" disabled={!first.trim() && !last.trim()}>
             Save
           </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
+  );
+};
+
+/* an artist needs a name and whether it is one person or a group */
+export const QuickCreateArtist = () => {
+  const { filter, onCancel, onCreate } = useCreateSuggestionContext();
+  const [name, setName] = useState(filter || '');
+  const [kind, setKind] = useState('person');
+  const save = useQuickCreate('artist');
+
+  const submit = (e) => {
+    e.preventDefault();
+    save({ name: name.trim(), kind }, onCreate);
+  };
+
+  return (
+    <Dialog open onClose={onCancel}>
+      <form onSubmit={submit}>
+        <DialogTitle>New artist</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1, minWidth: 340 }}>
+            <TextField autoFocus label="Name" value={name}
+                       onChange={(e) => setName(e.target.value)}
+                       helperText="As it appears on the release" />
+            <TextField select label="Kind" value={kind}
+                       onChange={(e) => setKind(e.target.value)}>
+              <MenuItem value="person">Person</MenuItem>
+              <MenuItem value="group">Group</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="submit" disabled={!name.trim()}>Save</Button>
         </DialogActions>
       </form>
     </Dialog>

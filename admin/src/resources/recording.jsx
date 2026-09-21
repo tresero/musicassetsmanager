@@ -7,19 +7,37 @@ import {
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName, QuickCreateContact } from './quickCreate';
+import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
+import { DurationInput } from './DurationInput';
 import {
-  versionLabels, tempos, freeText, byName, bySortName, byTitle,
+  versionLabels, tempos, storageKinds, freeText,
+  byName, bySortName, byTitle,
 } from './vocab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
-const storageKinds = [
-  { id: 'local', name: 'Local file' },
-  { id: 's3',    name: 'S3 / object storage' },
-  { id: 'url',   name: 'URL' },
+const artistRoles = [
+  { id: 'main',     name: 'Main' },
+  { id: 'featured', name: 'Featured' },
 ];
+
+// Shared by every array on this form: no divider between rows, and
+// fields centered so a Select does not sit below an Autocomplete.
+const iteratorSx = {
+  '& .RaSimpleFormIterator-line': {
+    borderBottom: 'none',
+    paddingTop: 1,
+    paddingBottom: 1,
+  },
+  '& .RaSimpleFormIterator-form': {
+    alignItems: 'center',
+  },
+  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+};
 
 const RecordingList = () => (
   <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
@@ -40,45 +58,74 @@ const RecordingList = () => (
 const RecordingForm = () => (
   <TabbedForm toolbar={<EditToolbar />}>
     <TabbedForm.Tab label="Details">
-      <TextInput source="title" required fullWidth />
+      <TextInput source="title" fullWidth
+                 helperText="Leave blank to take the composition's title" />
       <AutocompleteInput source="version_label" label="Version"
                          choices={versionLabels}
                          onCreate={freeText}
-                         helperText="Release is the commercial version" />
+                         helperText="Release is the commercial version"
+                         sx={{ width: { xs: '100%', md: 240 } }} />
       <TextInput source="isrc" label="ISRC"
-                 helperText="Two-letter country, three-character registrant, seven digits" />
-      <NumberInput source="duration_ms" label="Duration (ms)" />
-      <NumberInput source="bpm" label="BPM" step={0.01} />
+                 helperText="Country, registrant, five digits"
+                 sx={{ width: { xs: '100%', md: 220 } }} />
+      <NumberInput source="bpm" label="BPM" step={0.01}
+                   sx={{ width: { xs: '100%', md: 130 } }} />
       <AutocompleteInput source="tempo" label="Tempo"
                          choices={tempos}
                          onCreate={freeText}
-                         helperText="How it feels, not the BPM" />
+                         helperText="How it feels, not the BPM"
+                         sx={{ width: { xs: '100%', md: 200 } }} />
       <ReferenceInput source="key_signature" reference="key_signature" perPage={50}
                       sort={{ field: 'accidentals', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Key" filterToQuery={byName} />
+        <AutocompleteInput optionText="name" label="Key" filterToQuery={byName}
+                           sx={{ width: { xs: '100%', md: 200 } }} />
       </ReferenceInput>
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <SelectInput optionText="name" label="Status" />
+        <SelectInput optionText="name" label="Status"
+                     sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
       <TextInput source="description" multiline fullWidth />
       <TextInput source="keywords" fullWidth />
       <TextInput source="sounds_like" label="Sounds like" fullWidth />
     </TabbedForm.Tab>
 
+    <TabbedForm.Tab label="Artists">
+      <ArrayInput source="artists" label={false}
+                  helperText="Who the record is by. Two main artists read as a duet.">
+        <SimpleFormIterator inline sx={iteratorSx}>
+          <ReferenceInput source="artist_id" reference="artist" perPage={200}
+                          sort={{ field: 'sort_name', order: 'ASC' }}>
+            <AutocompleteInput optionText="name" label="Artist"
+                               filterToQuery={byName}
+                               create={<QuickCreateArtist />}
+                               createLabel="Type to search or add an artist"
+                               helperText={false}
+                               sx={{ width: { xs: '100%', md: 300 } }} />
+          </ReferenceInput>
+          <SelectInput source="role" label="Billing" choices={artistRoles}
+                       defaultValue="main" helperText={false}
+                       sx={{ width: { xs: '100%', md: 160 } }} />
+          <NumberInput source="sequence" label="Order" defaultValue={1}
+                       helperText={false}
+                       sx={{ width: { xs: '100%', md: 100 } }} />
+        </SimpleFormIterator>
+      </ArrayInput>
+    </TabbedForm.Tab>
+
     <TabbedForm.Tab label="Songs">
       <ArrayInput source="songs" label={false}
                   helperText="More than one for a medley or mashup">
-        <SimpleFormIterator inline>
+        <SimpleFormIterator inline sx={iteratorSx}>
           <ReferenceInput source="song_id" reference="song" perPage={500}
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText="title" label="Composition"
-                               filterToQuery={byTitle} />
+                               filterToQuery={byTitle} helperText={false}
+                               sx={{ width: { xs: '100%', md: 380 } }} />
           </ReferenceInput>
-          <NumberInput source="sequence" label="Seq" sx={{ width: 90 }} />
         </SimpleFormIterator>
       </ArrayInput>
     </TabbedForm.Tab>
@@ -86,36 +133,52 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Credits">
       <ArrayInput source="credits" label={false}
                   helperText="One row per person. Add all their roles and instruments to that row.">
-        <SimpleFormIterator>
+        <SimpleFormIterator inline sx={iteratorSx}>
           <ReferenceInput source="contact_id" reference="contact" perPage={200}
                           sort={{ field: 'sort_name', order: 'ASC' }}>
             <AutocompleteInput optionText="sort_name" label="Person"
                                filterToQuery={bySortName}
                                create={<QuickCreateContact />}
-                               createLabel="Type to search or add a person" />
+                               createLabel="Type to search or add a person"
+                               helperText={false}
+                               sx={{ width: { xs: '100%', md: 240 } }} />
           </ReferenceInput>
           <ReferenceInput source="organization_id" reference="organization" perPage={200}
                           sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteInput optionText="name" label="or Company"
                                filterToQuery={byName}
                                create={<QuickCreateName resource="organization" />}
-                               createLabel="Type to search or add a company" />
+                               createLabel="Type to search or add a company"
+                               helperText={false}
+                               sx={{ width: { xs: '100%', md: 240 } }} />
           </ReferenceInput>
+          <TextInput source="credited_as" label="Credited as (this recording)"
+                     helperText={false}
+                     placeholder="Uses the person's default"
+                     sx={{ width: { xs: '100%', md: 220 } }} />
           <ReferenceArrayInput source="role_ids" reference="role" perPage={50}
                                sort={{ field: 'name', order: 'ASC' }}>
-            <AutocompleteArrayInput optionText="name" label="Roles" />
+            <AutocompleteArrayInput optionText="name" label="Roles"
+                                    helperText={false}
+                                    sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
           <ReferenceArrayInput source="instrument_ids" reference="instrument" perPage={300}
                                sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteArrayInput optionText="name" label="Instruments"
                                     filterToQuery={byName}
                                     create={<QuickCreateName resource="instrument" />}
-                                    createLabel="Type to search or add an instrument" />
+                                    createLabel="Type to search or add an instrument"
+                                    helperText={false}
+                                    sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
           <NumberInput source="share" label="Share %" step={0.0001}
-                       helperText="Blank for work for hire" />
-          <TextInput source="performance_details" label="Performance details" />
-          <TextInput source="notes" label="Note" multiline />
+                       helperText={false}
+                       sx={{ width: { xs: '100%', md: 110 } }} />
+          <TextInput source="performance_details" label="Performance details"
+                     helperText={false}
+                     sx={{ width: { xs: '100%', md: 240 } }} />
+          <TextInput source="notes" label="Note" helperText={false}
+                     sx={{ width: { xs: '100%', md: 220 } }} />
         </SimpleFormIterator>
       </ArrayInput>
     </TabbedForm.Tab>
@@ -137,41 +200,75 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Audio">
       <ArrayInput source="audio_files" label={false}>
-        <SimpleFormIterator>
-          <TextInput source="title" label="Label" />
+        <SimpleFormIterator inline sx={iteratorSx}>
+          <TextInput source="title" label="Label" helperText={false}
+                     sx={{ width: { xs: '100%', md: 200 } }} />
           <SelectInput source="storage_kind" choices={storageKinds}
-                       label="Storage" defaultValue="local" />
-          <TextInput source="storage_uri" label="URI" fullWidth />
-          <TextInput source="format" label="Format" helperText="WAV, FLAC, MP3" />
-          <BooleanInput source="is_lossless" label="Lossless" />
-          <NumberInput source="sample_rate" label="Sample rate (Hz)" />
-          <NumberInput source="bit_depth" label="Bit depth"
-                       helperText="Lossless only" />
-          <NumberInput source="bit_rate_kbps" label="Bit rate (kbps)"
-                       helperText="Lossy only" />
-          <NumberInput source="channels" label="Channels" />
-          <NumberInput source="duration_ms" label="Duration (ms)" />
-          <BooleanInput source="is_preview" label="Preview" />
-          <TextInput source="notes" label="Note" multiline />
+                       label="Storage" defaultValue="local" helperText={false}
+                       sx={{ width: { xs: '100%', md: 200 } }} />
+          <TextInput source="storage_uri" label="URI" helperText={false}
+                     sx={{ width: { xs: '100%', md: 360 } }} />
+          <TextInput source="format" label="Format" helperText={false}
+                     sx={{ width: { xs: '100%', md: 120 } }} />
+          <BooleanInput source="is_lossless" label="Lossless" helperText={false} />
+          <NumberInput source="sample_rate" label="Sample rate" helperText={false}
+                       sx={{ width: { xs: '100%', md: 150 } }} />
+          <NumberInput source="bit_depth" label="Bit depth" helperText={false}
+                       sx={{ width: { xs: '100%', md: 130 } }} />
+          <NumberInput source="bit_rate_kbps" label="Bit rate" helperText={false}
+                       sx={{ width: { xs: '100%', md: 130 } }} />
+          <NumberInput source="channels" label="Channels" helperText={false}
+                       sx={{ width: { xs: '100%', md: 120 } }} />
+          <DurationInput scoped label="Duration"
+                         sx={{ width: { xs: '100%', md: 130 } }} />
+          <BooleanInput source="is_preview" label="Preview" helperText={false} />
+          <TextInput source="notes" label="Note" helperText={false}
+                     sx={{ width: { xs: '100%', md: 220 } }} />
         </SimpleFormIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 
-    <TabbedForm.Tab label="Session">
-      <DateInput source="recorded_on" label="Recorded" />
+    <TabbedForm.Tab label="Master">
+      <DateInput source="recorded_on" label="Recorded"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
       <ReferenceInput source="recorded_country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Country recorded"
+        <AutocompleteInput optionText="name" label="Country of first fixation"
                            filterToQuery={byName}
-                           helperText="Determines neighboring rights eligibility" />
+                           helperText="Where the master was first recorded. Decides neighboring rights eligibility in many territories."
+                           sx={{ width: { xs: '100%', md: 340 } }} />
       </ReferenceInput>
-      <TextInput source="studio" label="Studio" fullWidth />
-      <NumberInput source="p_line_year" label="℗ year" />
-      <ReferenceInput source="p_line_owner_id" reference="organization" perPage={200}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="℗ owner"
-                           filterToQuery={byName} />
-      </ReferenceInput>
+      <NumberInput source="p_line_year" label="℗ year"
+                   sx={{ width: { xs: '100%', md: 150 } }} />
+
+      <ArrayInput source="owners" label="Master owners"
+                  helperText="Who owns the master, and in what share. The printed P line is built from these.">
+        <SimpleFormIterator inline sx={iteratorSx}>
+          <ReferenceInput source="contact_id" reference="contact" perPage={200}
+                          sort={{ field: 'sort_name', order: 'ASC' }}>
+            <AutocompleteInput optionText="sort_name" label="Person"
+                               filterToQuery={bySortName}
+                               create={<QuickCreateContact />}
+                               createLabel="Type to search or add a person"
+                               helperText={false}
+                               sx={{ width: { xs: '100%', md: 260 } }} />
+          </ReferenceInput>
+          <ReferenceInput source="organization_id" reference="organization" perPage={200}
+                          sort={{ field: 'name', order: 'ASC' }}>
+            <AutocompleteInput optionText="name" label="or Company"
+                               filterToQuery={byName}
+                               create={<QuickCreateName resource="organization" />}
+                               createLabel="Type to search or add a company"
+                               helperText={false}
+                               sx={{ width: { xs: '100%', md: 260 } }} />
+          </ReferenceInput>
+          <NumberInput source="share" label="Share %" step={0.0001}
+                       helperText={false}
+                       sx={{ width: { xs: '100%', md: 110 } }} />
+        </SimpleFormIterator>
+      </ArrayInput>
+
+      <TextField source="p_line" label="P line" emptyText="Add an owner to build the P line" />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Notes">
@@ -184,7 +281,8 @@ const RecordingForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ duration_display, created_at, updated_at, ...rest }) => rest;
+const strip = ({ duration_display, owner_total, p_line,
+                 created_at, updated_at, ...rest }) => rest;
 
 export default {
   list: RecordingList,
