@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useInput } from 'react-admin';
 import { TextField } from '@mui/material';
-import { useSourceContext } from 'ra-core';
 
 const toDisplay = (ms) => {
   if (ms === null || ms === undefined || ms === '') return '';
@@ -29,15 +28,12 @@ const toMs = (text) => {
  * Duration typed as m:ss, stored as milliseconds. Nobody knows what
  * 225000 is, and the database wants integer ms for sorting and totals.
  *
- * scoped=true resolves the field name through SourceContext so it works
- * inside an ArrayInput row.
+ * useInput already resolves the source against the row it sits in, so
+ * the plain field name is passed through unchanged. Prefixing it here as
+ * well would point at audio_files.0.audio_files.0.duration_ms.
  */
-export const DurationInput = ({ source = 'duration_ms', label = 'Duration',
-                                scoped = false, sx }) => {
-  const sourceCtx = useSourceContext();
-  const name = scoped && sourceCtx ? sourceCtx.getSource(source) : source;
-
-  const { field, fieldState } = useInput({ source: name });
+export const DurationInput = ({ source = 'duration_ms', label = 'Duration', sx }) => {
+  const { field, fieldState } = useInput({ source });
   const [text, setText] = useState(toDisplay(field.value));
   const [bad, setBad] = useState(false);
 

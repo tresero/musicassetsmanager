@@ -10,8 +10,10 @@ import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
 import { DurationInput } from './DurationInput';
+import { AudioUploadInput } from './AudioUploadInput';
+import { FileLink } from './FileLink';
 import {
-  versionLabels, tempos, storageKinds, freeText,
+  versionLabels, tempos, freeText,
   byName, bySortName, byTitle,
 } from './vocab';
 
@@ -199,13 +201,14 @@ const RecordingForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Audio">
-      <ArrayInput source="audio_files" label={false}>
+      <ArrayInput source="audio_files" label={false}
+                  helperText="Drop a file on a row and its format, sample rate, bit depth, channels, and length are read from it.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <TextInput source="title" label="Label" helperText={false}
-                     sx={{ width: { xs: '100%', md: 200 } }} />
-          <SelectInput source="storage_kind" choices={storageKinds}
-                       label="Storage" defaultValue="local" helperText={false}
-                       sx={{ width: { xs: '100%', md: 200 } }} />
+          <AudioUploadInput scoped />
+          <FileLink scoped />
+          <TextInput source="title" label="Description" helperText={false}
+                     placeholder="Master, MP3 preview, stems"
+                     sx={{ width: { xs: '100%', md: 220 } }} />
           <TextInput source="storage_uri" label="URI" helperText={false}
                      sx={{ width: { xs: '100%', md: 360 } }} />
           <TextInput source="format" label="Format" helperText={false}
@@ -219,7 +222,7 @@ const RecordingForm = () => (
                        sx={{ width: { xs: '100%', md: 130 } }} />
           <NumberInput source="channels" label="Channels" helperText={false}
                        sx={{ width: { xs: '100%', md: 120 } }} />
-          <DurationInput scoped label="Duration"
+          <DurationInput label="Duration"
                          sx={{ width: { xs: '100%', md: 130 } }} />
           <BooleanInput source="is_preview" label="Preview" helperText={false} />
           <TextInput source="notes" label="Note" helperText={false}

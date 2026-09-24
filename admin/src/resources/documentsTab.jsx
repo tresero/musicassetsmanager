@@ -14,11 +14,11 @@ const byName = (q) => ({ 'name@ilike': `*${q}*` });
  * Add a row, name it, upload the file, save. Removing a row detaches the
  * document; it is not deleted, because the same split sheet may cover
  * forty other works. Anything left attached to nothing shows up under
- * Document orphans.
+ * Unattached documents.
  *
- * Storage backend and location are filled in by the upload and come from
- * the account's storage settings. Both are editable for a file that lives
- * somewhere else.
+ * Where the file lives is decided by the account's storage settings, not
+ * chosen here. The location can still be edited by hand for a file held
+ * elsewhere; a web address is recorded as a URL.
  */
 export const DocumentsInput = () => (
   <ArrayInput source="documents" label={false}
@@ -29,7 +29,8 @@ export const DocumentsInput = () => (
                       perPage={100} sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Type"
                            filterToQuery={byName}
-                           create={<QuickCreateName resource="document_type" />} />
+                           create={<QuickCreateName resource="document_type" />}
+                           sx={{ width: { xs: '100%', md: 300 } }} />
       </ReferenceInput>
 
       <FileUploadInput kind="documents" scoped />
@@ -38,9 +39,12 @@ export const DocumentsInput = () => (
       <TextInput source="storage_uri" label="Location" fullWidth
                  helperText="Set by the upload. Paste a URL here for a file held elsewhere." />
 
-      <DateInput source="document_date" label="Date" />
-      <DateInput source="signed_on" label="Signed" />
-      <DateInput source="expires_on" label="Expires" />
+      <DateInput source="document_date" label="Date"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
+      <DateInput source="signed_on" label="Signed"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
+      <DateInput source="expires_on" label="Expires"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
       <TextInput source="notes" label="Note" multiline fullWidth />
     </SimpleFormIterator>
   </ArrayInput>
