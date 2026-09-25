@@ -6,6 +6,7 @@ import { Box } from '@mui/material';
 import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
 import { DurationInput } from './DurationInput';
+import { RemoveFileButton } from './RemoveFileButton';
 import { QuickCreateName } from './quickCreate';
 import { byName } from './vocab';
 
@@ -63,6 +64,7 @@ export const AudioFilesInput = () => (
         <TextInput source="title" label="Description" helperText={false}
                    placeholder="For a stem, which one: drums, bass, vocals"
                    sx={{ flex: '1 1 240px' }} />
+        <RemoveFileButton />
       </Box>
 
       {/* where it lives */}

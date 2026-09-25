@@ -1,7 +1,6 @@
 import { Admin, Resource, defaultTheme } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
-
 import { i18nProvider } from './i18n';
 
 import song from './resources/song';
@@ -27,6 +26,7 @@ import genre from './resources/genre';
 import language from './resources/language';
 import assetStatus from './resources/assetStatus';
 import documentType from './resources/documentType';
+import audioFileType from './resources/audioFileType';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
 import vocabulary from './resources/vocabulary';
@@ -40,12 +40,18 @@ const theme = {
     ...defaultTheme.components,
     MuiTextField:   { defaultProps: { size: 'small', variant: 'outlined' } },
     MuiFormControl: { defaultProps: { size: 'small' } },
+    // React Admin hides each list row's remove button until hover.
+    RaSimpleFormIterator: {
+      styleOverrides: {
+        root: { '& .RaSimpleFormIterator-action': { visibility: 'visible' } },
+      },
+    },
   },
 };
 
 export default function App() {
   return (
-        <Admin dataProvider={dataProvider} authProvider={authProvider}
+    <Admin dataProvider={dataProvider} authProvider={authProvider}
            theme={theme} i18nProvider={i18nProvider}>
       <Resource name="song" {...song} />
       <Resource name="recording" {...recording} />
@@ -70,6 +76,7 @@ export default function App() {
       <Resource name="language" {...language} />
       <Resource name="asset_status" {...assetStatus} />
       <Resource name="document_type" {...documentType} />
+      <Resource name="audio_file_type" {...audioFileType} />
       <Resource name="role_group" {...roleGroup} />
       <Resource name="role" {...role} />
       <Resource name="vocabulary" {...vocabulary} />

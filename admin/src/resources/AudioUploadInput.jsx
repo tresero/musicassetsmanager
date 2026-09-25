@@ -19,12 +19,14 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
  * Every file gets a bitrate. Bit depth only means something for lossless
  * audio, so a lossy file leaves it empty.
  *
- * WAV needs its own rule. music-metadata marks any WAV with a fact chunk
- * as lossy, and many DAWs write one for plain PCM; 32-bit float requires
- * it. It also reports WAVE_FORMAT_EXTENSIBLE, which Pro Tools and Logic
- * write for 24-bit, as "non-PCM". So for WAV the codec decides, and
- * duration falls back to size over byte rate when the fact chunk's sample
- * count is zero.
+ * The library's own lossless flag cannot be trusted for uncompressed
+ * files. A WAV carrying a fact chunk is reported as lossy, and many DAWs
+ * write one for plain PCM; so is AIFF-C, which Logic and Pro Tools write
+ * for uncompressed audio. The codec name is reliable where the flag is
+ * not, so an uncompressed codec wins over the flag.
+ *
+ * Duration also falls back to size over byte rate, for the WAVs whose
+ * fact chunk carries a sample count of zero.
  *
  * If the recording has no duration yet and this is the full mix rather
  * than an alternate or a stem, the recording's duration is taken from
@@ -35,14 +37,15 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
 
 const extOf = (name) => (name.split('.').pop() || '').toUpperCase();
 
-// PCM, 32-bit float, and EXTENSIBLE (tag 65534) are uncompressed.
-// ADPCM, a-law, mu-law, GSM and the rest are genuinely lossy.
-const WAV_LOSSLESS = /^(PCM|IEEE_FLOAT|non-PCM \(65534\))$/;
+// Codec names the parser reports for uncompressed audio. WAVE_FORMAT_
+// EXTENSIBLE (tag 65534) is how 24-bit WAV is usually written; sowt is
+// little-endian PCM in AIFF-C. Anything else falls back to the library's
+// flag, which is right for FLAC, ALAC, and the lossy formats.
+const UNCOMPRESSED =
+  /^(pcm|ieee_float|not compressed|sowt|pcm \(byte swapped\)|non-pcm \(65534\))$/i;
 
 const isLossless = (f) =>
-  /WAVE/i.test(f.container || '')
-    ? WAV_LOSSLESS.test(f.codec || '')
-    : (f.lossless ?? null);
+  UNCOMPRESSED.test(f.codec || '') ? true : (f.lossless ?? null);
 
 const durationOf = (f, file) => {
   if (f.duration) return f.duration;
@@ -50,10 +53,16 @@ const durationOf = (f, file) => {
   return null;
 };
 
-const describe = ({ format, lossless, bits, rate, kbps }) => {
-  const khz = rate ? `${+(rate / 1000).toFixed(1)} kHz` : '';
-  if (lossless) return [format, bits && `${bits}-bit`, khz].filter(Boolean).join(' ');
-  return [format, kbps && `${kbps} kbps`].filter(Boolean).join(' ');
+// Description names what a file is, not its specs, which have fields of
+// their own. A zip is all the stems. Otherwise use a title embedded in the
+// file, as MP3s usually carry, but only when it says more than the
+// recording's title does; a tag that repeats the song name adds nothing.
+const norm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const describeFile = (ext, tagTitle, recordingTitle) => {
+  if (ext === 'ZIP') return 'All stems';
+  if (tagTitle && norm(tagTitle) !== norm(recordingTitle)) return tagTitle;
+  return null;
 };
 
 export const AudioUploadInput = ({ scoped = false }) => {
@@ -83,9 +92,12 @@ export const AudioUploadInput = ({ scoped = false }) => {
       // 1. read the header; a zip of stems has none, and still uploads
       const ext = extOf(file.name);
       let f = {};
+      let tagTitle = null;
       if (ext !== 'ZIP') {
         try {
-          ({ format: f } = await parseBlob(file, { duration: true }));
+          const meta = await parseBlob(file, { duration: true });
+          f = meta.format;
+          tagTitle = meta.common?.title?.trim() || null;
         } catch {
           f = {};
         }
@@ -110,6 +122,18 @@ export const AudioUploadInput = ({ scoped = false }) => {
         onUploadProgress: (p) => { setPhase('Uploading'); setPct(Math.round(p * 100)); },
       });
 
+      // 3. refuse a file this recording already has on another row
+      const here = path('storage_uri');
+      const rows = getValues('audio_files') || [];
+      const twin = rows.findIndex((r, i) =>
+        r?.storage_uri === plan.key && `audio_files.${i}.storage_uri` !== here);
+      if (twin >= 0) {
+        const label = rows[twin]?.title ? ` (${rows[twin].title})` : '';
+        notify(`That file is already on this recording, row ${twin + 1}${label}.`,
+               { type: 'warning' });
+        return;
+      }
+
       // 4. fill the row
       const opts = { shouldDirty: true };
       setValue(path('storage_kind'), plan.backend, opts);
@@ -126,7 +150,8 @@ export const AudioUploadInput = ({ scoped = false }) => {
                  typeId(ext === 'ZIP' ? 'Stem' : 'Full Mix'), opts);
       }
       if (!getValues(path('title'))) {
-        setValue(path('title'), ext === 'ZIP' ? 'All stems' : describe(info), opts);
+        const desc = describeFile(ext, tagTitle, getValues('title'));
+        if (desc) setValue(path('title'), desc, opts);
       }
 
       const isMainMix = typeName(getValues(path('file_type_id'))) === 'Full Mix';
