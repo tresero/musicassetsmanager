@@ -9,9 +9,8 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
-import { DurationInput } from './DurationInput';
-import { AudioUploadInput } from './AudioUploadInput';
-import { FileLink } from './FileLink';
+import { AudioFilesInput } from './audioFilesTab';
+import { RepresentationsInput } from './representationsTab';
 import {
   versionLabels, tempos, freeText,
   byName, bySortName, byTitle,
@@ -201,44 +200,22 @@ const RecordingForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Audio">
-      <ArrayInput source="audio_files" label={false}
-                  helperText="Drop a file on a row and its format, sample rate, bit depth, channels, and length are read from it.">
-        <SimpleFormIterator inline sx={iteratorSx}>
-          <AudioUploadInput scoped />
-          <FileLink scoped />
-          <TextInput source="title" label="Description" helperText={false}
-                     placeholder="Master, MP3 preview, stems"
-                     sx={{ width: { xs: '100%', md: 220 } }} />
-          <TextInput source="storage_uri" label="URI" helperText={false}
-                     sx={{ width: { xs: '100%', md: 360 } }} />
-          <TextInput source="format" label="Format" helperText={false}
-                     sx={{ width: { xs: '100%', md: 120 } }} />
-          <BooleanInput source="is_lossless" label="Lossless" helperText={false} />
-          <NumberInput source="sample_rate" label="Sample rate" helperText={false}
-                       sx={{ width: { xs: '100%', md: 150 } }} />
-          <NumberInput source="bit_depth" label="Bit depth" helperText={false}
-                       sx={{ width: { xs: '100%', md: 130 } }} />
-          <NumberInput source="bit_rate_kbps" label="Bit rate" helperText={false}
-                       sx={{ width: { xs: '100%', md: 130 } }} />
-          <NumberInput source="channels" label="Channels" helperText={false}
-                       sx={{ width: { xs: '100%', md: 120 } }} />
-          <DurationInput label="Duration"
-                         sx={{ width: { xs: '100%', md: 130 } }} />
-          <BooleanInput source="is_preview" label="Preview" helperText={false} />
-          <TextInput source="notes" label="Note" helperText={false}
-                     sx={{ width: { xs: '100%', md: 220 } }} />
-        </SimpleFormIterator>
-      </ArrayInput>
+      <AudioFilesInput />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Master">
-      <DateInput source="recorded_on" label="Recorded"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
       <ReferenceInput source="recorded_country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Country of first fixation"
+        <AutocompleteInput optionText="name" label="Country of recording"
                            filterToQuery={byName}
-                           helperText="Where the master was first recorded. Decides neighboring rights eligibility in many territories."
+                           helperText="Where it was mainly recorded. For a record tracked in more than one country, pick the main one."
+                           sx={{ width: { xs: '100%', md: 340 } }} />
+      </ReferenceInput>
+      <ReferenceInput source="commissioned_country" reference="country" perPage={500}
+                      sort={{ field: 'name', order: 'ASC' }}>
+        <AutocompleteInput optionText="name" label="Country of commissioning"
+                           filterToQuery={byName}
+                           helperText="Where the original owner of the master was based when it was made: the label's country, or yours if self-released, wherever the tracks were cut. Societies such as PPL use this and the country of recording to decide eligibility for performance income."
                            sx={{ width: { xs: '100%', md: 340 } }} />
       </ReferenceInput>
       <NumberInput source="p_line_year" label="℗ year"
@@ -272,6 +249,23 @@ const RecordingForm = () => (
       </ArrayInput>
 
       <TextField source="p_line" label="P line" emptyText="Add an owner to build the P line" />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Copyright">
+      <TextInput source="copyright_number" label="Registration number"
+                 helperText="The sound recording's own registration, such as a US SR number"
+                 sx={{ width: { xs: '100%', md: 300 } }} />
+      <DateInput source="copyright_date" label="Registration date"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
+      <DateInput source="reversion_date" label="Reversion date"
+                 sx={{ width: { xs: '100%', md: 200 } }} />
+      <NumberInput source="reversion_lead" label="Lead (years)"
+                   helperText="Notice before the reversion date"
+                   sx={{ width: { xs: '100%', md: 160 } }} />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Signed">
+      <RepresentationsInput />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Notes">

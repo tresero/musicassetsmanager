@@ -6,18 +6,8 @@ import { Box } from '@mui/material';
 import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
 import { DurationInput } from './DurationInput';
-import { RemoveFileButton } from './RemoveFileButton';
 import { QuickCreateName } from './quickCreate';
 import { byName } from './vocab';
-
-/*
- * One block per file rather than one long strip, grouped by what the
- * fields are for: the file itself, where it lives, what the header says
- * about it, and anything else worth noting.
- *
- * Inputs nested in layout boxes still resolve to audio_files.N.field,
- * because each iterator row provides its own source context.
- */
 
 const row = {
   display: 'flex',
@@ -48,7 +38,6 @@ export const AudioFilesInput = () => (
               helperText="Drop a file on a row; its format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip.">
     <SimpleFormIterator sx={blockSx} disableReordering>
 
-      {/* the file */}
       <Box sx={row}>
         <AudioUploadInput scoped />
         <FileLink scoped />
@@ -64,14 +53,11 @@ export const AudioFilesInput = () => (
         <TextInput source="title" label="Description" helperText={false}
                    placeholder="For a stem, which one: drums, bass, vocals"
                    sx={{ flex: '1 1 240px' }} />
-        <RemoveFileButton />
       </Box>
 
-      {/* where it lives */}
       <TextInput source="storage_uri" label="Location" helperText={false}
                  fullWidth />
 
-      {/* what the header says */}
       <Box sx={row}>
         <TextInput source="format" label="Format" helperText={false}
                    sx={{ width: { xs: '100%', md: 110 } }} />
