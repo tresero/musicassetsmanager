@@ -2,6 +2,7 @@ import { Admin, Resource, defaultTheme } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 import { i18nProvider } from './i18n';
+import { AppLayout } from './AppMenu';
 
 import song from './resources/song';
 import recording from './resources/recording';
@@ -52,7 +53,7 @@ const theme = {
 export default function App() {
   return (
     <Admin dataProvider={dataProvider} authProvider={authProvider}
-           theme={theme} i18nProvider={i18nProvider}>
+           theme={theme} i18nProvider={i18nProvider} layout={AppLayout}>
       <Resource name="song" {...song} />
       <Resource name="recording" {...recording} />
       <Resource name="document" {...document} />

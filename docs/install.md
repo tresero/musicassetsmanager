@@ -5,7 +5,10 @@
 - PostgreSQL 18. Needs `uuidv7()` and stored generated columns.
 - PostgREST 14 or later
 - Node 20 or later, to build the admin app
+- Go 1.22 or later, to build the upload service
 - A reverse proxy. Caddy is what this is developed against.
+- S3-compatible object storage for audio. Local disk works, but every file
+  then passes through the server.
 
 ## Database
 
@@ -15,18 +18,6 @@ psql -d music_assets -f db/roles.sql
 psql -d music_assets -f db/schema.sql
 psql -d music_assets -f db/seed/reference.sql
 ```
-## Extensions
-
-```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS unaccent;
-```
-
-`pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
-login function. `unaccent` is used when matching titles against society
-exports, where the same work appears as both "Que Pena" and "Qué Pena".
-
-Both ship with PostgreSQL and nomrally don't need a separate install.
 
 `roles.sql` creates `authenticator`, `app_user`, and `web_anon`. Set a real
 password on `authenticator` before going further:
@@ -41,6 +32,18 @@ parsing, and the password goes into a connection string.
 The reference seed loads countries, languages, societies, key signatures,
 instruments, genres, moods, roles, and document types. None of it is
 account-scoped.
+
+## Extensions
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+```
+
+`pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
+login function. `unaccent` is used when matching titles against society
+exports, where the same work appears as both "Que Pena" and "Qué Pena". Both
+ship with PostgreSQL.
 
 ## PostgREST
 
@@ -71,6 +74,10 @@ npm install
 npm run build
 ```
 
+`music-metadata` reads audio file headers in the browser, and `hash-wasm`
+hashes files before upload. Both are in `package.json`, so `npm install`
+covers them.
+
 Set the API URL in `src/dataProvider.js` and `src/authProvider.js` before
 building. If the app and the API are served from the same host, `/api` is
 correct and the proxy handles the rest.
@@ -86,6 +93,9 @@ music.example.com {
         uri strip_prefix /api
         reverse_proxy localhost:3000
     }
+    handle /upload/* {
+        reverse_proxy localhost:3001
+    }
     handle {
         root * /path/to/admin/dist
         try_files {path} /index.html
@@ -94,8 +104,18 @@ music.example.com {
 }
 ```
 
+The catch-all `handle` has to come last. Caddy evaluates `handle` blocks in
+order, and one without a path matches everything, so an upload route placed
+after it is never reached.
+
 `try_files {path} /index.html` matters. The admin app uses client-side routing,
 so deep links have to fall back to index.html or refreshing a page 404s.
+
+## Upload service
+
+Uploads, downloads, and storage cleanup go through a small Go service in
+`upload/`. Its README covers building it, its database role, and the nightly
+sweep timer.
 
 ## Security
 

@@ -24,7 +24,12 @@ A **composition** is the written work: melody, lyrics, writers, splits, ISWC.
 A **recording** is a master: one performance, with an ISRC and its own credits.
 
 A radio edit and an album mix are two recordings of one composition, each with
-its own ISRC. The link between them is a junction rather than a foreign key, so
+its own ISRC.
+
+The song table holds only what is true of the written work: title, ISWC,
+lyrics, language, the rights flags, copyright, and derivation. Genre, mood,
+key, tempo, and status describe how something sounds or where a master stands,
+so they live on the recording. You pitch recordings, never compositions. The link between them is a junction rather than a foreign key, so
 a medley can reference several compositions with a sequence number. Audio files
 hang off the recording as formats of the same master: a WAV, a FLAC, and an MP3
 of one mix.
@@ -35,7 +40,7 @@ Recording someone else's song creates no new composition. Same writers, same
 ISWC, same splits. The composition row is theirs, with the real writers and
 `controlled = false`, and your recording points at it with `is_cover` set.
 
-This is worth being pedantic about because getting it wrong produces duplicate
+The distinction is pedantic on purpose, because getting it wrong produces duplicate
 compositions with invented ISWCs, which is how a catalog becomes unusable.
 
 ### A new composition needs new authorship
@@ -69,6 +74,48 @@ is not and never will be.
 The last row is the case a foreign key is actually for: both works are yours,
 both are in the catalog, and the translator has a claim on the derived work
 only. The original's splits do not change.
+
+## Who a recording is by, and who played on it
+
+Two different lists. Credits say who performed and in what roles; artists say
+whose record it is. A session player is credited but is not the artist, and a
+band is the artist without any one member being credited as such.
+
+Artists are billed as main or featured, with an order. Two main artists read
+as a duet; a featured artist is appended. This is how DDEX distinguishes
+display artists, and it is what a distributor will ask for.
+
+## Performing names
+
+A person can perform under a name other than their own. The default lives on
+the person: set once, it is used on every recording they are credited on. A
+single credit can override it, which covers the session player who cannot use
+their own name on someone else's record because of a contract elsewhere.
+
+The printed name is resolved when read rather than copied into each credit, so
+changing someone's performing name updates every recording at once.
+
+This is separate from the artist table. A performing name is how a person is
+credited; an artist is an identity a record is released under.
+
+## Master ownership is a list
+
+A master can be owned by several parties, people or companies, in shares. That
+matters beyond paperwork: SoundExchange pays the owner's half of US digital
+performance income by those shares.
+
+The printed P line is built from the year and the owners rather than stored,
+so the notice cannot disagree with the ownership it describes.
+
+## Alternates and stems are files, not recordings
+
+A recording is one master. Its instrumental, TV mix, timed cuts, and stems are
+files under it, typed from a lookup table, because they exist for supervisors
+and music editors to download and are never released on their own.
+
+The same file can appear only once on a recording. Two recordings can share
+one stored file, since storage keys are made from file contents; see
+[file-storage.md](file-storage.md).
 
 ## Three identity tables, deliberately kept apart
 

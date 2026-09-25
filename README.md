@@ -11,30 +11,40 @@ Built because every tool in this space either gets the credits wrong (treating
 particular session) or puts your own catalog behind a subscription.
 
 **Status:** in development, and in daily use on a working catalog.
-Compositions, recordings, contacts, and companies are done. Releases,
-contracts, and documents are next.
+Compositions, recordings, audio files, people, companies, artists, and
+documents are done. Releases and tracked share links for supervisors are next.
 
 ---
 
 ## What it does
 
-**Compositions.** Title, ISWC, lyrics, alternate titles, and a pitch line for
-supervisors. Writer and publisher splits with the controlled/uncontrolled
-distinction that determines what you can actually license. Society
-registrations with work numbers. Copyright dates and reversion tracking. Genre
-and mood tagging for search.
+**Compositions.** Title, ISWC, lyrics, and alternate titles. Writer and
+publisher splits with the controlled and uncontrolled distinction that decides
+what you can actually license. Society registrations with work numbers and
+dates. Copyright and reversion dates. Arrangements, translations, and other
+derived works, including arrangements of public domain tunes.
 
-**Recordings.** Separate from the composition they're of, because a radio edit
-and an album mix are different masters with different ISRCs. Credits where one
-person can hold several roles and play several instruments in a single entry.
-Recorded date, country, and studio. Audio file references with format details.
+**Recordings.** Separate from the composition they record, because a radio edit
+and an album mix are different masters with different ISRCs. Artists billed as
+main or featured. Credits where one person holds several roles and plays
+several instruments in a single entry, under their own name or the one they
+perform under. Master owners with shares, from which the P line is built.
 
-**People and companies.** Contacts with IPI and ISNI, PRO affiliation, multiple
-phones and emails. Companies with their own IPI. One person can be attached to
-several companies, with their job title on the relationship.
+**Audio files.** The master plus its alternates, timed cuts, and stems. Drop a
+file and its format, sample rate, bit depth, and length are read from it. The
+same file is never stored twice.
 
-**Reports.** Splits that don't total 100%. Songs missing an MLC or PRO
-registration. Duplicate email addresses.
+**People, companies, and artists.** IPI and ISNI, society affiliation, contact
+details, and who works where. A band, a pen name, and a legal name are kept
+apart.
+
+**Documents.** Split sheets, contracts, and track sheets, attachable to any
+song, recording, person, or company, with expiry dates.
+
+**Reports.** Splits that don't total 100%, songs missing a registration,
+expiring documents, unattached documents, and duplicate email addresses.
+
+The full list is in [docs/features.md](docs/features.md).
 
 ---
 
@@ -57,114 +67,13 @@ Longer version: [docs/modeling.md](docs/modeling.md)
 
 ## Running it
 
-Self-hosted. You need PostgreSQL, PostgREST, and a web server. Setup is a few
-commands; see [docs/install.md](docs/install.md).
+Self-hosted. You need PostgreSQL, PostgREST, a web server, and for uploads the
+small Go service in `upload/`. Audio belongs in S3-compatible storage; local
+disk works but puts every file through the server. See
+[docs/install.md](docs/install.md).
 
-There's no hosted version and no plan for one.
-
----
-
-# Storage
-
-Files live outside the database. The database stores where a file is, not the
-file itself.
-
-Two kinds of file, and they have different requirements:
-
-**Documents.** Split sheets, contracts, W-9s, registration confirmations. Small,
-read rarely, never streamed.
-
-**Audio.** Masters, stems, mixes, reference MP3s. Large, streamed to a browser,
-sometimes multi-gigabyte on upload.
-
-## What works
-
-| Backend | Documents | Audio | Notes |
-|---|---|---|---|
-| Local disk | Yes | Yes | Simplest. One server, one filesystem. |
-| S3-compatible | Yes | Yes | Presigned uploads and downloads. |
-| WebDAV | Yes | Poor | No presigned URLs, so everything proxies through the app. |
-| SFTP | Yes | No | Same problem, worse latency. |
-
-S3-compatible covers more than AWS. Hetzner Object Storage, Backblaze B2,
-Cloudflare R2, Wasabi, DigitalOcean Spaces, MinIO, Ceph RGW all speak the same
-API. Set the endpoint and it works.
-
-Hetzner Storage Box is **not** S3. It speaks SFTP, WebDAV, and rsync. Fine for
-documents, wrong for audio, because without presigned URLs every byte of every
-master has to pass through your server twice.
-
-## Why presigned URLs matter
-
-A multi-gigabyte master uploaded through the application is transferred twice:
-browser to server, server to storage. It ties up a worker for the duration and
-burns bandwidth you're paying for on both legs.
-
-With a presigned PUT the browser talks directly to the bucket. The application
-issues a signed URL, the transfer happens without touching your server, and the
-client reports back when it's done.
-
-The same applies in reverse for downloads of original files.
-
-## Streaming is different
-
-Playback can't use presigned URLs.
-
-A presigned URL is unforgeable but freely shareable. Once it's issued, anyone
-with the string can fetch the file until it expires, and you have no idea who.
-For a tracked share link that defeats the point.
-
-So streaming proxies through the application: validate the share token, check
-expiry, log the play, then serve the bytes with Range support. The file being
-streamed is a transcoded MP3 rather than the master, so the volume is
-manageable.
-
-Original-file downloads can still use presigned URLs, logged at the moment the
-URL is issued.
-
-## Self-hosting
-
-Local disk is the default and the simplest thing that works. Point `base_path`
-at a directory, make sure it's backed up, done.
-
-Move to S3-compatible storage when the catalog outgrows the server's disk, or
-when you want uploads to stop competing with everything else for bandwidth.
-Hetzner Object Storage and Backblaze B2 are the cheap options; Cloudflare R2
-has no egress fees, which matters if audio gets served publicly.
-
-Everything else on this list works, with the caveats in the table.
-
-## Multi-tenant
-
-Storage is configured per account, not globally. One row in
-`music.account_storage` per account: the backend kind, the endpoint, the bucket,
-the path prefix.
-
-That means a hosted deployment doesn't have to hold anyone's masters. A client
-points the install at their own bucket, keeps their own credentials, and pays
-their own storage bill. The database records where their files are; the files
-stay theirs.
-
-An operator who does want to host files can run one bucket with a per-account
-key prefix, and the same config table handles it.
-
-Credentials are not stored in the database. They live in the upload service's
-config, keyed by account id, so a database dump doesn't hand over anyone's
-bucket.
-
-## The upload service
-
-PostgREST can't accept a multipart upload, so this is a separate small service.
-It:
-
-- validates the JWT and reads the account's storage config
-- issues presigned PUT URLs, or accepts a direct upload for backends that can't
-  presign
-- queues transcoding for audio
-- proxies authenticated streams and logs playback events
-
-Self-hosters who only want to reference files by URI can skip it entirely. The
-schema works without it; you paste in a path and nothing uploads.
+The schema already separates accounts, so a hosted version is possible later,
+with each client keeping files in their own bucket.
 
 ---
 
@@ -172,12 +81,14 @@ schema works without it; you paste in a path and nothing uploads.
 
 | | |
 |---|---|
+| [Features](docs/features.md) | What the app does today |
 | [Modeling decisions](docs/modeling.md) | Why the schema looks like this |
 | [Architecture](docs/architecture.md) | How the three layers fit together |
 | [Installation](docs/install.md) | Getting it running |
 | [Development](docs/development.md) | Adding tables and screens |
+| [File storage](docs/file-storage.md) | Where files live, and the tradeoffs |
 | [Standards](docs/standards.md) | CWR, DDEX, ISWC, ISRC, IPI, ISNI |
-| [Roadmap](docs/roadmap.md) | What's next |
+| [Future features](docs/future-features.md) | What's next, and what's further off |
 | [Who this is for](docs/who-this-is-for.md) | And who it isn't |
 | [How I use AI](docs/how-i-use-ai.md) | The division of labor on this project |
 

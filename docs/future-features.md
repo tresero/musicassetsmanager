@@ -1,29 +1,16 @@
 # Future features
 
-This file is the roadmap.
+Ideas and planned work. What exists today is in [features.md](features.md).
+The Next section is what comes after it; the rest is the longer list,
+including things that may never get built.
 
 Ordered roughly by value against effort.
 
 ---
 
-## Built since the last revision
+## Next
 
-**Recordings**, with credits carrying roles and instruments per party, audio
-file references, session detail, and neighboring rights fields.
-
-**Documents**, stored as references rather than bytes, attachable from either
-direction, with expiry and orphan reports.
-
-**The upload service.** A small Go binary that issues presigned PUT URLs for
-S3-compatible storage or proxies the body for local disk. Drag and drop in the
-form, progress bar, and a presigned GET for opening files back.
-
-**Per-account storage configuration**, so a hosted deployment does not have to
-hold anyone's files.
-
----
-
-## Committed
+Decided and next in line. Nothing here is built yet.
 
 ### Releases
 
@@ -52,15 +39,22 @@ when, and what came back.
 Pure schema, no service required. Contacts and recordings already exist, so
 most of it is junctions and a status vocabulary.
 
-### Streaming and transcoding
+### Conversion
 
-Upload a master, generate an MP3 for playback. ffmpeg in a queue.
+A button on a lossless file that makes an MP3 of it, 320 kbps by default, and
+adds it to the recording as another file. The service pulls the master from
+storage, runs ffmpeg, and stores the result. Synchronous is fine at this
+scale: a five-minute song converts in a few seconds. Other targets (a 16-bit
+44.1 kHz WAV for distributors, a 30-second clip) are more buttons on the same
+path.
 
-Playback proxies through the service rather than using presigned URLs, because
-a presigned URL is shareable and would defeat the tracking. Range requests
-supported so scrubbing works.
+### Streaming
 
-The largest single piece of work on this list.
+Every file on a recording can be streamed or downloaded by whoever a playlist
+is shared with; there is no designated preview. Playback of a tracked share
+link proxies through the service rather than handing out presigned URLs,
+because a presigned URL is shareable and would defeat the tracking. Range
+requests so scrubbing works.
 
 ### Role-based access
 
@@ -71,6 +65,20 @@ without reaching storage settings or deleting works.
 ---
 
 ## Planned
+
+### Ad hoc report builder
+
+The fixed reports answer fixed questions: splits that do not total, unregistered
+songs, expiring documents. A builder would let you pick a subject, choose
+columns and filters, and save the result as a named report, without writing SQL.
+The views are already shaped for it; the work is the interface.
+
+### MCP server
+
+An MCP server so AI assistants can read the catalog directly: look up a song's
+splits, find unregistered works, draft a cue sheet. It has to be open source,
+like the rest of the project.
+
 
 ### Royalty and project reporting
 
@@ -141,7 +149,7 @@ both storage and CPU. Wrong time.
 ### CWR file generation
 
 The data model is aligned with CWR. Producing the file is a separate piece of
-work, and worth doing only for someone registering enough works to feel the
+work, and pays off only for someone registering enough works to feel the
 manual entry.
 
 ### DDEX ERN and RIN delivery

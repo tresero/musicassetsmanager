@@ -22,7 +22,7 @@ DDEX expects for instrumentals.
 
 ## Composition and recording are separate
 
-This is the distinction most tools get wrong, so it is worth stating plainly.
+This is the distinction most tools get wrong, so it is stated plainly here.
 
 A **composition** is the written work: melody, lyrics, writers, splits, ISWC. A
 **recording** is a master: a specific performance, with an ISRC and its own
@@ -79,6 +79,13 @@ One credit row per party per recording, carrying a list of roles and a list of
 instruments. A player who was on guitar, tres, arranger, and producer is one
 entry with four roles.
 
+A credit can carry the name the performer is credited under, which DDEX treats
+as the display name on the contributor. When blank it falls back to the
+person's default performing name, then their legal name.
+
+Artists on a recording are billed as main or featured with an order, matching
+DDEX's display artist roles. Two main artists are a duet.
+
 No ERN or RIN file generation yet.
 
 ## Registration
@@ -103,8 +110,16 @@ SoundExchange, PPL, and GVL use SCAPR and IPD identifiers rather than CISAC and
 IPI, and membership does not overlap with the societies in this database. That
 is a separate set of tables when it gets built, not rows in the existing ones.
 
-`recording.recorded_country` is already captured, because eligibility depends on
-where the master was cut.
+Two things already captured are what those registrations need.
+
+The country of first fixation, `recording.recorded_country`, because under the
+Rome Convention eligibility in many territories depends on where the master was
+first recorded. Where tracks were later overdubbed or mixed does not change it.
+
+Master ownership with shares, because SoundExchange splits US digital
+performance income 50 percent to the rights owner, 45 percent to featured
+artists, and 5 percent to non-featured performers, and a co-owned master
+divides the owner's half by those shares.
 
 ## Semantic web
 
