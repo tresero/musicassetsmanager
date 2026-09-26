@@ -6,6 +6,8 @@ import {
   AutocompleteArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
+import { useWatch } from 'react-hook-form';
+import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
@@ -17,6 +19,21 @@ import {
 } from './vocab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
+
+// Sum of the featured shares on this recording's credits. Nothing shows
+// until someone has a share, since plenty of recordings are never
+// registered with SoundExchange.
+const FeaturedTotal = () => {
+  const credits = useWatch({ name: 'credits' }) || [];
+  const shares = credits.map((c) => Number(c?.featured_share)).filter((n) => !Number.isNaN(n) && n > 0);
+  if (!shares.length) return null;
+  const total = Math.round(shares.reduce((a, b) => a + b, 0) * 100) / 100;
+  return (
+    <Typography variant="body2" sx={{ mt: 1, color: total === 100 ? 'text.secondary' : 'warning.main' }}>
+      Featured shares total {total}%{total === 100 ? '' : ', not 100'}
+    </Typography>
+  );
+};
 
 const artistRoles = [
   { id: 'main',     name: 'Main' },
@@ -133,7 +150,7 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Credits">
       <ArrayInput source="credits" label={false}
-                  helperText="One row per person. Add all their roles and instruments to that row.">
+                  helperText="One row per person, with all their roles and instruments. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
         <SimpleFormIterator inline sx={iteratorSx}>
           <ReferenceInput source="contact_id" reference="contact" perPage={200}
                           sort={{ field: 'sort_name', order: 'ASC' }}>
@@ -172,16 +189,17 @@ const RecordingForm = () => (
                                     helperText={false}
                                     sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
-          <NumberInput source="share" label="Share %" step={0.0001}
+          <NumberInput source="featured_share" label="Featured %" step={0.01}
+                       helperText={false}
+                       sx={{ width: { xs: '100%', md: 120 } }} />
+          <NumberInput source="share" label="Points %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />
-          <TextInput source="performance_details" label="Performance details"
-                     helperText={false}
-                     sx={{ width: { xs: '100%', md: 240 } }} />
           <TextInput source="notes" label="Note" helperText={false}
                      sx={{ width: { xs: '100%', md: 220 } }} />
         </SimpleFormIterator>
       </ArrayInput>
+      <FeaturedTotal />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Tags">
@@ -278,7 +296,7 @@ const RecordingForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ duration_display, owner_total, p_line,
+const strip = ({ duration_display, owner_total, p_line, featured_total,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

@@ -77,7 +77,7 @@ const ArtistForm = () => (
 
     <TabbedForm.Tab label="Members">
       <ArrayInput source="members" label={false}
-                  helperText="The people behind this identity. A solo act under their own name has one member; a pen name has one too.">
+                  helperText="The people behind this identity, and when they were in it. A solo act under their own name has one member. Hired players belong on recording credits, not here.">
         <SimpleFormIterator inline sx={iteratorSx}>
           <ReferenceInput source="contact_id" reference="contact" perPage={200}
                           sort={{ field: 'sort_name', order: 'ASC' }}>
