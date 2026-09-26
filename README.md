@@ -14,6 +14,17 @@ particular session) or puts your own catalog behind a subscription.
 Compositions, recordings, audio files, people, companies, artists, and
 documents are done. Releases and tracked share links for supervisors are next.
 
+[Features](docs/features.md) ·
+[Modeling](docs/modeling.md) ·
+[Installation](docs/install.md) ·
+[Architecture](docs/architecture.md) ·
+[Development](docs/development.md) ·
+[File storage](docs/file-storage.md) ·
+[Standards](docs/standards.md) ·
+[Future features](docs/future-features.md) ·
+[Who this is for](docs/who-this-is-for.md) ·
+[How I use AI](docs/how-i-use-ai.md)
+
 ---
 
 ## What it does

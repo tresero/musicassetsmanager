@@ -110,16 +110,23 @@ SoundExchange, PPL, and GVL use SCAPR and IPD identifiers rather than CISAC and
 IPI, and membership does not overlap with the societies in this database. That
 is a separate set of tables when it gets built, not rows in the existing ones.
 
-Two things already captured are what those registrations need.
+What those registrations need is already captured.
 
-The country of first fixation, `recording.recorded_country`, because under the
-Rome Convention eligibility in many territories depends on where the master was
-first recorded. Where tracks were later overdubbed or mixed does not change it.
+The country of recording and the country of commissioning. PPL requires both,
+and other societies use them to decide whether a recording qualifies for
+performance income in their territory. Commissioning is where the master's
+original owner was based, regardless of where the tracks were cut.
 
-Master ownership with shares, because SoundExchange splits US digital
-performance income 50 percent to the rights owner, 45 percent to featured
-artists, and 5 percent to non-featured performers, and a co-owned master
-divides the owner's half by those shares.
+Featured shares per recording. SoundExchange splits US digital performance
+income 50 percent to the rights owner, 45 percent to featured artists, and 5
+percent to non-featured performers. The featured half is divided among the
+act's members by percentages SoundExchange holds per recording, which is why
+the share sits on each recording's credits rather than on the act: lineups and
+splits change between projects. A credit with no featured share is a
+non-featured performer, which is what hired players are.
+
+Master ownership with shares, since a co-owned master divides the rights
+owner's half by them.
 
 ## Semantic web
 

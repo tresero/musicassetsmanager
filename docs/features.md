@@ -47,17 +47,28 @@ Two main artists read as a duet.
 **Songs** links the composition, or several for a medley.
 
 **Credits** are who played on it: a person or a company, with any number of
-roles and instruments on one row, an optional share for points in lieu of pay,
-performance notes, and the name they are credited under. A person's performing
-name is used by default and can be overridden for one session.
+roles and instruments on one row, the name they are credited under, and a note.
+A person's performing name is used by default and can be overridden for one
+session. Featured % is a band member's cut of the featured-artist royalty on
+this recording, blank for hired players; the tab shows the total and flags one
+that is not 100. Points % is a share of master income agreed in lieu of pay.
 
 **Tags**: genres and moods, the terms supervisors search by.
 
 **Audio**: the master and its alternates, timed cuts, and stems, each typed and
 described. See Audio files below.
 
-**Master**: recording date, country of first fixation, the P line year, and the
-owners with their shares. The P line is built from those rather than typed.
+**Master**: country of recording, country of commissioning, the P line year,
+and the owners with their shares. The P line is built from the year and owners
+rather than typed.
+
+**Copyright**: the sound recording's own registration number and date, separate
+from the composition's, and a reversion date with a lead time.
+
+**Signed**: publishers and sync agents holding rights to license the master,
+each with whether the deal is exclusive, its start and end dates, the agent's
+share of the fee, and the signed agreement. Any number of non-exclusive deals
+can run at once; an exclusive one refuses anything overlapping it.
 
 ## Audio files
 

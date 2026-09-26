@@ -85,6 +85,14 @@ Artists are billed as main or featured, with an order. Two main artists read
 as a duet; a featured artist is appended. This is how DDEX distinguishes
 display artists, and it is what a distributor will ask for.
 
+"Featured" means two different things, and the model keeps them apart. On a
+distributor it means a guest, billed as "feat." In neighboring rights it means
+the members of the act, as opposed to hired players. The first is billing on
+the recording's artists. The second is a share on each credit, set per
+recording, because who was in the band and how they split the royalty can
+change from one record to the next. A credit without a featured share is a
+hired player.
+
 ## Performing names
 
 A person can perform under a name other than their own. The default lives on
@@ -106,6 +114,26 @@ performance income by those shares.
 
 The printed P line is built from the year and the owners rather than stored,
 so the notice cannot disagree with the ownership it describes.
+
+## A master has its own copyright
+
+A sound recording is registered separately from the composition it records,
+with its own number and date, and it carries its own termination rights. So a
+recording has copyright and reversion fields of its own rather than borrowing
+the song's.
+
+## Signed deals are about the master
+
+A publisher or sync agent holding rights to license a recording is recorded on
+the recording, with whether the deal is exclusive and its term. Non-exclusive
+deals can overlap freely. An exclusive one excludes every other deal on that
+recording for the dates it covers, and the database refuses an overlap in
+either direction. The check runs when a save commits rather than row by row,
+so rearranging several deals at once does not trip over its own intermediate
+states.
+
+Retitling, where a library registers a work under its own title, is a
+publishing matter and is not recorded here.
 
 ## Alternates and stems are files, not recordings
 
