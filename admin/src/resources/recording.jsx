@@ -3,10 +3,10 @@ import {
   SearchInput, Edit, Create, TabbedForm, TextInput, NumberInput,
   BooleanInput, DateInput, SelectInput, ArrayInput, SimpleFormIterator,
   ReferenceInput, AutocompleteInput, ReferenceArrayInput,
-  AutocompleteArrayInput,
+  AutocompleteArrayInput, NullableBooleanInput, useRecordContext,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
-import { useWatch } from 'react-hook-form';
+import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
@@ -18,7 +18,25 @@ import {
   byName, bySortName, byTitle,
 } from './vocab';
 
-const filters = [<SearchInput source="title@ilike" alwaysOn />];
+const filters = [
+  <SearchInput source="title@ilike" alwaysOn />,
+  <NullableBooleanInput source="one_stop" label="One stop" />,
+];
+
+// Whether the saved recording can be licensed by you alone, and if not,
+// the first thing standing in the way. Computed by the database from the
+// owners, the signed deals, and the compositions' publishing.
+const OneStopStatus = () => {
+  const record = useRecordContext();
+  const { isDirty } = useFormState();
+  if (!record?.id) return null;
+  const pending = isDirty ? ' (as of the last save; save to recheck)' : '';
+  return record.one_stop
+    ? <Typography variant="body2" sx={{ color: 'success.main', mb: 1 }}>One stop{pending}</Typography>
+    : <Typography variant="body2" sx={{ color: 'warning.main', mb: 1 }}>
+        Not one stop: {record.one_stop_reason}{pending}
+      </Typography>;
+};
 
 // Sum of the featured shares on this recording's credits. Nothing shows
 // until someone has a share, since plenty of recordings are never
@@ -67,6 +85,7 @@ const RecordingList = () => (
       <NumberField source="bpm" label="BPM" emptyText="—" />
       <BooleanField source="is_instrumental" label="Instr." />
       <BooleanField source="is_cover" label="Cover" />
+      <BooleanField source="one_stop" label="One stop" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
     </Datagrid>
@@ -222,6 +241,7 @@ const RecordingForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Master">
+      <OneStopStatus />
       <ReferenceInput source="recorded_country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Country of recording"
@@ -240,7 +260,7 @@ const RecordingForm = () => (
                    sx={{ width: { xs: '100%', md: 150 } }} />
 
       <ArrayInput source="owners" label="Master owners"
-                  helperText="Who owns the master, and in what share. The printed P line is built from these.">
+                  helperText="Who owns the master, and in what share. Controlled means you can license that share, by owning it or by agreement. The printed P line is built from these.">
         <SimpleFormIterator inline sx={iteratorSx}>
           <ReferenceInput source="contact_id" reference="contact" perPage={200}
                           sort={{ field: 'sort_name', order: 'ASC' }}>
@@ -263,6 +283,7 @@ const RecordingForm = () => (
           <NumberInput source="share" label="Share %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />
+          <BooleanInput source="controlled" label="Controlled" helperText={false} />
         </SimpleFormIterator>
       </ArrayInput>
 
@@ -297,6 +318,7 @@ const RecordingForm = () => (
 );
 
 const strip = ({ duration_display, owner_total, p_line, featured_total,
+                 one_stop, one_stop_reason,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

@@ -1,6 +1,7 @@
 import {
   Toolbar, SaveButton, DeleteButton,
   useRecordContext, useResourceContext, useNotify, useRedirect,
+  useGetResourceLabel, useRefresh,
 } from 'react-admin';
 
 /*
@@ -12,13 +13,20 @@ import {
  * screen to stay on yet, so it goes to the one just created; otherwise
  * each click would make another record.
  *
- * Delete only appears once there is something to delete.
+ * After a save that stays on the record, the record is reloaded, because
+ * values the database computes (P line, one stop, split totals) are not in
+ * the save's reply.
+ *
+ * Delete names what it deletes, since "Delete" alone on a form full of
+ * child rows reads as though it might take more than the record.
  */
 export const EditToolbar = () => {
   const record = useRecordContext();
   const resource = useResourceContext();
   const notify = useNotify();
   const redirect = useRedirect();
+  const getResourceLabel = useGetResourceLabel();
+  const refresh = useRefresh();
   const saved = !!record?.id;
 
   const saveMessage = () =>
@@ -29,6 +37,7 @@ export const EditToolbar = () => {
     onSuccess: (data) => {
       saveMessage();
       if (!saved) redirect('edit', resource, data.id);
+      else refresh();
     },
   };
 
@@ -45,7 +54,12 @@ export const EditToolbar = () => {
         <SaveButton label="Save & continue" type="button" mutationOptions={stay} />
         <SaveButton label="Save & close" type="button" mutationOptions={leave} />
       </div>
-      {saved && <DeleteButton mutationMode="pessimistic" />}
+      {saved && (
+        <DeleteButton
+          mutationMode="pessimistic"
+          label={`Delete this ${getResourceLabel(resource, 1).toLowerCase()}`}
+        />
+      )}
     </Toolbar>
   );
 };
