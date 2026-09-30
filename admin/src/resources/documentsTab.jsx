@@ -5,13 +5,16 @@ import {
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
 import { QuickCreateName } from './quickCreate';
+import { AttachDocumentInput } from './AttachDocumentInput';
 
 const byName = (q) => ({ 'name@ilike': `*${q}*` });
 
 /*
  * Documents edited in place on the parent record.
  *
- * Add a row, name it, upload the file, save. Removing a row detaches the
+ * Add a row, name it, upload the file, save. Or attach a document that
+ * already exists from the picker above the list, so a registration covering
+ * ten works is one document linked ten times, not ten copies. Removing a row detaches the
  * document; it is not deleted, because the same split sheet may cover
  * forty other works. Anything left attached to nothing shows up under
  * Unattached documents.
@@ -23,6 +26,7 @@ const byName = (q) => ({ 'name@ilike': `*${q}*` });
 export const DocumentsInput = () => (
   <ArrayInput source="documents" label={false}
               helperText="Removing a row detaches the document. It is not deleted.">
+    <AttachDocumentInput />
     <SimpleFormIterator disableReordering>
       <TextInput source="title" label="Title" fullWidth />
       <ReferenceInput source="document_type_id" reference="document_type"

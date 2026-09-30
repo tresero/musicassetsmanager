@@ -28,7 +28,7 @@ const SongForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ writer_total, publisher_total,
+const strip = ({ writer_total, publisher_total, one_stop, one_stop_reason,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

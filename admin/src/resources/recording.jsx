@@ -9,6 +9,7 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
+import { ListActions } from './listActions';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
@@ -76,7 +77,8 @@ const iteratorSx = {
 };
 
 const RecordingList = () => (
-  <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
+  <List filters={filters} actions={<ListActions />}
+        sort={{ field: 'title', order: 'ASC' }} perPage={50}>
     <Datagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="version_label" label="Version" emptyText="—" />
