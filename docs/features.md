@@ -6,7 +6,12 @@ What the app does today. Anything not yet built is in
 ## Compositions
 
 A song is the written work: title, ISWC, lyrics, language, and notes, with
-flags for one stop and public domain.
+flags for public domain and easy clear.
+
+**One stop** is computed, not set. A song is one stop when the publishing you
+control totals 100: controlled publisher shares, or controlled writer shares
+when there is no publisher, with public domain works passing. The Details tab
+says so, or names the first thing in the way.
 
 **Writers** carry a role, a share, and whether you control that share. Each
 writer's society is recorded on the credit and defaults from the person's own
@@ -14,7 +19,8 @@ record, so a back-catalog work registered with a former PRO stays correct.
 
 **Publishers** carry a share, whether you control it, and which writer's share
 they administer. The publisher's society shows alongside it, read from the
-company record.
+company record. One company can administer several writers' shares of the same
+work, one row per writer.
 
 **Registrations** record each society a work is registered with, its work
 number there, and the date.
@@ -38,8 +44,9 @@ A recording is one master, separate from the composition it records.
 
 **Details**: title, which defaults from the composition when left blank;
 version; ISRC; BPM; tempo, described as it feels rather than as a number; key;
-whether it is instrumental or a cover; status; and a description, keywords, and
-"sounds like" for pitching.
+vocals (female, male, mixed, or group); whether it is instrumental or a cover;
+easy clear, set by hand for a track that can be cleared quickly; status; and a
+description, keywords, and "sounds like" for pitching.
 
 **Artists** are who the record is by, billed as main or featured and in order.
 Two main artists read as a duet.
@@ -53,14 +60,26 @@ session. Featured % is a band member's cut of the featured-artist royalty on
 this recording, blank for hired players; the tab shows the total and flags one
 that is not 100. Points % is a share of master income agreed in lieu of pay.
 
-**Tags**: genres and moods, the terms supervisors search by.
+**Tags**: genres and moods, the terms supervisors search by, and the pitch
+comment: the text DISCO writes into a pitched MP3, generated from the catalog.
+It opens with the contact line, never dropped: ONE-STOP when the recording is,
+the pitch contact's name, email, and phone, and whether stems and alternates
+exist. Vocals and language, moods, tempo, genres, and sounds like follow,
+trimmed from the end to fit 255 characters. The pitch contact is chosen per
+recording, falling back to an active exclusive agent and then to the default
+contact in Settings. The tab shows the comment with a count and a Copy button,
+and a recording can carry its own text instead.
 
 **Audio**: the master and its alternates, timed cuts, and stems, each typed and
 described. See Audio files below.
 
 **Master**: country of recording, country of commissioning, the P line year,
-and the owners with their shares. The P line is built from the year and owners
-rather than typed.
+and the owners with their shares, each marked controlled when you can license
+that share, by owning it or by agreement. The P line is built from the year and
+owners rather than typed. The tab says whether the recording is one stop: the
+controlled master shares total 100, no exclusive deal is active with anyone
+else, and every composition it records is one stop. When it isn't, it names the
+first thing in the way.
 
 **Copyright**: the sound recording's own registration number and date, separate
 from the composition's, and a reversion date with a lead time.
@@ -105,8 +124,10 @@ member's ISNI. Members are listed with the dates they joined and left.
 Split sheets, contracts, track sheets, licenses, and the rest, each with a type,
 the file itself, and dates for when it was made, signed, and expires. A document
 attaches to any number of songs, recordings, people, and companies, and can be
-added from either side: from the document, or from the record it belongs to.
-Removing it from one record detaches it without deleting it.
+added from either side: from the document, or from the record it belongs to,
+where a document that already exists can be attached rather than uploaded
+again. A copyright registration covering ten works is one document linked ten
+times. Removing it from one record detaches it without deleting it.
 
 ## Reports
 
@@ -120,8 +141,20 @@ Removing it from one record detaches it without deleting it.
 ## Lists
 
 The vocabularies behind the pickers are editable: audio file types, document
-types, statuses, roles, instruments, genres, moods, keys, languages, countries,
-and societies. Most pickers can add a missing entry without leaving the form.
+types, vocals, statuses, roles, instruments, genres, moods, keys, languages,
+countries, and societies. Most pickers can add a missing entry without leaving
+the form.
+
+Roles and instruments carry their DDEX codes; see
+[standards.md](standards.md). A recording's credits offer only performer and
+studio roles, leaving publishing and business roles to the tables they belong
+on.
+
+## Settings
+
+**Pitch settings** holds the default pitch contact, used by any recording that
+has no contact of its own. The Recordings list can be filtered to recordings
+that resolve to nobody, which would go out with nobody to call.
 
 ## Storage
 
@@ -137,4 +170,12 @@ twice, and a nightly sweep deletes stored files nothing refers to. See
   returns to the list.
 - Delete names what it deletes.
 - The menu groups the catalog, the reports, the reference lists, and settings.
+- The Songs and Recordings lists can be filtered by one stop and easy clear, and
+  recordings by whether they have a pitch contact.
 - Row remove buttons are always visible.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-09-30 | One stop computed on songs and recordings; controlled master owners; easy clear; vocals; pitch comment and pitch contacts; attaching existing documents; DDEX codes; Pitch settings. |

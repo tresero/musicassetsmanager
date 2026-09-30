@@ -200,9 +200,34 @@ points instead of pay.
 A share is controlled if you have the right to license it. Uncontrolled means
 someone else's publisher administers it.
 
-A composition where every writer row is uncontrolled is one you recorded but do
-not own. `one_stop_p` should be false, and a supervisor asking to clear it
-needs to know that before they pitch it to a client.
+Control is authority, not ownership. A master owned half by you and half by a
+collaborator is fully controlled when your collaboration agreement lets either
+owner grant non-exclusive licenses on behalf of both. Both rows are marked
+controlled, and the database treats the recording as yours to clear.
+
+One stop is computed from these flags rather than typed, so it can never
+disagree with the splits. A composition is one stop when its controlled
+publishing totals 100, counting writer shares when there is no publisher. A
+recording is one stop when its controlled master shares total 100, no exclusive
+deal is active with anyone else, and every composition it records is one stop.
+Where it isn't, the database reports the first reason, which is what tells you
+which row to fix.
+
+## A publisher appears once per writer
+
+The same company can administer several writers' shares of one work, so a
+publisher row is unique per song, publisher, role, and writer rather than per
+song and publisher.
+
+## The pitch comment is generated
+
+The comment written into a pitched file is built from the catalog rather than
+typed: contact line first, then vocals, moods, tempo, genres, and sounds like,
+dropped from the end until it fits. Fixing a mood fixes every comment that
+mentions it. The contact is chosen per recording, because different recordings
+are pitched by different people, with an exclusive agent and then an account
+default as fallbacks. A hand-written comment can still replace the generated
+one for a single recording.
 
 ## Documents are references, not files
 
@@ -252,3 +277,9 @@ and the address has one owner like everything else.
 The alternative was a foreign key that points at either a person or a company
 depending on a type column, which PostgreSQL can't enforce. That pattern is the
 thing this project exists to avoid.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-09-30 | Control as authority by agreement; one stop computed for songs and recordings; publisher per writer; generated pitch comment. |

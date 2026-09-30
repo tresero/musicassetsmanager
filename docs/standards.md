@@ -86,6 +86,14 @@ person's default performing name, then their legal name.
 Artists on a recording are billed as main or featured with an order, matching
 DDEX's display artist roles. Two main artists are a duet.
 
+Roles and instruments carry their DDEX codes, checked against the allowed value
+sets, version 011. Of 137 instruments, 121 map to a DDEX value; the rest, such
+as the guataca, export as UserDefined under their own names. DDEX treats voices
+as instruments (LeadVocalist, background vocalists, FemaleVoice, MaleVoice,
+MixedVoice), which the recording's Vocals field lines up with. Business roles
+such as attorney and sync agent have no code, since they never appear in a
+release message.
+
 No ERN or RIN file generation yet.
 
 ## Registration
@@ -149,3 +157,9 @@ relationship to a party, no shares, no registration implications.
 
 Document types are likewise a local vocabulary. They are a lookup table rather
 than a CHECK constraint so they can be extended without a migration.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-09-30 | DDEX codes on roles and instruments, allowed value sets version 011. |

@@ -40,6 +40,9 @@ and an album mix are different masters with different ISRCs. Artists billed as
 main or featured. Credits where one person holds several roles and plays
 several instruments in a single entry, under their own name or the one they
 perform under. Master owners with shares, from which the P line is built.
+Whether a recording is one stop, computed from who controls the master and the
+publishing, and the pitch comment DISCO carries in the file, generated from the
+catalog.
 
 **Audio files.** The master plus its alternates, timed cuts, and stems. Drop a
 file and its format, sample rate, bit depth, and length are read from it. The
@@ -109,3 +112,9 @@ with each client keeping files in their own bucket.
 
 GNU Affero General Public License v3.0. Use it, change it, sell it. If you run
 a modified version as a service for other people, publish your changes.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-09-30 | One stop and pitch comments added to the feature summary. |

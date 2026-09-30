@@ -46,7 +46,8 @@ adds it to the recording as another file. The service pulls the master from
 storage, runs ffmpeg, and stores the result. Synchronous is fine at this
 scale: a five-minute song converts in a few seconds. Other targets (a 16-bit
 44.1 kHz WAV for distributors, a 30-second clip) are more buttons on the same
-path.
+path. The MP3 gets the recording's pitch comment in its comment tag, so the
+contact and one-stop line travel with the file.
 
 ### Streaming
 
@@ -72,6 +73,14 @@ The fixed reports answer fixed questions: splits that do not total, unregistered
 songs, expiring documents. A builder would let you pick a subject, choose
 columns and filters, and save the result as a named report, without writing SQL.
 The views are already shaped for it; the work is the interface.
+
+### Shared vocabularies for hosted accounts
+
+In a hosted version, moods, genres, instruments, and roles would be curated
+globally and read-only to customers. An account could add private terms visible
+only to itself, enforced by row-level security, and private terms that several
+accounts invent independently could be promoted into the global list. Global
+terms keep their DDEX codes; private ones export as UserDefined.
 
 ### MCP server
 
@@ -117,7 +126,8 @@ in Germany, which works revert in 2028. Also gives provenance to the
 ### Metadata embedding
 
 Write ID3, BWF, and Vorbis tags into files on export, populated from the
-catalog. Deliverables that arrive correctly tagged.
+catalog. Deliverables that arrive correctly tagged. The generated pitch comment
+is the first of these, and the rest follow the same path.
 
 ### JSON-LD output
 
@@ -206,3 +216,9 @@ royalty work above is the music-specific half only.
 
 Discovery, following, public commenting. This is a rights database with a
 sharing layer, not a network.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-09-30 | Conversion writes the pitch comment into the MP3; shared vocabularies for hosted accounts added under Planned. |
