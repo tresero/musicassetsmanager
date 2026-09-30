@@ -9,7 +9,6 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
-import { ListActions } from './listActions';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
@@ -22,6 +21,7 @@ import {
 const filters = [
   <SearchInput source="title@ilike" alwaysOn />,
   <NullableBooleanInput source="one_stop" label="One stop" />,
+  <NullableBooleanInput source="easy_clear" label="Easy clear" />,
 ];
 
 // Whether the saved recording can be licensed by you alone, and if not,
@@ -77,8 +77,7 @@ const iteratorSx = {
 };
 
 const RecordingList = () => (
-  <List filters={filters} actions={<ListActions />}
-        sort={{ field: 'title', order: 'ASC' }} perPage={50}>
+  <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
     <Datagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="version_label" label="Version" emptyText="—" />
@@ -88,6 +87,7 @@ const RecordingList = () => (
       <BooleanField source="is_instrumental" label="Instr." />
       <BooleanField source="is_cover" label="Cover" />
       <BooleanField source="one_stop" label="One stop" />
+      <BooleanField source="easy_clear" label="Easy clear" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
     </Datagrid>
@@ -122,6 +122,8 @@ const RecordingForm = () => (
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
+      <BooleanInput source="easy_clear" label="Easy clear"
+                    helperText="Set by hand: can be cleared quickly for sync" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
         <SelectInput optionText="name" label="Status"

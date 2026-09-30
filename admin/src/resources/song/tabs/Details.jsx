@@ -34,7 +34,10 @@ const DetailsFields = () => (
                            sx={{ width: { xs: '100%', md: 240 } }} />
       </ReferenceInput>
     </Box>
-    <BooleanInput source="public_domain_p" label="Public domain" helperText={false} />
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+      <BooleanInput source="easy_clear" label="Easy clear" helperText={false} />
+      <BooleanInput source="public_domain_p" label="Public domain" helperText={false} />
+    </Box>
   </Stack>
 );
 
