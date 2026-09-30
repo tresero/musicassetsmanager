@@ -28,6 +28,8 @@ import language from './resources/language';
 import assetStatus from './resources/assetStatus';
 import documentType from './resources/documentType';
 import audioFileType from './resources/audioFileType';
+import vocalType from './resources/vocalType';
+import pitchSetting from './resources/pitchSetting';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
 import vocabulary from './resources/vocabulary';
@@ -78,11 +80,13 @@ export default function App() {
       <Resource name="asset_status" {...assetStatus} />
       <Resource name="document_type" {...documentType} />
       <Resource name="audio_file_type" {...audioFileType} />
+      <Resource name="vocal_type" {...vocalType} />
       <Resource name="role_group" {...roleGroup} />
       <Resource name="role" {...role} />
       <Resource name="vocabulary" {...vocabulary} />
       <Resource name="schema_type" {...schemaType} />
       <Resource name="account_storage" {...accountStorage} />
+      <Resource name="pitch_setting" {...pitchSetting} />
       <Resource name="document_orphan" {...documentOrphan} />
     </Admin>
   );

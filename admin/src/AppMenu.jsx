@@ -51,6 +51,7 @@ export const AppMenu = () => (
 
     <Folded label="Lists">
       <Menu.ResourceItem name="audio_file_type" />
+      <Menu.ResourceItem name="vocal_type" />
       <Menu.ResourceItem name="document_type" />
       <Menu.ResourceItem name="asset_status" />
       <Menu.ResourceItem name="role" />
@@ -69,6 +70,7 @@ export const AppMenu = () => (
 
     <Heading>Settings</Heading>
     <Menu.ResourceItem name="account_storage" />
+    <Menu.ResourceItem name="pitch_setting" />
   </Menu>
 );
 

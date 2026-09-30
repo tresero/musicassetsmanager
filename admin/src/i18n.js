@@ -28,11 +28,14 @@ const messages = {
     language:          { name: 'Language |||| Languages' },
     asset_status:      { name: 'Status |||| Statuses' },
     document_type:     { name: 'Document type |||| Document types' },
+    audio_file_type:   { name: 'Audio file type |||| Audio file types' },
+    vocal_type:        { name: 'Vocals |||| Vocals' },
     role_group:        { name: 'Role group |||| Role groups' },
     role:              { name: 'Role |||| Roles' },
     vocabulary:        { name: 'Vocabulary |||| Vocabularies' },
     schema_type:       { name: 'Schema type |||| Schema types' },
     account_storage:   { name: 'Storage setting |||| Storage settings' },
+    pitch_setting:     { name: 'Pitch setting |||| Pitch settings' },
   },
 };
 

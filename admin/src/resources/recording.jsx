@@ -13,6 +13,7 @@ import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickC
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
+import { PitchCommentInput } from './PitchCommentInput';
 import {
   versionLabels, tempos, freeText,
   byName, bySortName, byTitle,
@@ -22,6 +23,7 @@ const filters = [
   <SearchInput source="title@ilike" alwaysOn />,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
+  <NullableBooleanInput source="has_pitch_contact" label="Has pitch contact" />,
 ];
 
 // Whether the saved recording can be licensed by you alone, and if not,
@@ -88,6 +90,7 @@ const RecordingList = () => (
       <BooleanField source="is_cover" label="Cover" />
       <BooleanField source="one_stop" label="One stop" />
       <BooleanField source="easy_clear" label="Easy clear" />
+      <BooleanField source="has_pitch_contact" label="Contact" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
     </Datagrid>
@@ -118,6 +121,13 @@ const RecordingForm = () => (
                       sort={{ field: 'accidentals', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Key" filterToQuery={byName}
                            sx={{ width: { xs: '100%', md: 200 } }} />
+      </ReferenceInput>
+      <ReferenceInput source="vocal_type_id" reference="vocal_type" perPage={50}
+                      sort={{ field: 'name', order: 'ASC' }}>
+        <AutocompleteInput optionText="name" label="Vocals" filterToQuery={byName}
+                           create={<QuickCreateName resource="vocal_type" />}
+                           helperText="Who sings lead. Leave blank for an instrumental."
+                           sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
@@ -197,7 +207,7 @@ const RecordingForm = () => (
                      helperText={false}
                      placeholder="Uses the person's default"
                      sx={{ width: { xs: '100%', md: 220 } }} />
-          <ReferenceArrayInput source="role_ids" reference="role" perPage={50}
+          <ReferenceArrayInput source="role_ids" reference="recording_role" perPage={50}
                                sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteArrayInput optionText="name" label="Roles"
                                     helperText={false}
@@ -238,6 +248,7 @@ const RecordingForm = () => (
                                 filterToQuery={byName}
                                 create={<QuickCreateName resource="mood" />} />
       </ReferenceArrayInput>
+      <PitchCommentInput />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Audio">
@@ -321,7 +332,8 @@ const RecordingForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ duration_display, owner_total, p_line, featured_total,
+const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_comment_auto,
+                 pitch_contact_used, has_pitch_contact,
                  one_stop, one_stop_reason,
                  created_at, updated_at, ...rest }) => rest;
 

@@ -1,5 +1,5 @@
 import {
-  List, Datagrid, TextField, ReferenceField, SearchInput,
+  List, Datagrid, TextField, BooleanField, ReferenceField, SearchInput,
   Edit, Create, TabbedForm, TextInput, NumberInput, BooleanInput,
   ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
