@@ -4,3 +4,7 @@ upload/mam-upload
 *.env
 .DS_Store
 AGENTS.md
+.agents/
+.claude/
+skills/
+skills-lock.json
