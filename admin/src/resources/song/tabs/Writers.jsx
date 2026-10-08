@@ -2,8 +2,10 @@ import {
   ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
   SelectInput, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
-import { QuickCreateContact } from '../../quickCreate';
-import { bySortName, byCode, proOptionText, proInputText } from '../../vocab';
+import { useSourceContext } from 'ra-core';
+import { useFormContext } from 'react-hook-form';
+import { PersonInput } from '../../partyInputs';
+import { byCode, proOptionText, proInputText } from '../../vocab';
 
 const iteratorSx = {
   '& .RaSimpleFormIterator-line': {
@@ -20,18 +22,26 @@ const iteratorSx = {
   },
 };
 
+/*
+ * Picking a writer fills the row's PRO from the person's record. It stays
+ * editable, for a writer registered differently on this song.
+ */
+const WriterInput = () => {
+  const { setValue } = useFormContext();
+  const sourceCtx = useSourceContext();
+  const fillPro = (value, person) => {
+    if (value) {
+      setValue(sourceCtx.getSource('pro_code'), person?.pro_code ?? null,
+               { shouldDirty: true });
+    }
+  };
+  return <PersonInput label="Writer" onChange={fillPro} />;
+};
+
 const WritersFields = () => (
   <ArrayInput source="writers" label={false}>
     <SimpleFormIterator inline sx={iteratorSx}>
-      <ReferenceInput source="contact_id" reference="contact" perPage={200}
-                      sort={{ field: 'sort_name', order: 'ASC' }}>
-        <AutocompleteInput optionText="sort_name" label="Writer"
-                           filterToQuery={bySortName}
-                           create={<QuickCreateContact />}
-                           createLabel="Type to search or add a person"
-                           helperText={false}
-                           sx={{ width: { xs: '100%', md: 260 } }} />
-      </ReferenceInput>
+      <WriterInput />
 
       <ReferenceInput source="role_id" reference="role" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
