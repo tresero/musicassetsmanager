@@ -6,6 +6,7 @@ import { AppLayout } from './AppMenu';
 
 import song from './resources/song';
 import recording from './resources/recording';
+import release from './resources/release';
 import contact from './resources/contact';
 import organization from './resources/organization';
 import artist from './resources/artist';
@@ -58,6 +59,7 @@ export default function App() {
            theme={theme} i18nProvider={i18nProvider} layout={AppLayout}>
       <Resource name="song" {...song} />
       <Resource name="recording" {...recording} />
+      <Resource name="release" {...release} />
       <Resource name="document" {...document} />
       <Resource name="contact" {...contact} />
       <Resource name="organization" {...organization} />

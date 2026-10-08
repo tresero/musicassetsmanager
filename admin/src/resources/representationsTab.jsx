@@ -4,6 +4,7 @@ import {
 } from 'react-admin';
 import { Box } from '@mui/material';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
+import { PersonOrCompanyInput } from './partyInputs';
 import { byName, bySortName, byTitle } from './vocab';
 
 const row = {
@@ -36,24 +37,8 @@ export const RepresentationsInput = () => (
     <SimpleFormIterator sx={blockSx} disableReordering>
 
       <Box sx={row}>
-        <ReferenceInput source="organization_id" reference="organization" perPage={200}
-                        sort={{ field: 'name', order: 'ASC' }}>
-          <AutocompleteInput optionText="name" label="Agent or library"
-                             filterToQuery={byName}
-                             create={<QuickCreateName resource="organization" />}
-                             createLabel="Type to search or add a company"
-                             helperText={false}
-                             sx={{ width: { xs: '100%', md: 280 } }} />
-        </ReferenceInput>
-        <ReferenceInput source="contact_id" reference="contact" perPage={200}
-                        sort={{ field: 'sort_name', order: 'ASC' }}>
-          <AutocompleteInput optionText="sort_name" label="or Person"
-                             filterToQuery={bySortName}
-                             create={<QuickCreateContact />}
-                             createLabel="Type to search or add a person"
-                             helperText={false}
-                             sx={{ width: { xs: '100%', md: 240 } }} />
-        </ReferenceInput>
+        <PersonOrCompanyInput companyFirst companyLabel="Agent or library" personLabel="or Person"
+                              companyHelperText="Who holds the rights, like Megatrax" w={280} />
         <BooleanInput source="is_exclusive" label="Exclusive" helperText={false} />
       </Box>
 

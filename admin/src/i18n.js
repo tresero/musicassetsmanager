@@ -6,6 +6,7 @@ const messages = {
   resources: {
     song:              { name: 'Song |||| Songs' },
     recording:         { name: 'Recording |||| Recordings' },
+    release:           { name: 'Release |||| Releases' },
     document:          { name: 'Document |||| Documents' },
     contact:           { name: 'Person |||| People' },
     organization:      { name: 'Company |||| Companies' },

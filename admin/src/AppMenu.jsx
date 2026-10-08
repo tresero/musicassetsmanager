@@ -37,6 +37,7 @@ export const AppMenu = () => (
     <Heading>Catalog</Heading>
     <Menu.ResourceItem name="song" />
     <Menu.ResourceItem name="recording" />
+    <Menu.ResourceItem name="release" />
     <Menu.ResourceItem name="artist" />
     <Menu.ResourceItem name="contact" />
     <Menu.ResourceItem name="organization" />

@@ -10,6 +10,7 @@ import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
+import { PersonOrCompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
@@ -132,6 +133,14 @@ const RecordingForm = () => (
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
+      <SelectInput source="parental_warning" label="Explicit content" emptyText="Not set"
+                   choices={[
+                     { id: 'NotExplicit', name: 'Not explicit' },
+                     { id: 'Explicit', name: 'Explicit' },
+                     { id: 'ExplicitContentEdited', name: 'Clean edit of an explicit track' },
+                   ]}
+                   helperText="Asked per track by every distributor"
+                   sx={{ width: { xs: '100%', md: 300 } }} />
       <BooleanInput source="easy_clear" label="Easy clear"
                     helperText="Set by hand: can be cleared quickly for sync" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
@@ -185,24 +194,7 @@ const RecordingForm = () => (
       <ArrayInput source="credits" label={false}
                   helperText="One row per person, with all their roles and instruments. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="contact_id" reference="contact" perPage={200}
-                          sort={{ field: 'sort_name', order: 'ASC' }}>
-            <AutocompleteInput optionText="sort_name" label="Person"
-                               filterToQuery={bySortName}
-                               create={<QuickCreateContact />}
-                               createLabel="Type to search or add a person"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 240 } }} />
-          </ReferenceInput>
-          <ReferenceInput source="organization_id" reference="organization" perPage={200}
-                          sort={{ field: 'name', order: 'ASC' }}>
-            <AutocompleteInput optionText="name" label="or Company"
-                               filterToQuery={byName}
-                               create={<QuickCreateName resource="organization" />}
-                               createLabel="Type to search or add a company"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 240 } }} />
-          </ReferenceInput>
+          <PersonOrCompanyInput w={240} />
           <TextInput source="credited_as" label="Credited as (this recording)"
                      helperText={false}
                      placeholder="Uses the person's default"
@@ -277,24 +269,7 @@ const RecordingForm = () => (
       <ArrayInput source="owners" label="Master owners"
                   helperText="Who owns the master, and in what share. Controlled means you can license that share, by owning it or by agreement. The printed P line is built from these.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="contact_id" reference="contact" perPage={200}
-                          sort={{ field: 'sort_name', order: 'ASC' }}>
-            <AutocompleteInput optionText="sort_name" label="Person"
-                               filterToQuery={bySortName}
-                               create={<QuickCreateContact />}
-                               createLabel="Type to search or add a person"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 260 } }} />
-          </ReferenceInput>
-          <ReferenceInput source="organization_id" reference="organization" perPage={200}
-                          sort={{ field: 'name', order: 'ASC' }}>
-            <AutocompleteInput optionText="name" label="or Company"
-                               filterToQuery={byName}
-                               create={<QuickCreateName resource="organization" />}
-                               createLabel="Type to search or add a company"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 260 } }} />
-          </ReferenceInput>
+          <PersonOrCompanyInput />
           <NumberInput source="share" label="Share %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />

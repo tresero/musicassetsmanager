@@ -2,6 +2,7 @@ import {
   TextInput, ReferenceInput, AutocompleteInput, useRecordContext, useNotify,
 } from 'react-admin';
 import { QuickCreateContact } from './quickCreate';
+import { PersonInput } from './partyInputs';
 import { bySortName } from './vocab';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Box, Button, Typography } from '@mui/material';
@@ -45,15 +46,8 @@ export const PitchCommentInput = () => {
   return (
     <Box sx={{ mt: 3, width: '100%', maxWidth: 760 }}>
       <Typography variant="subtitle2">Pitch comment</Typography>
-      <ReferenceInput source="pitch_contact_id" reference="contact" perPage={200}
-                      sort={{ field: 'sort_name', order: 'ASC' }}>
-        <AutocompleteInput optionText="sort_name" label="Pitch contact"
-                           filterToQuery={bySortName}
-                           create={<QuickCreateContact />}
-                           createLabel="Type to search or add a person"
-                           helperText={pickerHelp}
-                           sx={{ width: { xs: '100%', md: 360 }, mt: 1 }} />
-      </ReferenceInput>
+      <PersonInput source="pitch_contact_id" label="Pitch contact"
+                   helperText={pickerHelp} w={360} />
       {missing && (
         <Typography variant="body2" sx={{ color: 'error.main', mt: 1 }}>
           No pitch contact: this recording would go out with nobody to call. Pick
