@@ -3,3 +3,4 @@ dist/
 upload/mam-upload
 *.env
 .DS_Store
+AGENTS.md
