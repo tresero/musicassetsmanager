@@ -7,7 +7,6 @@ import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
 import { AudioFilePlayer, RemoveAndPlay } from './AudioPlayer';
 import { DurationInput } from './DurationInput';
-import { QuickCreateName } from './quickCreate';
 import { byName } from './vocab';
 
 const row = {
@@ -47,8 +46,6 @@ export const AudioFilesInput = () => (
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>
           <AutocompleteInput optionText="name" label="Type"
                              filterToQuery={byName}
-                             create={<QuickCreateName resource="audio_file_type" />}
-                             createLabel="Type to search or add a type"
                              helperText={false}
                              sx={{ width: { xs: '100%', md: 180 } }} />
         </ReferenceInput>

@@ -6922,25 +6922,25 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist_member TO app_user;
 -- Name: TABLE asset_status; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.asset_status TO app_user;
+GRANT SELECT ON TABLE music.asset_status TO app_user;
 
 --
 -- Name: TABLE asset_status; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.asset_status TO app_user;
+GRANT SELECT ON TABLE api.asset_status TO app_user;
 
 --
 -- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
+GRANT SELECT ON TABLE music.audio_file_type TO app_user;
 
 --
 -- Name: TABLE audio_file_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.audio_file_type TO app_user;
+GRANT SELECT ON TABLE api.audio_file_type TO app_user;
 
 --
 -- Name: TABLE contact_email; Type: ACL; Schema: music; Owner: -
@@ -7037,7 +7037,7 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document TO app_user;
 -- Name: TABLE document_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document_type TO app_user;
+GRANT SELECT ON TABLE music.document_type TO app_user;
 
 --
 -- Name: TABLE document_expiring; Type: ACL; Schema: api; Owner: -
@@ -7061,7 +7061,7 @@ GRANT SELECT,DELETE ON TABLE api.document_orphan TO app_user;
 -- Name: TABLE document_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document_type TO app_user;
+GRANT SELECT ON TABLE api.document_type TO app_user;
 
 --
 -- Name: TABLE document_usage; Type: ACL; Schema: api; Owner: -
@@ -7079,25 +7079,25 @@ GRANT SELECT ON TABLE api.email_duplicate TO app_user;
 -- Name: TABLE genre; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.genre TO app_user;
+GRANT SELECT ON TABLE music.genre TO app_user;
 
 --
 -- Name: TABLE genre; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.genre TO app_user;
+GRANT SELECT ON TABLE api.genre TO app_user;
 
 --
 -- Name: TABLE instrument; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.instrument TO app_user;
+GRANT SELECT ON TABLE music.instrument TO app_user;
 
 --
 -- Name: TABLE instrument; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.instrument TO app_user;
+GRANT SELECT ON TABLE api.instrument TO app_user;
 
 --
 -- Name: TABLE key_signature; Type: ACL; Schema: music; Owner: -
@@ -7115,25 +7115,25 @@ GRANT SELECT ON TABLE api.key_signature TO app_user;
 -- Name: TABLE language; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.language TO app_user;
+GRANT SELECT ON TABLE music.language TO app_user;
 
 --
 -- Name: TABLE language; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.language TO app_user;
+GRANT SELECT ON TABLE api.language TO app_user;
 
 --
 -- Name: TABLE mood; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,UPDATE ON TABLE music.mood TO app_user;
+GRANT SELECT ON TABLE music.mood TO app_user;
 
 --
 -- Name: TABLE mood; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,UPDATE ON TABLE api.mood TO app_user;
+GRANT SELECT ON TABLE api.mood TO app_user;
 
 --
 -- Name: TABLE organization; Type: ACL; Schema: music; Owner: -
@@ -7405,13 +7405,13 @@ GRANT SELECT ON TABLE api.vocabulary TO app_user;
 -- Name: TABLE vocal_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocal_type TO app_user;
+GRANT SELECT ON TABLE music.vocal_type TO app_user;
 
 --
 -- Name: TABLE vocal_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocal_type TO app_user;
+GRANT SELECT ON TABLE api.vocal_type TO app_user;
 
 --
 -- Name: TABLE account; Type: ACL; Schema: music; Owner: -

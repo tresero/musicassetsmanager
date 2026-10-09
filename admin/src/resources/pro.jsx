@@ -2,7 +2,7 @@ import { List, Datagrid, TextField, ReferenceField } from 'react-admin';
 
 const ProList = () => (
   <List sort={{ field: 'name', order: 'ASC' }} perPage={100}>
-    <Datagrid rowClick={false}>
+    <Datagrid rowClick={false} bulkActionButtons={false}>
       <TextField source="code" />
       <TextField source="name" />
       <TextField source="cisac_code" label="CISAC" />

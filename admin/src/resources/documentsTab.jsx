@@ -5,7 +5,6 @@ import {
 } from 'react-admin';
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
-import { QuickCreateName } from './quickCreate';
 import { AttachDocumentInput } from './AttachDocumentInput';
 
 const byName = (q) => ({ 'name@ilike': `*${q}*` });
@@ -34,7 +33,6 @@ export const DocumentsInput = () => (
                       perPage={100} sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Type"
                            filterToQuery={byName}
-                           create={<QuickCreateName resource="document_type" />}
                            sx={{ width: { xs: '100%', md: 300 } }} />
       </ReferenceInput>
 

@@ -140,10 +140,13 @@ times. Removing it from one record detaches it without deleting it.
 
 ## Lists
 
-The vocabularies behind the pickers are editable: audio file types, document
-types, vocals, statuses, roles, instruments, genres, moods, keys, languages,
-countries, and societies. Most pickers can add a missing entry without leaving
-the form.
+The vocabularies behind the pickers are shared by every account and fixed:
+audio file types, document types, vocals, statuses, roles, instruments, genres,
+moods, keys, languages, countries, and societies. Users pick from them but
+cannot add or change entries, so made-up values don't creep in; the operator
+changes them. Anything descriptive that no list covers goes in a recording's
+Keywords, Sounds like or Description, which are free text for that recording
+only. Version and Tempo offer suggestions but accept any text.
 
 Roles and instruments carry their DDEX codes; see
 [standards.md](standards.md). A recording's credits offer only performer and
@@ -153,7 +156,8 @@ on.
 ## Settings
 
 **Pitch settings** holds the default pitch contact, used by any recording that
-has no contact of its own. The Recordings list can be filtered to recordings
+has no contact of its own. A new person can be added from the picker.
+Storage and pitch settings belong to the account. The Recordings list can be filtered to recordings
 that resolve to nobody, which would go out with nobody to call.
 
 ## Storage
@@ -164,12 +168,22 @@ by the hash of its contents, so the same file uploaded again is not stored
 twice, and a nightly sweep deletes stored files nothing refers to. See
 [file-storage.md](file-storage.md).
 
+## Accounts
+
+Each account's catalog, people, companies, documents, audio and settings are
+kept apart in the database by row security. A signed-in user sees and changes
+only their own account's records, and a record can only link to others in the
+same account. The shared lists are the only data every account sees.
+
 ## Interface
 
 - Save and continue keeps you on the tab you were editing; Save and close
   returns to the list.
 - Delete names what it deletes.
-- The menu groups the catalog, the reports, the reference lists, and settings.
+- The menu groups the catalog, the reports, and settings.
+- A row missing a field it needs, like a writer without a role or a credit
+  without a person or company, can't be saved; the field is marked instead of
+  the row being dropped.
 - The Songs and Recordings lists can be filtered by one stop and easy clear, and
   recordings by whether they have a pitch contact.
 - Row remove buttons are always visible.
@@ -179,3 +193,4 @@ twice, and a nightly sweep deletes stored files nothing refers to. See
 | Date | Revision |
 |---|---|
 | 2026-09-30 | One stop computed on songs and recordings; controlled master owners; easy clear; vocals; pitch comment and pitch contacts; attaching existing documents; DDEX codes; Pitch settings. |
+| 2026-10-09 | Accounts kept apart by row security; shared lists fixed; required row fields; pitch contact quick add. |

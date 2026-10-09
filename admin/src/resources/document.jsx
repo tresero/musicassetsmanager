@@ -6,7 +6,6 @@ import {
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName } from './quickCreate';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -44,8 +43,7 @@ const DocumentForm = () => (
     <ReferenceInput source="document_type_id" reference="document_type"
                     perPage={100} sort={{ field: 'name', order: 'ASC' }}>
       <AutocompleteInput optionText="name" label="Type"
-                         filterToQuery={byName}
-                         create={<QuickCreateName resource="document_type" />} />
+                         filterToQuery={byName} />
     </ReferenceInput>
 
     <SelectInput source="storage_kind" choices={storageKinds}

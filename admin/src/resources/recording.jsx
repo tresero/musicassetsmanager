@@ -10,7 +10,6 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
@@ -127,7 +126,6 @@ const RecordingForm = () => (
       <ReferenceInput source="vocal_type_id" reference="vocal_type" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Vocals" filterToQuery={byName}
-                           create={<QuickCreateName resource="vocal_type" />}
                            helperText="Who sings lead. Leave blank for an instrumental."
                            sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
@@ -203,8 +201,6 @@ const RecordingForm = () => (
                                sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteArrayInput optionText="name" label="Instruments"
                                     filterToQuery={byName}
-                                    create={<QuickCreateName resource="instrument" />}
-                                    createLabel="Type to search or add an instrument"
                                     helperText={false}
                                     sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
@@ -225,14 +221,12 @@ const RecordingForm = () => (
       <ReferenceArrayInput source="genre_ids" reference="genre" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteArrayInput optionText="name" label="Genres"
-                                filterToQuery={byName}
-                                create={<QuickCreateName resource="genre" />} />
+                                filterToQuery={byName} />
       </ReferenceArrayInput>
       <ReferenceArrayInput source="mood_ids" reference="mood" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteArrayInput optionText="name" label="Moods"
-                                filterToQuery={byName}
-                                create={<QuickCreateName resource="mood" />} />
+                                filterToQuery={byName} />
       </ReferenceArrayInput>
       <PitchCommentInput />
     </TabbedForm.Tab>
