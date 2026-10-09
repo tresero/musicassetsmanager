@@ -1,8 +1,7 @@
 import {
   List, Datagrid, ReferenceField, Edit, Create, SimpleForm, Toolbar, SaveButton,
-  ReferenceInput, AutocompleteInput,
 } from 'react-admin';
-import { bySortName } from './vocab';
+import { PersonInput } from './partyInputs';
 
 // One row per account. The list shows it, or offers to create it.
 const PitchSettingList = () => (
@@ -16,13 +15,8 @@ const PitchSettingList = () => (
 
 const PitchSettingForm = () => (
   <SimpleForm toolbar={<Toolbar><SaveButton /></Toolbar>}>
-    <ReferenceInput source="default_contact_id" reference="contact" perPage={200}
-                    sort={{ field: 'sort_name', order: 'ASC' }}>
-      <AutocompleteInput optionText="sort_name" label="Default pitch contact"
-                         filterToQuery={bySortName}
-                         helperText="Named in a recording's pitch comment when the recording has no pitch contact of its own"
-                         sx={{ width: { xs: '100%', md: 400 } }} />
-    </ReferenceInput>
+    <PersonInput source="default_contact_id" label="Default pitch contact" w={400}
+                 helperText="Named in a recording's pitch comment when the recording has no pitch contact of its own" />
   </SimpleForm>
 );
 
