@@ -1783,6 +1783,8 @@ CREATE TABLE music.account_storage (
     CONSTRAINT account_storage_s3 CHECK (((kind <> 's3'::text) OR (bucket IS NOT NULL)))
 );
 
+ALTER TABLE ONLY music.account_storage FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: COLUMN account_storage.secret_key; Type: COMMENT; Schema: music; Owner: -
 --
@@ -1826,6 +1828,8 @@ CREATE TABLE music.artist (
     CONSTRAINT artist_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
 
+ALTER TABLE ONLY music.artist FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: artist_member; Type: TABLE; Schema: music; Owner: -
 --
@@ -1859,6 +1863,8 @@ CREATE TABLE music.contact (
     credit_name text,
     CONSTRAINT contact_has_name CHECK ((COALESCE(first_name, last_name) IS NOT NULL))
 );
+
+ALTER TABLE ONLY music.contact FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN contact.credit_name; Type: COMMENT; Schema: music; Owner: -
@@ -2158,6 +2164,8 @@ CREATE TABLE music.document (
     CONSTRAINT document_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'paperless'::text, 'url'::text]))),
     CONSTRAINT document_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
+
+ALTER TABLE ONLY music.document FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: organization_document; Type: TABLE; Schema: music; Owner: -
@@ -2460,6 +2468,8 @@ CREATE TABLE music.organization (
     CONSTRAINT organization_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
 
+ALTER TABLE ONLY music.organization FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: organization; Type: VIEW; Schema: api; Owner: -
 --
@@ -2485,6 +2495,8 @@ CREATE TABLE music.pitch_setting (
     account_id uuid DEFAULT music.current_account() NOT NULL,
     default_contact_id integer
 );
+
+ALTER TABLE ONLY music.pitch_setting FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: TABLE pitch_setting; Type: COMMENT; Schema: music; Owner: -
@@ -2615,6 +2627,8 @@ CREATE TABLE music.recording (
     CONSTRAINT recording_reversion_lead CHECK (((reversion_lead IS NULL) OR (reversion_lead >= 0))),
     CONSTRAINT recording_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
+
+ALTER TABLE ONLY music.recording FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN recording.recorded_country; Type: COMMENT; Schema: music; Owner: -
@@ -2957,6 +2971,8 @@ CREATE TABLE music.song (
     CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
 
+ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
 --
@@ -3098,6 +3114,8 @@ CREATE TABLE music.release (
     CONSTRAINT release_type_ddex CHECK ((release_type = ANY (ARRAY['Single'::text, 'EP'::text, 'Album'::text]))),
     CONSTRAINT release_upc_valid CHECK (((upc IS NULL) OR music.gtin_valid(upc)))
 );
+
+ALTER TABLE ONLY music.release FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: TABLE release; Type: COMMENT; Schema: music; Owner: -
@@ -3847,6 +3865,8 @@ CREATE TABLE music.user_account (
     created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
     password_hash text NOT NULL
 );
+
+ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: vocal_type_id_seq; Type: SEQUENCE; Schema: music; Owner: -
@@ -5727,6 +5747,222 @@ ALTER TABLE ONLY music.song_writer
     ADD CONSTRAINT song_writer_song_id_fkey FOREIGN KEY (song_id) REFERENCES music.song(id) ON DELETE CASCADE;
 
 --
+-- Name: account_storage; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.account_storage ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: account_storage account_storage_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY account_storage_account ON music.account_storage USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY account_storage_account ON account_storage; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY account_storage_account ON music.account_storage IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: account_storage account_storage_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY account_storage_upload ON music.account_storage FOR SELECT TO mamupload USING (true);
+
+--
+-- Name: POLICY account_storage_upload ON account_storage; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY account_storage_upload ON music.account_storage IS 'mam-upload has no request token in the database; it filters by account itself, and sweep reads every account.';
+
+--
+-- Name: artist; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.artist ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: artist artist_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY artist_account ON music.artist USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY artist_account ON artist; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY artist_account ON music.artist IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: contact; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.contact ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: contact contact_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY contact_account ON music.contact USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY contact_account ON contact; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY contact_account ON music.contact IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY document_account ON music.document USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY document_account ON document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY document_account ON music.document IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: document document_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY document_upload ON music.document FOR SELECT TO mamupload USING (true);
+
+--
+-- Name: POLICY document_upload ON document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY document_upload ON music.document IS 'mam-upload has no request token in the database; it filters by account itself, and sweep reads every account.';
+
+--
+-- Name: organization; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.organization ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: organization organization_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY organization_account ON music.organization USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY organization_account ON organization; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY organization_account ON music.organization IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: pitch_setting; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.pitch_setting ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: pitch_setting pitch_setting_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY pitch_setting_account ON music.pitch_setting USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY pitch_setting_account ON pitch_setting; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY pitch_setting_account ON music.pitch_setting IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: recording; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording recording_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_account ON music.recording USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY recording_account ON recording; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_account ON music.recording IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: recording recording_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_upload ON music.recording FOR SELECT TO mamupload USING (true);
+
+--
+-- Name: POLICY recording_upload ON recording; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_upload ON music.recording IS 'mam-upload has no request token in the database; it filters by account itself, and sweep reads every account.';
+
+--
+-- Name: release; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.release ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: release release_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY release_account ON music.release USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY release_account ON release; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY release_account ON music.release IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: song; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song song_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_account ON music.song USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY song_account ON song; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_account ON music.song IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: user_account; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.user_account ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_account user_account_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_account_account ON music.user_account USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY user_account_account ON user_account; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY user_account_account ON music.user_account IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
 -- Name: SCHEMA api; Type: ACL; Schema: -; Owner: -
 --
 
@@ -5879,6 +6115,46 @@ GRANT ALL ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent in
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.account_storage TO app_user;
 GRANT SELECT ON TABLE music.account_storage TO mamupload;
+
+--
+-- Name: COLUMN account_storage.account_id; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.kind; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.endpoint; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.region; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.bucket; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.base_path; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.public_base_url; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.notes; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.created_at; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account_storage.updated_at; Type: ACL; Schema: music; Owner: -
+--
 
 --
 -- Name: TABLE account_storage; Type: ACL; Schema: api; Owner: -
@@ -6412,6 +6688,10 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocal_type TO app_user;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocal_type TO app_user;
 
 --
+-- Name: TABLE account; Type: ACL; Schema: music; Owner: -
+--
+
+--
 -- Name: SEQUENCE artist_id_seq; Type: ACL; Schema: music; Owner: -
 --
 
@@ -6484,8 +6764,36 @@ GRANT USAGE ON SEQUENCE music.mood_id_seq TO app_user;
 GRANT USAGE ON SEQUENCE music.organization_id_seq TO app_user;
 
 --
+-- Name: COLUMN user_account.id; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN user_account.account_id; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN user_account.email; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN user_account.created_at; Type: ACL; Schema: music; Owner: -
+--
+
+--
 -- Name: SEQUENCE vocal_type_id_seq; Type: ACL; Schema: music; Owner: -
 --
 
 GRANT USAGE ON SEQUENCE music.vocal_type_id_seq TO app_user;
+
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: api; Owner: -
+--
+
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: music; Owner: -
+--
+
+--
+-- PostgreSQL database dump complete
+--
 
