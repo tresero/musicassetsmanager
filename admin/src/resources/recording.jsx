@@ -4,13 +4,14 @@ import {
   BooleanInput, DateInput, SelectInput, ArrayInput, SimpleFormIterator,
   ReferenceInput, AutocompleteInput, ReferenceArrayInput,
   AutocompleteArrayInput, NullableBooleanInput, useRecordContext,
+  required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName, QuickCreateContact, QuickCreateArtist } from './quickCreate';
-import { PersonOrCompanyInput } from './partyInputs';
+import { QuickCreateName, QuickCreateContact } from './quickCreate';
+import { PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
@@ -157,15 +158,7 @@ const RecordingForm = () => (
       <ArrayInput source="artists" label={false}
                   helperText="Who the record is by. Two main artists read as a duet.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="artist_id" reference="artist" perPage={200}
-                          sort={{ field: 'sort_name', order: 'ASC' }}>
-            <AutocompleteInput optionText="name" label="Artist"
-                               filterToQuery={byName}
-                               create={<QuickCreateArtist />}
-                               createLabel="Type to search or add an artist"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 300 } }} />
-          </ReferenceInput>
+          <ArtistInput validate={required()} />
           <SelectInput source="role" label="Billing" choices={artistRoles}
                        defaultValue="main" helperText={false}
                        sx={{ width: { xs: '100%', md: 160 } }} />
@@ -184,6 +177,7 @@ const RecordingForm = () => (
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText="title" label="Composition"
                                filterToQuery={byTitle} helperText={false}
+                               validate={required()}
                                sx={{ width: { xs: '100%', md: 380 } }} />
           </ReferenceInput>
         </SimpleFormIterator>
@@ -194,7 +188,7 @@ const RecordingForm = () => (
       <ArrayInput source="credits" label={false}
                   helperText="One row per person, with all their roles and instruments. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <PersonOrCompanyInput w={240} />
+          <PersonOrCompanyInput w={240} required />
           <TextInput source="credited_as" label="Credited as (this recording)"
                      helperText={false}
                      placeholder="Uses the person's default"
@@ -269,7 +263,7 @@ const RecordingForm = () => (
       <ArrayInput source="owners" label="Master owners"
                   helperText="Who owns the master, and in what share. Controlled means you can license that share, by owning it or by agreement. The printed P line is built from these.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <PersonOrCompanyInput />
+          <PersonOrCompanyInput required />
           <NumberInput source="share" label="Share %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />

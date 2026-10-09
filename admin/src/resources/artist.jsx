@@ -1,13 +1,13 @@
 import {
   List, Datagrid, TextField, NumberField, SearchInput,
   Edit, Create, TabbedForm, TextInput, SelectInput, DateInput,
-  ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
+  ArrayInput, SimpleFormIterator,
+  required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateContact } from './quickCreate';
-import { bySortName } from './vocab';
+import { PersonInput } from './partyInputs';
 import { IsniInput } from './IsniInput';
 
 const filters = [<SearchInput source="name@ilike" alwaysOn />];
@@ -79,15 +79,7 @@ const ArtistForm = () => (
       <ArrayInput source="members" label={false}
                   helperText="The people behind this identity, and when they were in it. A solo act under their own name has one member. Hired players belong on recording credits, not here.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="contact_id" reference="contact" perPage={200}
-                          sort={{ field: 'sort_name', order: 'ASC' }}>
-            <AutocompleteInput optionText="sort_name" label="Person"
-                               filterToQuery={bySortName}
-                               create={<QuickCreateContact />}
-                               createLabel="Type to search or add a person"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 280 } }} />
-          </ReferenceInput>
+          <PersonInput w={280} validate={required()} />
           <DateInput source="begin_date" label="Joined" helperText={false}
                      sx={{ width: { xs: '100%', md: 170 } }} />
           <DateInput source="end_date" label="Left" helperText={false}

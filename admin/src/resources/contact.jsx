@@ -2,12 +2,13 @@ import {
   List, Datagrid, TextField, BooleanField, ReferenceField, SearchInput,
   Edit, Create, TabbedForm, TextInput, NumberInput, BooleanInput,
   ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
+  required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName } from './quickCreate';
+import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
-import { byName, byCode, proOptionText, proInputText } from './vocab';
+import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput } from './IsniInput';
 
 const filters = [<SearchInput source="sort_name@ilike" alwaysOn />];
@@ -72,6 +73,7 @@ const ContactForm = () => (
       <ArrayInput source="emails" label={false}>
         <SimpleFormIterator inline sx={iteratorSx}>
           <TextInput source="email" type="email" label="Address" helperText={false}
+                     validate={required()}
                      sx={{ width: { xs: '100%', md: 320 } }} />
           <BooleanInput source="is_primary" label="Primary" helperText={false} />
           <TextInput source="note" label="Note" helperText={false}
@@ -87,6 +89,7 @@ const ContactForm = () => (
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 90 } }} />
           <TextInput source="number" label="Number" helperText={false}
+                     validate={required()}
                      sx={{ width: { xs: '100%', md: 200 } }} />
           <TextInput source="extension" label="Ext" helperText={false}
                      sx={{ width: { xs: '100%', md: 100 } }} />
@@ -100,15 +103,7 @@ const ContactForm = () => (
     <TabbedForm.Tab label="Companies">
       <ArrayInput source="organizations" label={false}>
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="organization_id" reference="organization" perPage={200}
-                          sort={{ field: 'name', order: 'ASC' }}>
-            <AutocompleteInput optionText="name" label="Company"
-                               filterToQuery={byName}
-                               create={<QuickCreateName resource="organization" />}
-                               createLabel="Type to search or add a company"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 280 } }} />
-          </ReferenceInput>
+          <CompanyInput w={280} validate={required()} />
           <TextInput source="title" label="Title" helperText={false}
                      sx={{ width: { xs: '100%', md: 220 } }} />
           <BooleanInput source="is_primary" label="Primary" helperText={false} />

@@ -1,6 +1,7 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
   SelectInput, ReferenceInput, AutocompleteInput,
+  required,
 } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { useFormContext } from 'react-hook-form';
@@ -35,7 +36,7 @@ const WriterInput = () => {
                { shouldDirty: true });
     }
   };
-  return <PersonInput label="Writer" onChange={fillPro} />;
+  return <PersonInput label="Writer" onChange={fillPro} validate={required()} />;
 };
 
 const WritersFields = () => (
@@ -45,7 +46,7 @@ const WritersFields = () => (
 
       <ReferenceInput source="role_id" reference="role" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <SelectInput optionText="name" label="Role" helperText={false}
+        <SelectInput optionText="name" label="Role" helperText={false} validate={required()}
                      sx={{ width: { xs: '100%', md: 150 } }} />
       </ReferenceInput>
 

@@ -1,6 +1,7 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, DateInput,
   ReferenceInput, AutocompleteInput,
+  required,
 } from 'react-admin';
 import { byCode, proOptionText, proInputText } from '../../vocab';
 
@@ -13,7 +14,7 @@ const RegistrationsFields = () => (
                            optionText={proOptionText}
                            inputText={proInputText}
                            filterToQuery={byCode}
-                           helperText={false}
+                           helperText={false} validate={required()}
                            sx={{ width: 160 }} />
       </ReferenceInput>
       <TextInput source="work_number" label="Work number" helperText={false}

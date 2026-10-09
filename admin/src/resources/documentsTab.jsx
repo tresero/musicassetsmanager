@@ -1,6 +1,7 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, DateInput,
   ReferenceInput, AutocompleteInput,
+  required,
 } from 'react-admin';
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
@@ -28,7 +29,7 @@ export const DocumentsInput = () => (
               helperText="Removing a row detaches the document. It is not deleted.">
     <AttachDocumentInput />
     <SimpleFormIterator disableReordering>
-      <TextInput source="title" label="Title" fullWidth />
+      <TextInput source="title" label="Title" fullWidth validate={required()} />
       <ReferenceInput source="document_type_id" reference="document_type"
                       perPage={100} sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Type"

@@ -38,7 +38,7 @@ export const RepresentationsInput = () => (
 
       <Box sx={row}>
         <PersonOrCompanyInput companyFirst companyLabel="Agent or library" personLabel="or Person"
-                              companyHelperText="Who holds the rights, like Megatrax" w={280} />
+                              companyHelperText="Who holds the rights, like Megatrax" w={280} required />
         <BooleanInput source="is_exclusive" label="Exclusive" helperText={false} />
       </Box>
 

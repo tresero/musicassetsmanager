@@ -3,12 +3,13 @@ import {
   Edit, Create, TabbedForm, TextInput, NumberInput, DateInput, SelectInput,
   ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
   useRecordContext, useSimpleFormIteratorItem, minValue,
+  required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { Box, Typography, TextField as MuiTextField } from '@mui/material';
 import { EditToolbar } from './formToolbar';
-import { QuickCreateName, QuickCreateArtist, QuickCreateContact } from './quickCreate';
-import { PersonInput, CompanyInput, PersonOrCompanyInput } from './partyInputs';
+import { QuickCreateName, QuickCreateContact } from './quickCreate';
+import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { byName, bySortName, byTitle } from './vocab';
@@ -135,14 +136,7 @@ const ReleaseForm = () => (
       <ArrayInput source="artists" label={false}
                   helperText="Who the release is by, like Sin Camisas. Billing is Main for the act and Featured for a guest, shown as feat. Two main artists read as a duet; Order sets which is named first.">
         <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="artist_id" reference="artist" perPage={200}
-                          sort={{ field: 'sort_name', order: 'ASC' }}>
-            <AutocompleteInput optionText="name" label="Artist" filterToQuery={byName}
-                               create={<QuickCreateArtist />}
-                               createLabel="Type to search or add an artist"
-                               helperText={false}
-                               sx={{ width: { xs: '100%', md: 300 } }} />
-          </ReferenceInput>
+          <ArtistInput validate={required()} />
           <SelectInput source="role" label="Billing" choices={artistRoles}
                        defaultValue="main" helperText={false}
                        sx={{ width: { xs: '100%', md: 160 } }} />
@@ -162,7 +156,7 @@ const ReleaseForm = () => (
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText={recordingLabel} inputText={recordingLabel}
                                label="Recording" filterToQuery={byTitle}
-                               helperText={false}
+                               helperText={false} validate={required()}
                                sx={{ width: { xs: '100%', md: 420 } }} />
           </ReferenceInput>
           <NumberInput source="disc_number" label="Disc" defaultValue={1} min={1} step={1}
@@ -177,7 +171,7 @@ const ReleaseForm = () => (
                   helperText="Each distributor that has carried this release, kept as history when it moves. Status at the top of Details follows from these dates.">
         <SimpleFormIterator sx={blockSx} disableReordering>
           <Box sx={row}>
-            <CompanyInput source="distributor_id" label="Distributor" w={280}
+            <CompanyInput source="distributor_id" label="Distributor" w={280} validate={required()}
                           helperText="Who delivered it to stores, like Priam Digital or CD Baby" />
             <TextInput source="distributor_release_id" label="Their release ID"
                        helperText="The ID the distributor's dashboard shows for it"
