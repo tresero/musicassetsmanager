@@ -24,7 +24,7 @@ export const AttachDocumentInput = () => {
   const [query, setQuery] = useState('');
 
   const { data = [], isPending } = useGetList('document', {
-    pagination: { page: 1, perPage: 25 },
+    pagination: { page: 1, perPage: 500 },
     sort: { field: 'title', order: 'ASC' },
     filter: query ? { 'title@ilike': `*${query}*` } : {},
   });
