@@ -10,6 +10,7 @@ import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateArtist, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
+import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { byName, bySortName, byTitle } from './vocab';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
@@ -153,8 +154,9 @@ const ReleaseForm = () => (
 
     <TabbedForm.Tab label="Tracks">
       <ArrayInput source="tracks" label={false}
-                  helperText="Each recording in playing order; use the arrows to reorder. Track numbers follow the order, counting from 1 on each disc, so two tracks can never share one. Disc stays 1 unless it's a multi-disc release.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+                  helperText="Each recording in playing order; use the arrows to reorder. Track numbers follow the order, counting from 1 on each disc, so two tracks can never share one. Disc stays 1 unless it's a multi-disc release. Play uses the recording's Full Mix.">
+        <SimpleFormIterator inline sx={iteratorSx}
+                            removeButton={<RemoveAndPlay player={<RecordingInputPlayer />} />}>
           <TrackNumber />
           <ReferenceInput source="recording_id" reference="recording" perPage={500}
                           sort={{ field: 'title', order: 'ASC' }}>

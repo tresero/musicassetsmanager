@@ -5,7 +5,7 @@ import {
 import { Box } from '@mui/material';
 import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
-import { AudioPlayer } from './AudioPlayer';
+import { AudioFilePlayer, RemoveAndPlay } from './AudioPlayer';
 import { DurationInput } from './DurationInput';
 import { QuickCreateName } from './quickCreate';
 import { byName } from './vocab';
@@ -37,11 +37,11 @@ const blockSx = {
 export const AudioFilesInput = () => (
   <ArrayInput source="audio_files" label={false}
               helperText="Drop a file on a row; its format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip.">
-    <SimpleFormIterator sx={blockSx} disableReordering>
+    <SimpleFormIterator sx={blockSx} disableReordering
+                        removeButton={<RemoveAndPlay player={<AudioFilePlayer />} />}>
 
       <Box sx={row}>
         <AudioUploadInput scoped />
-        <AudioPlayer scoped />
         <FileLink scoped />
         <ReferenceInput source="file_type_id" reference="audio_file_type"
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>

@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { useNotify, useGetList } from 'react-admin';
+import { useNotify } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { parseBlob } from 'music-metadata';
 import { uploadFile } from './uploadClient';
+import { useAudioFileTypes } from './AudioPlayer';
 import { Box, LinearProgress, Stack, Typography } from '@mui/material';
 import UploadIcon from '@mui/icons-material/CloudUpload';
 
@@ -74,12 +75,7 @@ export const AudioUploadInput = ({ scoped = false }) => {
   const path = (f) => (scoped && sourceCtx ? sourceCtx.getSource(f) : f);
   const storageUri = useWatch({ name: path('storage_uri') });
 
-  const { data: types = [] } = useGetList('audio_file_type', {
-    pagination: { page: 1, perPage: 100 },
-    sort: { field: 'name', order: 'ASC' },
-  });
-  const typeId = (name) => types.find((t) => t.name === name)?.id ?? null;
-  const typeName = (id) => types.find((t) => t.id === id)?.name ?? null;
+  const { typeId, typeName } = useAudioFileTypes();
 
   const [phase, setPhase] = useState(null);
   const [pct, setPct] = useState(0);
