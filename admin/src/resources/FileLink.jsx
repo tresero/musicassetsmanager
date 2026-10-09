@@ -3,6 +3,7 @@ import { useNotify } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { Button } from '@mui/material';
 import OpenIcon from '@mui/icons-material/OpenInNew';
+import { fileUrl } from './uploadClient';
 
 const extOf = (key) => {
   const m = /\.([a-z0-9]{1,10})$/i.exec(key || '');
@@ -49,12 +50,7 @@ export const FileLink = ({ scoped = false }) => {
   const open = async () => {
     const win = window.open('', '_blank');
     try {
-      const q = new URLSearchParams({ key: uri, name: name() });
-      const res = await fetch(`/upload/download?${q}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const { url } = await res.json();
+      const url = await fileUrl(uri, name());
       if (win) {
         win.opener = null;
         win.location = url;

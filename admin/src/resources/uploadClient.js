@@ -62,3 +62,13 @@ export const uploadFile = async (file, { kind, onHashProgress, onUploadProgress 
 
   return plan;
 };
+// A short-lived link to a stored file, served under the given name.
+export const fileUrl = async (key, name) => {
+  const q = new URLSearchParams({ key, name });
+  const res = await fetch(`/upload/download?${q}`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const { url } = await res.json();
+  return url;
+};

@@ -5,6 +5,7 @@ import {
 import { Box } from '@mui/material';
 import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
+import { AudioPlayer } from './AudioPlayer';
 import { DurationInput } from './DurationInput';
 import { QuickCreateName } from './quickCreate';
 import { byName } from './vocab';
@@ -40,6 +41,7 @@ export const AudioFilesInput = () => (
 
       <Box sx={row}>
         <AudioUploadInput scoped />
+        <AudioPlayer scoped />
         <FileLink scoped />
         <ReferenceInput source="file_type_id" reference="audio_file_type"
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>
