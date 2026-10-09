@@ -28,13 +28,12 @@ sudo install -m755 mam-upload /usr/local/bin/
 ## Database role
 
 The service reads the account's storage settings, and the sweep reads every
-stored location. Give it its own read-only role:
+stored location. It has its own read-only role, `mamupload`, created by
+`db/roles.sql` and granted what it reads by `db/schema.sql`. Give it a
+password:
 
 ```sql
-CREATE ROLE mamupload LOGIN PASSWORD 'pick-something-hex';
-GRANT USAGE ON SCHEMA music TO mamupload;
-GRANT SELECT ON music.account_storage, music.document,
-                music.audio_file, music.recording TO mamupload;
+ALTER ROLE mamupload PASSWORD 'pick-something-hex';
 ```
 
 ## Run it
@@ -123,3 +122,8 @@ On AWS that is the bucket's Permissions tab.
 and hold a connection for the duration, and land on a temporary name that is
 renamed on completion, so an interrupted transfer never leaves a partial file
 under a real key.
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |

@@ -5,7 +5,7 @@
 - PostgreSQL 18. Needs `uuidv7()` and stored generated columns.
 - PostgREST 14 or later
 - Node 20 or later, to build the admin app
-- Go 1.22 or later, to build the upload service
+- Go 1.24 or later, to build the upload service
 - A reverse proxy. Caddy is what this is developed against.
 - S3-compatible object storage for audio. Local disk works, but every file
   then passes through the server.
@@ -19,26 +19,34 @@ psql -d music_assets -f db/schema.sql
 psql -d music_assets -f db/seed/reference.sql
 ```
 
-`roles.sql` creates `authenticator`, `app_user`, and `web_anon`. Set a real
-password on `authenticator` before going further:
+`roles.sql` creates `authenticator`, `app_user`, `web_anon`, and
+`mamupload`, the upload service's read-only role. Set real passwords on the
+two that log in before going further:
 
 ```sql
-ALTER ROLE authenticator LOGIN PASSWORD 'something-long-and-hex';
+ALTER ROLE authenticator PASSWORD 'something-long-and-hex';
+ALTER ROLE mamupload PASSWORD 'something-else-long-and-hex';
 ```
 
 Use hex or alphanumeric. Base64 output contains characters that break URI
 parsing, and the password goes into a connection string.
 
-The reference seed loads countries, languages, societies, key signatures,
-instruments, genres, moods, roles, and document types. None of it is
-account-scoped.
+The login function signs tokens with the same secret PostgREST checks, so
+the database needs it too. Use the `jwt-secret` from `postgrest.conf` below:
+
+```sql
+ALTER DATABASE music_assets SET app.jwt_secret = 'the-same-secret';
+```
+
+The reference seed loads countries, languages, societies, territories, key
+signatures, instruments, credit roles, genres, moods, vocal types, audio file
+types, document types, and statuses. None of it is account-scoped, and the
+lists that describe how you work (genres, moods, file types, document types,
+statuses) are starting points to edit.
 
 ## Extensions
 
-```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS unaccent;
-```
+`schema.sql` creates the two extensions it needs:
 
 `pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
 login function. `unaccent` is used when matching titles against society
@@ -137,3 +145,8 @@ VALUES ('<the uuid>', 'you@example.com',
 ```
 
 Then log in at the app's root URL.
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |
