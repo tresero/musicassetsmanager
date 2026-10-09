@@ -1,14 +1,13 @@
 import {
-  List, Datagrid, TextField, NumberField, SearchInput,
-  Edit, Create, TabbedForm, TextInput, SelectInput, DateInput,
-  ArrayInput, SimpleFormIterator,
-  required,
+  List, TextField, NumberField, SearchInput, Edit, Create, TabbedForm,
+  TextInput, SelectInput, DateInput, ArrayInput, SimpleFormIterator, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
 import { IsniInput } from './IsniInput';
+import { CatalogDatagrid } from './shared';
 
 const filters = [<SearchInput source="name@ilike" alwaysOn />];
 
@@ -34,13 +33,13 @@ const iteratorSx = {
 
 const ArtistList = () => (
   <List filters={filters} sort={{ field: 'sort_name', order: 'ASC' }} perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="name" />
       <TextField source="sort_name" label="Sorts as" emptyText="—" />
       <TextField source="kind" label="Kind" />
       <TextField source="isni" label="ISNI" emptyText="—" />
       <NumberField source="member_count" label="Members" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 

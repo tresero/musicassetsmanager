@@ -3,6 +3,7 @@ import {
   useRecordContext, useResourceContext, useNotify, useRedirect,
   useGetResourceLabel, useRefresh,
 } from 'react-admin';
+import { useCan } from '../permissions';
 
 /*
  * An onSuccess in mutationOptions replaces the form's default side
@@ -17,6 +18,9 @@ import {
  * values the database computes (P line, one stop, split totals) are not in
  * the save's reply.
  *
+ * Save needs the catalog.edit permission and Delete needs catalog.delete;
+ * the database refuses either way, so hiding them only avoids the error.
+ *
  * Delete names what it deletes, since "Delete" alone on a form full of
  * child rows reads as though it might take more than the record.
  */
@@ -28,6 +32,8 @@ export const EditToolbar = () => {
   const getResourceLabel = useGetResourceLabel();
   const refresh = useRefresh();
   const saved = !!record?.id;
+  const canEdit = useCan('catalog.edit');
+  const canDelete = useCan('catalog.delete');
 
   const saveMessage = () =>
     notify(saved ? 'ra.notification.updated' : 'ra.notification.created',
@@ -51,10 +57,10 @@ export const EditToolbar = () => {
   return (
     <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <SaveButton label="Save & continue" type="button" mutationOptions={stay} />
-        <SaveButton label="Save & close" type="button" mutationOptions={leave} />
+        {canEdit && <SaveButton label="Save & continue" type="button" mutationOptions={stay} />}
+        {canEdit && <SaveButton label="Save & close" type="button" mutationOptions={leave} />}
       </div>
-      {saved && (
+      {saved && canDelete && (
         <DeleteButton
           mutationMode="pessimistic"
           label={`Delete this ${getResourceLabel(resource, 1).toLowerCase()}`}

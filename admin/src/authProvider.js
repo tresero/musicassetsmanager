@@ -1,3 +1,5 @@
+import { fetchPermissions } from './permissions';
+
 const API = '/api';
 
 export default {
@@ -26,5 +28,5 @@ export default {
     return Promise.resolve();
   },
   getIdentity: () => Promise.resolve({ id: 'me' }),
-  getPermissions: () => Promise.resolve(''),
+  getPermissions: fetchPermissions,
 };

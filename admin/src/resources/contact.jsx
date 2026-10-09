@@ -1,8 +1,7 @@
 import {
-  List, Datagrid, TextField, BooleanField, ReferenceField, SearchInput,
-  Edit, Create, TabbedForm, TextInput, NumberInput, BooleanInput,
-  ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
-  required,
+  List, TextField, BooleanField, ReferenceField, SearchInput, Edit, Create,
+  TabbedForm, TextInput, NumberInput, BooleanInput, ArrayInput,
+  SimpleFormIterator, ReferenceInput, AutocompleteInput, required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
@@ -10,6 +9,7 @@ import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput } from './IsniInput';
+import { CatalogDatagrid } from './shared';
 
 const filters = [<SearchInput source="sort_name@ilike" alwaysOn />];
 
@@ -32,7 +32,7 @@ const iteratorSx = {
 
 const ContactList = () => (
   <List filters={filters} sort={{ field: 'sort_name', order: 'ASC' }} perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="display_name" label="Name" />
       <TextField source="credit_name" label="Credited as" emptyText="—" />
       <TextField source="primary_email" label="Email" emptyText="—" />
@@ -40,7 +40,7 @@ const ContactList = () => (
         <TextField source="code" />
       </ReferenceField>
       <TextField source="member_ipi" label="IPI" emptyText="—" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 

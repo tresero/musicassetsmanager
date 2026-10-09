@@ -3,6 +3,7 @@ import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 import { i18nProvider } from './i18n';
 import { AppLayout } from './AppMenu';
+import { can } from './permissions';
 
 import song from './resources/song';
 import recording from './resources/recording';
@@ -57,14 +58,21 @@ export default function App() {
   return (
     <Admin dataProvider={dataProvider} authProvider={authProvider}
            theme={theme} i18nProvider={i18nProvider} layout={AppLayout}>
-      <Resource name="song" {...song} />
-      <Resource name="recording" {...recording} />
-      <Resource name="release" {...release} />
-      <Resource name="document" {...document} />
-      <Resource name="contact" {...contact} />
-      <Resource name="organization" {...organization} />
-      <Resource name="artist" {...artist} />
-      <Resource name="artist_member" {...artistMember} />
+      {(permissions) => {
+        // A role that may not add gets no create page, so no Create buttons.
+        const addable = (code) => (def) =>
+          can(permissions, code) ? def : { ...def, create: undefined };
+        const catalog = addable('catalog.edit');
+        const settings = addable('settings.edit');
+        return (<>
+      <Resource name="song" {...catalog(song)} />
+      <Resource name="recording" {...catalog(recording)} />
+      <Resource name="release" {...catalog(release)} />
+      <Resource name="document" {...catalog(document)} />
+      <Resource name="contact" {...catalog(contact)} />
+      <Resource name="organization" {...catalog(organization)} />
+      <Resource name="artist" {...catalog(artist)} />
+      <Resource name="artist_member" {...catalog(artistMember)} />
 
       <Resource name="song_split_check" {...songSplitCheck} />
       <Resource name="song_unregistered" {...songUnregistered} />
@@ -87,9 +95,11 @@ export default function App() {
       <Resource name="role" {...role} />
       <Resource name="vocabulary" {...vocabulary} />
       <Resource name="schema_type" {...schemaType} />
-      <Resource name="account_storage" {...accountStorage} />
-      <Resource name="pitch_setting" {...pitchSetting} />
+      <Resource name="account_storage" {...settings(accountStorage)} />
+      <Resource name="pitch_setting" {...settings(pitchSetting)} />
       <Resource name="document_orphan" {...documentOrphan} />
+        </>);
+      }}
     </Admin>
   );
 }

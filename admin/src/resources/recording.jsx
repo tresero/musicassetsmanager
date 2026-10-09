@@ -1,10 +1,9 @@
 import {
-  List, Datagrid, TextField, NumberField, BooleanField, ReferenceField,
-  SearchInput, Edit, Create, TabbedForm, TextInput, NumberInput,
-  BooleanInput, DateInput, SelectInput, ArrayInput, SimpleFormIterator,
-  ReferenceInput, AutocompleteInput, ReferenceArrayInput,
-  AutocompleteArrayInput, NullableBooleanInput, useRecordContext,
-  required,
+  List, TextField, NumberField, BooleanField, ReferenceField, SearchInput,
+  Edit, Create, TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
+  SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
+  AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
+  NullableBooleanInput, useRecordContext, required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
@@ -19,6 +18,7 @@ import {
   versionLabels, tempos, freeText,
   byName, bySortName, byTitle,
 } from './vocab';
+import { CatalogDatagrid } from './shared';
 
 const filters = [
   <SearchInput source="title@ilike" alwaysOn />,
@@ -81,7 +81,7 @@ const iteratorSx = {
 
 const RecordingList = () => (
   <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="version_label" label="Version" emptyText="—" />
       <TextField source="isrc" label="ISRC" emptyText="—" />
@@ -94,7 +94,7 @@ const RecordingList = () => (
       <BooleanField source="has_pitch_contact" label="Contact" />
       <ReferenceField source="status_id" reference="asset_status"
                       label="Status" emptyText="—" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 

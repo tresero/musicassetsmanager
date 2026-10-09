@@ -1,9 +1,8 @@
 import {
-  List, Datagrid, TextField, NumberField, DateField, SearchInput,
-  Edit, Create, TabbedForm, TextInput, NumberInput, DateInput, SelectInput,
-  ArrayInput, SimpleFormIterator, ReferenceInput, AutocompleteInput,
-  useRecordContext, useSimpleFormIteratorItem, minValue,
-  required,
+  List, TextField, NumberField, DateField, SearchInput, Edit, Create,
+  TabbedForm, TextInput, NumberInput, DateInput, SelectInput, ArrayInput,
+  SimpleFormIterator, ReferenceInput, AutocompleteInput, useRecordContext,
+  useSimpleFormIteratorItem, minValue, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { Box, Typography, TextField as MuiTextField } from '@mui/material';
@@ -13,6 +12,7 @@ import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { byName, bySortName, byTitle } from './vocab';
+import { CatalogDatagrid } from './shared';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -76,7 +76,7 @@ const TrackNumber = () => {
 
 const ReleaseList = () => (
   <List filters={filters} sort={{ field: 'release_date', order: 'DESC' }} perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="title" />
       <TextField source="release_type" label="Type" />
       <TextField source="upc" label="UPC" emptyText="—" />
@@ -84,7 +84,7 @@ const ReleaseList = () => (
       <TextField source="status" />
       <NumberField source="track_count" label="Tracks" />
       <TextField source="duration_display" label="Length" emptyText="—" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 

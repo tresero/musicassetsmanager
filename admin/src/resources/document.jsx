@@ -1,11 +1,12 @@
 import {
-  List, Datagrid, TextField, DateField, NumberField, ReferenceField,
-  SearchInput, Edit, Create, SimpleForm, TextInput, NumberInput,
-  DateInput, SelectInput, ReferenceInput, AutocompleteInput,
-  ReferenceArrayInput, AutocompleteArrayInput,
+  List, TextField, DateField, NumberField, ReferenceField, SearchInput, Edit,
+  Create, SimpleForm, TextInput, NumberInput, DateInput, SelectInput,
+  ReferenceInput, AutocompleteInput, ReferenceArrayInput,
+  AutocompleteArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
+import { CatalogDatagrid } from './shared';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -25,7 +26,7 @@ const storageKinds = [
 const DocumentList = () => (
   <List filters={filters} sort={{ field: 'document_date', order: 'DESC' }}
         perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="title" />
       <ReferenceField source="document_type_id" reference="document_type"
                       label="Type" emptyText="—" />
@@ -33,7 +34,7 @@ const DocumentList = () => (
       <DateField source="signed_on" label="Signed" emptyText="—" />
       <DateField source="expires_on" label="Expires" emptyText="—" />
       <TextField source="storage_kind" label="Storage" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 

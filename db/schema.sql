@@ -476,6 +476,34 @@ END;
 $$;
 
 --
+-- Name: me(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.me() RETURNS json
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT json_build_object(
+    'role', r.name,
+    'site_admin', u.is_site_admin,
+    'permissions', coalesce((
+      SELECT json_agg(p.code ORDER BY p.code)
+        FROM music.account_role_permission rp
+        JOIN music.permission p ON p.id = rp.permission_id
+       WHERE rp.role_id = u.role_id), '[]'::json))
+    FROM music.user_account u
+    JOIN music.account_role r ON r.id = u.role_id
+   WHERE u.id = music.current_app_user()
+     AND u.account_id = music.current_account()
+$$;
+
+--
+-- Name: FUNCTION me(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do.';
+
+--
 -- Name: organization_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -1152,6 +1180,30 @@ CREATE FUNCTION auth.sign(payload json) RETURNS text
 $$;
 
 --
+-- Name: can(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.can(p_code text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+      FROM music.user_account u
+      JOIN music.account_role_permission rp ON rp.role_id = u.role_id
+      JOIN music.permission p ON p.id = rp.permission_id
+     WHERE u.id = music.current_app_user()
+       AND u.account_id = music.current_account()
+       AND p.code = p_code)
+$$;
+
+--
+-- Name: FUNCTION can(p_code text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.can(p_code text) IS 'True when the signed-in user''s role has the permission. Owner rights only to read the user''s own role; it changes nothing.';
+
+--
 -- Name: check_representation_exclusive(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -1196,6 +1248,20 @@ CREATE FUNCTION music.current_account() RETURNS uuid
     AS $$
   SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'account_id')::uuid
 $$;
+
+--
+-- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.current_app_user() RETURNS uuid
+    LANGUAGE sql STABLE
+    AS $$ SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'sub')::uuid $$;
+
+--
+-- Name: FUNCTION current_app_user(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.current_app_user() IS 'The signed-in user from the request token; null outside an API request.';
 
 --
 -- Name: default_audio_file_type(text); Type: FUNCTION; Schema: music; Owner: -
@@ -1761,6 +1827,29 @@ $$;
 
 COMMENT ON FUNCTION music.release_status(p_release integer) IS 'Draft with no distributions; Live while any distribution is live; Submitted
 when one is awaiting its live date; otherwise Taken down.';
+
+--
+-- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.require_permission() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT music.can(TG_ARGV[0]) THEN
+    RAISE EXCEPTION 'Your role does not allow %',
+      (SELECT description FROM music.permission WHERE code = TG_ARGV[0])
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION require_permission(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.require_permission() IS 'Statement trigger: refuses the write with a clear error unless the signed-in user''s role has the permission named in the trigger argument. Writes outside an API request, such as migrations, are not checked.';
 
 --
 -- Name: set_updated_at(); Type: FUNCTION; Schema: music; Owner: -
@@ -3731,6 +3820,50 @@ CREATE TABLE music.account (
 ALTER TABLE ONLY music.account FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: account_role; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_role (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text NOT NULL
+);
+
+--
+-- Name: TABLE account_role; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
+
+--
+-- Name: account_role_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.account_role ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.account_role_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: account_role_permission; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_role_permission (
+    role_id integer NOT NULL,
+    permission_id integer NOT NULL
+);
+
+--
+-- Name: TABLE account_role_permission; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.account_role_permission IS 'Which permissions each account role has.';
+
+--
 -- Name: artist_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -3892,6 +4025,41 @@ ALTER TABLE music.mood ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 ALTER TABLE music.organization ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME music.organization_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: permission; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.permission (
+    id integer NOT NULL,
+    code text NOT NULL,
+    description text NOT NULL
+);
+
+--
+-- Name: TABLE permission; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.permission IS 'Actions the database checks by code. The set is fixed by the code that checks it.';
+
+--
+-- Name: COLUMN permission.description; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.permission.description IS 'Completes the sentence "Your role does not allow ..." in the error a refused user sees.';
+
+--
+-- Name: permission_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.permission ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.permission_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -4103,10 +4271,24 @@ CREATE TABLE music.user_account (
     account_id uuid CONSTRAINT app_user_account_id_not_null NOT NULL,
     email music.email_address CONSTRAINT app_user_email_not_null NOT NULL,
     created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
-    password_hash text NOT NULL
+    password_hash text NOT NULL,
+    role_id integer NOT NULL,
+    is_site_admin boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN user_account.role_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.role_id IS 'The user''s account role. Required, with no default, so access is always granted on purpose.';
+
+--
+-- Name: COLUMN user_account.is_site_admin; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.is_site_admin IS 'The operator of this installation, not tied to one account. Sees the shared lists.';
 
 --
 -- Name: vocal_type_id_seq; Type: SEQUENCE; Schema: music; Owner: -
@@ -4127,6 +4309,27 @@ ALTER TABLE music.vocal_type ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 ALTER TABLE ONLY music.account
     ADD CONSTRAINT account_pkey PRIMARY KEY (id);
+
+--
+-- Name: account_role account_role_name_key; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.account_role
+    ADD CONSTRAINT account_role_name_key UNIQUE (name);
+
+--
+-- Name: account_role_permission account_role_permission_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.account_role_permission
+    ADD CONSTRAINT account_role_permission_pkey PRIMARY KEY (role_id, permission_id);
+
+--
+-- Name: account_role account_role_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.account_role
+    ADD CONSTRAINT account_role_pkey PRIMARY KEY (id);
 
 --
 -- Name: account_storage account_storage_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -4393,6 +4596,20 @@ ALTER TABLE ONLY music.organization
 
 ALTER TABLE ONLY music.organization
     ADD CONSTRAINT organization_pkey PRIMARY KEY (id);
+
+--
+-- Name: permission permission_code_key; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.permission
+    ADD CONSTRAINT permission_code_key UNIQUE (code);
+
+--
+-- Name: permission permission_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.permission
+    ADD CONSTRAINT permission_pkey PRIMARY KEY (id);
 
 --
 -- Name: pitch_setting pitch_setting_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5277,10 +5494,40 @@ CREATE TRIGGER song_ins INSTEAD OF INSERT ON api.song FOR EACH ROW EXECUTE FUNCT
 CREATE TRIGGER song_upd INSTEAD OF UPDATE ON api.song FOR EACH ROW EXECUTE FUNCTION api.song_write();
 
 --
+-- Name: account_storage account_storage_settings_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_storage_settings_permission BEFORE INSERT OR DELETE OR UPDATE ON music.account_storage FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('settings.edit');
+
+--
 -- Name: account_storage account_storage_touch; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER account_storage_touch BEFORE UPDATE ON music.account_storage FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
+
+--
+-- Name: artist artist_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER artist_delete_permission BEFORE DELETE ON music.artist FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: artist artist_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER artist_edit_permission BEFORE INSERT OR UPDATE ON music.artist FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: artist_member artist_member_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER artist_member_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.artist_member FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: audio_file audio_file_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER audio_file_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.audio_file FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
 -- Name: audio_file audio_file_touch; Type: TRIGGER; Schema: music; Owner: -
@@ -5289,10 +5536,46 @@ CREATE TRIGGER account_storage_touch BEFORE UPDATE ON music.account_storage FOR 
 CREATE TRIGGER audio_file_touch BEFORE UPDATE ON music.audio_file FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: contact contact_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_delete_permission BEFORE DELETE ON music.contact FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: contact_document contact_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.contact_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: contact contact_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_edit_permission BEFORE INSERT OR UPDATE ON music.contact FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: contact_email contact_email_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_email_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.contact_email FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: contact_email contact_email_touch; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER contact_email_touch BEFORE UPDATE ON music.contact_email FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
+
+--
+-- Name: contact_organization contact_organization_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_organization_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.contact_organization FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: contact_phone contact_phone_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_phone_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.contact_phone FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
 -- Name: contact_phone contact_phone_touch; Type: TRIGGER; Schema: music; Owner: -
@@ -5307,10 +5590,40 @@ CREATE TRIGGER contact_phone_touch BEFORE UPDATE ON music.contact_phone FOR EACH
 CREATE TRIGGER contact_touch BEFORE UPDATE ON music.contact FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: document document_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER document_delete_permission BEFORE DELETE ON music.document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: document document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER document_edit_permission BEFORE INSERT OR UPDATE ON music.document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: document document_storage_kind; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER document_storage_kind BEFORE INSERT OR UPDATE ON music.document FOR EACH ROW EXECUTE FUNCTION music.document_storage_kind();
+
+--
+-- Name: organization organization_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER organization_delete_permission BEFORE DELETE ON music.organization FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: organization_document organization_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER organization_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.organization_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: organization organization_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER organization_edit_permission BEFORE INSERT OR UPDATE ON music.organization FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
 -- Name: organization organization_touch; Type: TRIGGER; Schema: music; Owner: -
@@ -5319,10 +5632,88 @@ CREATE TRIGGER document_storage_kind BEFORE INSERT OR UPDATE ON music.document F
 CREATE TRIGGER organization_touch BEFORE UPDATE ON music.organization FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: pitch_setting pitch_setting_settings_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER pitch_setting_settings_permission BEFORE INSERT OR DELETE OR UPDATE ON music.pitch_setting FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('settings.edit');
+
+--
+-- Name: recording_artist recording_artist_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_artist_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_artist FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_credit recording_credit_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_credit_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_credit FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_credit_instrument recording_credit_instrument_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_credit_instrument_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_credit_instrument FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_credit_role recording_credit_role_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_credit_role_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_credit_role FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording recording_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_delete_permission BEFORE DELETE ON music.recording FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: recording_document recording_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording recording_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_edit_permission BEFORE INSERT OR UPDATE ON music.recording FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_genre recording_genre_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_genre_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_genre FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_mood recording_mood_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_mood_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_mood FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_owner recording_owner_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_owner_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_owner FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording_representation recording_representation_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_representation_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_representation FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: recording_representation recording_representation_exclusive; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE CONSTRAINT TRIGGER recording_representation_exclusive AFTER INSERT OR UPDATE ON music.recording_representation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION music.check_representation_exclusive();
+
+--
+-- Name: recording_song recording_song_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_song_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_song FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
 -- Name: recording recording_touch; Type: TRIGGER; Schema: music; Owner: -
@@ -5331,16 +5722,108 @@ CREATE CONSTRAINT TRIGGER recording_representation_exclusive AFTER INSERT OR UPD
 CREATE TRIGGER recording_touch BEFORE UPDATE ON music.recording FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: release_artist release_artist_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_artist_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.release_artist FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: release release_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_delete_permission BEFORE DELETE ON music.release FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: release_distribution release_distribution_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_distribution_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.release_distribution FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: release_document release_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.release_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: release release_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_edit_permission BEFORE INSERT OR UPDATE ON music.release FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: release_track release_track_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_track_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.release_track FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song song_delete_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_delete_permission BEFORE DELETE ON music.song FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.delete');
+
+--
+-- Name: song_document song_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song song_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_edit_permission BEFORE INSERT OR UPDATE ON music.song FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song_publisher song_publisher_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_publisher_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_publisher FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song_registration song_registration_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_registration_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_registration FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song_title song_title_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_title_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_title FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: song song_touch; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER song_touch BEFORE UPDATE ON music.song FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: song_writer song_writer_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_writer_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_writer FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: song_writer song_writer_pro; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER song_writer_pro BEFORE INSERT ON music.song_writer FOR EACH ROW EXECUTE FUNCTION music.song_writer_default_pro();
+
+--
+-- Name: account_role_permission account_role_permission_permission_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.account_role_permission
+    ADD CONSTRAINT account_role_permission_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES music.permission(id) ON DELETE CASCADE;
+
+--
+-- Name: account_role_permission account_role_permission_role_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.account_role_permission
+    ADD CONSTRAINT account_role_permission_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id) ON DELETE CASCADE;
 
 --
 -- Name: account_storage account_storage_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -5985,6 +6468,13 @@ ALTER TABLE ONLY music.song_writer
 
 ALTER TABLE ONLY music.song_writer
     ADD CONSTRAINT song_writer_song_id_fkey FOREIGN KEY (song_id) REFERENCES music.song(id) ON DELETE CASCADE;
+
+--
+-- Name: user_account user_account_role_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_account
+    ADD CONSTRAINT user_account_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id);
 
 --
 -- Name: account; Type: ROW SECURITY; Schema: music; Owner: -
@@ -6740,6 +7230,13 @@ REVOKE ALL ON FUNCTION api.login(email text, pass text) FROM PUBLIC;
 GRANT ALL ON FUNCTION api.login(email text, pass text) TO web_anon;
 
 --
+-- Name: FUNCTION me(); Type: ACL; Schema: api; Owner: -
+--
+
+REVOKE ALL ON FUNCTION api.me() FROM PUBLIC;
+GRANT ALL ON FUNCTION api.me() TO app_user;
+
+--
 -- Name: FUNCTION organization_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -7418,6 +7915,18 @@ GRANT SELECT ON TABLE api.vocal_type TO app_user;
 --
 
 --
+-- Name: TABLE account_role; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.account_role TO app_user;
+
+--
+-- Name: TABLE account_role_permission; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.account_role_permission TO app_user;
+
+--
 -- Name: SEQUENCE artist_id_seq; Type: ACL; Schema: music; Owner: -
 --
 
@@ -7488,6 +7997,12 @@ GRANT USAGE ON SEQUENCE music.mood_id_seq TO app_user;
 --
 
 GRANT USAGE ON SEQUENCE music.organization_id_seq TO app_user;
+
+--
+-- Name: TABLE permission; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.permission TO app_user;
 
 --
 -- Name: COLUMN user_account.id; Type: ACL; Schema: music; Owner: -

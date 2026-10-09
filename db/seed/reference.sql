@@ -1186,3 +1186,25 @@ COPY music.asset_status (id, name) FROM stdin;
 \.
 SELECT setval(pg_get_serial_sequence('music.asset_status', 'id'), (SELECT max(id) FROM music.asset_status));
 
+COPY music.account_role (id, name, description) FROM stdin;
+1	Owner	Everything, including deletes, settings and users.
+2	Editor	Adds and edits catalog data. Cannot delete whole records or change settings.
+3	Viewer	Reads everything in the account and changes nothing.
+\.
+SELECT setval(pg_get_serial_sequence('music.account_role', 'id'), (SELECT max(id) FROM music.account_role));
+
+COPY music.permission (id, code, description) FROM stdin;
+1	catalog.edit	adding or editing catalog data
+2	catalog.delete	deleting songs, recordings, releases, people, companies, artists or documents
+3	settings.edit	changing settings
+4	users.manage	managing users
+\.
+SELECT setval(pg_get_serial_sequence('music.permission', 'id'), (SELECT max(id) FROM music.permission));
+
+COPY music.account_role_permission (role_id, permission_id) FROM stdin;
+1	1
+2	1
+1	2
+1	3
+1	4
+\.

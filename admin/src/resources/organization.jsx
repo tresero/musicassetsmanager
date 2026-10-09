@@ -1,19 +1,19 @@
 import {
-  List, Datagrid, TextField, ReferenceField, SearchInput,
-  Edit, Create, TabbedForm, TextInput,
-  ReferenceInput, AutocompleteInput,
+  List, TextField, ReferenceField, SearchInput, Edit, Create, TabbedForm,
+  TextInput, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { DocumentsInput } from './documentsTab';
 import { IsniInput } from './IsniInput';
 import { byName, byCode, proOptionText, proInputText } from './vocab';
+import { CatalogDatagrid } from './shared';
 
 const filters = [<SearchInput source="name@ilike" alwaysOn />];
 
 const OrgList = () => (
   <List filters={filters} sort={{ field: 'name', order: 'ASC' }} perPage={50}>
-    <Datagrid rowClick="edit">
+    <CatalogDatagrid rowClick="edit">
       <TextField source="name" />
       <ReferenceField source="pro_code" reference="pro" label="PRO" emptyText="—">
         <TextField source="code" />
@@ -21,7 +21,7 @@ const OrgList = () => (
       <TextField source="member_ipi" label="IPI" emptyText="—" />
       <TextField source="isni" label="ISNI" emptyText="—" />
       <ReferenceField source="country" reference="country" emptyText="—" />
-    </Datagrid>
+    </CatalogDatagrid>
   </List>
 );
 
