@@ -103,7 +103,7 @@ CREATE DOMAIN music.web_url AS text
 --
 
 CREATE FUNCTION api.account_storage_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _acct uuid;
@@ -146,11 +146,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION account_storage_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.account_storage_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: artist_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.artist_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id integer;
@@ -209,11 +215,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION artist_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.artist_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: contact_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.contact_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id integer;
@@ -312,11 +324,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION contact_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.contact_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: document_orphan_delete(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.document_orphan_delete() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 BEGIN
   DELETE FROM music.document WHERE id = OLD.id;
@@ -325,11 +343,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION document_orphan_delete(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.document_orphan_delete() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: document_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.document_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id  integer;
@@ -415,6 +439,12 @@ END;
 $$;
 
 --
+-- Name: FUNCTION document_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.document_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: login(text, text); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -450,7 +480,7 @@ $$;
 --
 
 CREATE FUNCTION api.organization_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id integer;
@@ -488,11 +518,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION organization_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.organization_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: recording_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.recording_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id    integer;
@@ -776,11 +812,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION recording_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.recording_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: release_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.release_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id   integer;
@@ -891,11 +933,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION release_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.release_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: set_storage_secret(text); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.set_storage_secret(secret text) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 BEGIN
   UPDATE music.account_storage
@@ -909,11 +957,17 @@ END;
 $$;
 
 --
+-- Name: FUNCTION set_storage_secret(secret text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.set_storage_secret(secret text) IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
 -- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
 CREATE FUNCTION api.song_write() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
+    LANGUAGE plpgsql
     AS $$
 DECLARE
   _id integer;
@@ -1052,6 +1106,12 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+--
+-- Name: FUNCTION song_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.song_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
 
 --
 -- Name: b64url(bytea); Type: FUNCTION; Schema: auth; Owner: -
@@ -6461,69 +6521,69 @@ GRANT SELECT ON TABLE api.pro_territory TO app_user;
 -- Name: TABLE audio_file; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.audio_file TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file TO app_user;
 GRANT SELECT ON TABLE music.audio_file TO mamupload;
 
 --
 -- Name: TABLE recording; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording TO app_user;
 GRANT SELECT ON TABLE music.recording TO mamupload;
 
 --
 -- Name: TABLE recording_artist; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_artist TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_artist TO app_user;
 
 --
 -- Name: TABLE recording_credit; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_credit TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit TO app_user;
 
 --
 -- Name: TABLE recording_credit_instrument; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_credit_instrument TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_instrument TO app_user;
 
 --
 -- Name: TABLE recording_credit_role; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_credit_role TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_role TO app_user;
 
 --
 -- Name: TABLE recording_genre; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_genre TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_genre TO app_user;
 
 --
 -- Name: TABLE recording_mood; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_mood TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_mood TO app_user;
 
 --
 -- Name: TABLE recording_owner; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_owner TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_owner TO app_user;
 
 --
 -- Name: TABLE recording_representation; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_representation TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_representation TO app_user;
 
 --
 -- Name: TABLE recording_song; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.recording_song TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_song TO app_user;
 
 --
 -- Name: TABLE recording; Type: ACL; Schema: api; Owner: -
@@ -6535,13 +6595,13 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.recording TO app_user;
 -- Name: TABLE song; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.song TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
 
 --
 -- Name: TABLE song_writer; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.song_writer TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_writer TO app_user;
 
 --
 -- Name: TABLE recording_cover; Type: ACL; Schema: api; Owner: -
@@ -6637,19 +6697,19 @@ GRANT SELECT ON TABLE api.schema_type TO app_user;
 -- Name: TABLE song_publisher; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.song_publisher TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_publisher TO app_user;
 
 --
 -- Name: TABLE song_registration; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.song_registration TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_registration TO app_user;
 
 --
 -- Name: TABLE song_title; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.song_title TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_title TO app_user;
 
 --
 -- Name: TABLE song; Type: ACL; Schema: api; Owner: -
