@@ -2,6 +2,8 @@ module mam-upload
 
 go 1.24
 
+toolchain go1.27.2
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.27.27
