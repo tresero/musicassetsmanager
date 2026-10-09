@@ -1425,6 +1425,132 @@ $_$;
 COMMENT ON FUNCTION music.merge_document(p_keep integer, p_drop integer) IS 'Merges a duplicate document into the one kept: every attachment moves to it, blank fields are filled from the duplicate, and the duplicate is deleted.';
 
 --
+-- Name: own_artist(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_artist(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.artist WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_artist(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_artist(p_id integer) IS 'True when the artist row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_contact(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_contact(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.contact WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_contact(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_contact(p_id integer) IS 'True when the contact row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_credit(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_credit(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording_credit WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_credit(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_credit(p_id integer) IS 'True when the recording_credit row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_document(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_document(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.document WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_document(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_document(p_id integer) IS 'True when the document row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_organization(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_organization(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.organization WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_organization(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_organization(p_id integer) IS 'True when the organization row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_recording(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_recording(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_recording(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_recording(p_id integer) IS 'True when the recording row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_release(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_release(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.release WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_release(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_release(p_id integer) IS 'True when the release row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_song(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_song(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.song WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_song(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_song(p_id integer) IS 'True when the song row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_song_writer(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_song_writer(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.song_writer WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_song_writer(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_song_writer(p_id integer) IS 'True when the song_writer row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
 -- Name: recording_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -1903,6 +2029,8 @@ CREATE TABLE music.artist_member (
     CONSTRAINT artist_member_dates CHECK (((end_date IS NULL) OR (begin_date IS NULL) OR (end_date >= begin_date)))
 );
 
+ALTER TABLE ONLY music.artist_member FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: contact; Type: TABLE; Schema: music; Owner: -
 --
@@ -2036,6 +2164,8 @@ CREATE TABLE music.contact_email (
     CONSTRAINT email_trimmed CHECK (((email)::text = btrim((email)::text)))
 );
 
+ALTER TABLE ONLY music.contact_email FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: contact_organization; Type: TABLE; Schema: music; Owner: -
 --
@@ -2048,6 +2178,8 @@ CREATE TABLE music.contact_organization (
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY music.contact_organization FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: contact_phone; Type: TABLE; Schema: music; Owner: -
@@ -2068,6 +2200,8 @@ CREATE TABLE music.contact_phone (
     CONSTRAINT phone_cc_range CHECK (((country_code >= 1) AND (country_code <= 999))),
     CONSTRAINT phone_trimmed CHECK (((number = btrim(number)) AND (number <> ''::text)))
 );
+
+ALTER TABLE ONLY music.contact_phone FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: TABLE contact_phone; Type: COMMENT; Schema: music; Owner: -
@@ -2199,6 +2333,8 @@ CREATE TABLE music.contact_document (
     notes text
 );
 
+ALTER TABLE ONLY music.contact_document FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: document; Type: TABLE; Schema: music; Owner: -
 --
@@ -2237,6 +2373,8 @@ CREATE TABLE music.organization_document (
     notes text
 );
 
+ALTER TABLE ONLY music.organization_document FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: recording_document; Type: TABLE; Schema: music; Owner: -
 --
@@ -2247,6 +2385,8 @@ CREATE TABLE music.recording_document (
     notes text
 );
 
+ALTER TABLE ONLY music.recording_document FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: song_document; Type: TABLE; Schema: music; Owner: -
 --
@@ -2256,6 +2396,8 @@ CREATE TABLE music.song_document (
     document_id integer NOT NULL,
     notes text
 );
+
+ALTER TABLE ONLY music.song_document FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: document; Type: VIEW; Schema: api; Owner: -
@@ -2323,6 +2465,8 @@ CREATE TABLE music.release_document (
     release_id integer NOT NULL,
     document_id integer NOT NULL
 );
+
+ALTER TABLE ONLY music.release_document FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: document_orphan; Type: VIEW; Schema: api; Owner: -
@@ -2645,6 +2789,8 @@ CREATE TABLE music.audio_file (
     CONSTRAINT audio_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'url'::text])))
 );
 
+ALTER TABLE ONLY music.audio_file FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: recording; Type: TABLE; Schema: music; Owner: -
 --
@@ -2764,6 +2910,8 @@ CREATE TABLE music.recording_artist (
     CONSTRAINT recording_artist_role CHECK ((role = ANY (ARRAY['main'::text, 'featured'::text])))
 );
 
+ALTER TABLE ONLY music.recording_artist FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: recording_credit; Type: TABLE; Schema: music; Owner: -
 --
@@ -2781,6 +2929,8 @@ CREATE TABLE music.recording_credit (
     CONSTRAINT recording_credit_party CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
     CONSTRAINT recording_credit_share CHECK (((share IS NULL) OR ((share >= (0)::numeric) AND (share <= (100)::numeric))))
 );
+
+ALTER TABLE ONLY music.recording_credit FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN recording_credit.share; Type: COMMENT; Schema: music; Owner: -
@@ -2815,6 +2965,8 @@ CREATE TABLE music.recording_credit_instrument (
     instrument_id integer NOT NULL
 );
 
+ALTER TABLE ONLY music.recording_credit_instrument FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: recording_credit_role; Type: TABLE; Schema: music; Owner: -
 --
@@ -2823,6 +2975,8 @@ CREATE TABLE music.recording_credit_role (
     credit_id integer NOT NULL,
     role_id integer NOT NULL
 );
+
+ALTER TABLE ONLY music.recording_credit_role FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: recording_genre; Type: TABLE; Schema: music; Owner: -
@@ -2833,6 +2987,8 @@ CREATE TABLE music.recording_genre (
     genre_id integer NOT NULL
 );
 
+ALTER TABLE ONLY music.recording_genre FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: recording_mood; Type: TABLE; Schema: music; Owner: -
 --
@@ -2841,6 +2997,8 @@ CREATE TABLE music.recording_mood (
     recording_id integer NOT NULL,
     mood_id integer NOT NULL
 );
+
+ALTER TABLE ONLY music.recording_mood FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: recording_owner; Type: TABLE; Schema: music; Owner: -
@@ -2856,6 +3014,8 @@ CREATE TABLE music.recording_owner (
     CONSTRAINT recording_owner_party CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
     CONSTRAINT recording_owner_share CHECK (((share IS NULL) OR ((share >= (0)::numeric) AND (share <= (100)::numeric))))
 );
+
+ALTER TABLE ONLY music.recording_owner FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN recording_owner.controlled; Type: COMMENT; Schema: music; Owner: -
@@ -2885,6 +3045,8 @@ CREATE TABLE music.recording_representation (
     CONSTRAINT recording_representation_term CHECK (((ends_on IS NULL) OR (signed_on IS NULL) OR (ends_on >= signed_on)))
 );
 
+ALTER TABLE ONLY music.recording_representation FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: TABLE recording_representation; Type: COMMENT; Schema: music; Owner: -
 --
@@ -2913,6 +3075,8 @@ CREATE TABLE music.recording_song (
     recording_id integer NOT NULL,
     song_id integer NOT NULL
 );
+
+ALTER TABLE ONLY music.recording_song FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: recording; Type: VIEW; Schema: api; Owner: -
@@ -3063,6 +3227,8 @@ CREATE TABLE music.song_writer (
     pro_code text,
     CONSTRAINT song_writer_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
 );
+
+ALTER TABLE ONLY music.song_writer FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: recording_cover; Type: VIEW; Schema: api; Owner: -
@@ -3219,6 +3385,8 @@ CREATE TABLE music.release_artist (
     CONSTRAINT release_artist_role CHECK ((role = ANY (ARRAY['main'::text, 'featured'::text])))
 );
 
+ALTER TABLE ONLY music.release_artist FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: release_distribution; Type: TABLE; Schema: music; Owner: -
 --
@@ -3236,6 +3404,8 @@ CREATE TABLE music.release_distribution (
     CONSTRAINT release_distribution_term CHECK (((taken_down_on IS NULL) OR (live_on IS NULL) OR (taken_down_on >= live_on))),
     CONSTRAINT release_distribution_upc_valid CHECK (((upc IS NULL) OR music.gtin_valid(upc)))
 );
+
+ALTER TABLE ONLY music.release_distribution FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN release_distribution.upc; Type: COMMENT; Schema: music; Owner: -
@@ -3255,6 +3425,8 @@ CREATE TABLE music.release_track (
     track_number smallint NOT NULL,
     CONSTRAINT release_track_numbers CHECK (((disc_number >= 1) AND (track_number >= 1)))
 );
+
+ALTER TABLE ONLY music.release_track FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: COLUMN release_track.track_number; Type: COMMENT; Schema: music; Owner: -
@@ -3405,6 +3577,8 @@ CREATE TABLE music.song_publisher (
     CONSTRAINT song_publisher_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
 );
 
+ALTER TABLE ONLY music.song_publisher FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: song_registration; Type: TABLE; Schema: music; Owner: -
 --
@@ -3417,6 +3591,8 @@ CREATE TABLE music.song_registration (
     registered_on date,
     notes text
 );
+
+ALTER TABLE ONLY music.song_registration FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: song_title; Type: TABLE; Schema: music; Owner: -
@@ -3431,6 +3607,8 @@ CREATE TABLE music.song_title (
     CONSTRAINT song_title_alt_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
     CONSTRAINT song_title_type CHECK ((title_type = ANY (ARRAY['alternate'::text, 'translated'::text, 'working'::text, 'formal'::text, 'part'::text])))
 );
+
+ALTER TABLE ONLY music.song_title FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: song; Type: VIEW; Schema: api; Owner: -
@@ -3549,6 +3727,8 @@ CREATE TABLE music.account (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT account_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
+
+ALTER TABLE ONLY music.account FORCE ROW LEVEL SECURITY;
 
 --
 -- Name: artist_id_seq; Type: SEQUENCE; Schema: music; Owner: -
@@ -5807,6 +5987,24 @@ ALTER TABLE ONLY music.song_writer
     ADD CONSTRAINT song_writer_song_id_fkey FOREIGN KEY (song_id) REFERENCES music.song(id) ON DELETE CASCADE;
 
 --
+-- Name: account; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.account ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: account account_own; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY account_own ON music.account USING ((id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY account_own ON account; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY account_own ON music.account IS 'A signed-in user sees only their own account.';
+
+--
 -- Name: account_storage; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -5855,6 +6053,42 @@ CREATE POLICY artist_account ON music.artist USING ((account_id = ( SELECT music
 COMMENT ON POLICY artist_account ON music.artist IS 'Limits every role without its own policy to rows of the account in the request token.';
 
 --
+-- Name: artist_member; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.artist_member ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: artist_member artist_member_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY artist_member_account ON music.artist_member USING (music.own_artist(artist_id)) WITH CHECK ((music.own_artist(artist_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id))));
+
+--
+-- Name: POLICY artist_member_account ON artist_member; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY artist_member_account ON music.artist_member IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: audio_file; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.audio_file ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: audio_file audio_file_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY audio_file_account ON music.audio_file USING (music.own_recording(recording_id)) WITH CHECK (music.own_recording(recording_id));
+
+--
+-- Name: POLICY audio_file_account ON audio_file; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY audio_file_account ON music.audio_file IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
 -- Name: contact; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -5871,6 +6105,78 @@ CREATE POLICY contact_account ON music.contact USING ((account_id = ( SELECT mus
 --
 
 COMMENT ON POLICY contact_account ON music.contact IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: contact_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.contact_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: contact_document contact_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY contact_document_account ON music.contact_document USING (music.own_contact(contact_id)) WITH CHECK ((music.own_contact(contact_id) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY contact_document_account ON contact_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY contact_document_account ON music.contact_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: contact_email; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.contact_email ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: contact_email contact_email_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY contact_email_account ON music.contact_email USING ((((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id)))) WITH CHECK ((((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id))));
+
+--
+-- Name: POLICY contact_email_account ON contact_email; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY contact_email_account ON music.contact_email IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: contact_organization; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.contact_organization ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: contact_organization contact_organization_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY contact_organization_account ON music.contact_organization USING (music.own_contact(contact_id)) WITH CHECK ((music.own_contact(contact_id) AND ((organization_id IS NULL) OR music.own_organization(organization_id))));
+
+--
+-- Name: POLICY contact_organization_account ON contact_organization; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY contact_organization_account ON music.contact_organization IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: contact_phone; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.contact_phone ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: contact_phone contact_phone_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY contact_phone_account ON music.contact_phone USING ((((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id)))) WITH CHECK ((((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id))));
+
+--
+-- Name: POLICY contact_phone_account ON contact_phone; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY contact_phone_account ON music.contact_phone IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: document; Type: ROW SECURITY; Schema: music; Owner: -
@@ -5921,6 +6227,24 @@ CREATE POLICY organization_account ON music.organization USING ((account_id = ( 
 COMMENT ON POLICY organization_account ON music.organization IS 'Limits every role without its own policy to rows of the account in the request token.';
 
 --
+-- Name: organization_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.organization_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: organization_document organization_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY organization_document_account ON music.organization_document USING (music.own_organization(organization_id)) WITH CHECK ((music.own_organization(organization_id) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY organization_document_account ON organization_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY organization_document_account ON music.organization_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
 -- Name: pitch_setting; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -5930,13 +6254,13 @@ ALTER TABLE music.pitch_setting ENABLE ROW LEVEL SECURITY;
 -- Name: pitch_setting pitch_setting_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY pitch_setting_account ON music.pitch_setting USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+CREATE POLICY pitch_setting_account ON music.pitch_setting USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((default_contact_id IS NULL) OR music.own_contact(default_contact_id))));
 
 --
 -- Name: POLICY pitch_setting_account ON pitch_setting; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON POLICY pitch_setting_account ON music.pitch_setting IS 'Limits every role without its own policy to rows of the account in the request token.';
+COMMENT ON POLICY pitch_setting_account ON music.pitch_setting IS 'Limits every role without its own policy to rows of the account in the request token; on write, every linked record must be in the same account.';
 
 --
 -- Name: recording; Type: ROW SECURITY; Schema: music; Owner: -
@@ -5948,13 +6272,193 @@ ALTER TABLE music.recording ENABLE ROW LEVEL SECURITY;
 -- Name: recording recording_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY recording_account ON music.recording USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+CREATE POLICY recording_account ON music.recording USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((pitch_contact_id IS NULL) OR music.own_contact(pitch_contact_id))));
 
 --
 -- Name: POLICY recording_account ON recording; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON POLICY recording_account ON music.recording IS 'Limits every role without its own policy to rows of the account in the request token.';
+COMMENT ON POLICY recording_account ON music.recording IS 'Limits every role without its own policy to rows of the account in the request token; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_artist; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_artist ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_artist recording_artist_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_artist_account ON music.recording_artist USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((artist_id IS NULL) OR music.own_artist(artist_id))));
+
+--
+-- Name: POLICY recording_artist_account ON recording_artist; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_artist_account ON music.recording_artist IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_credit; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_credit ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_credit recording_credit_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_credit_account ON music.recording_credit USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id))));
+
+--
+-- Name: POLICY recording_credit_account ON recording_credit; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_credit_account ON music.recording_credit IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_credit_instrument; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_credit_instrument ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_credit_instrument recording_credit_instrument_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_credit_instrument_account ON music.recording_credit_instrument USING (music.own_credit(credit_id)) WITH CHECK (music.own_credit(credit_id));
+
+--
+-- Name: POLICY recording_credit_instrument_account ON recording_credit_instrument; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_credit_instrument_account ON music.recording_credit_instrument IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_credit_role; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_credit_role ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_credit_role recording_credit_role_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_credit_role_account ON music.recording_credit_role USING (music.own_credit(credit_id)) WITH CHECK (music.own_credit(credit_id));
+
+--
+-- Name: POLICY recording_credit_role_account ON recording_credit_role; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_credit_role_account ON music.recording_credit_role IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_document recording_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_document_account ON music.recording_document USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY recording_document_account ON recording_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_document_account ON music.recording_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_genre; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_genre ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_genre recording_genre_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_genre_account ON music.recording_genre USING (music.own_recording(recording_id)) WITH CHECK (music.own_recording(recording_id));
+
+--
+-- Name: POLICY recording_genre_account ON recording_genre; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_genre_account ON music.recording_genre IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_mood; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_mood ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_mood recording_mood_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_mood_account ON music.recording_mood USING (music.own_recording(recording_id)) WITH CHECK (music.own_recording(recording_id));
+
+--
+-- Name: POLICY recording_mood_account ON recording_mood; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_mood_account ON music.recording_mood IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_owner; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_owner ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_owner recording_owner_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_owner_account ON music.recording_owner USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id))));
+
+--
+-- Name: POLICY recording_owner_account ON recording_owner; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_owner_account ON music.recording_owner IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_representation; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_representation ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_representation recording_representation_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_representation_account ON music.recording_representation USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id)) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY recording_representation_account ON recording_representation; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_representation_account ON music.recording_representation IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_song; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_song ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_song recording_song_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_song_account ON music.recording_song USING (music.own_recording(recording_id)) WITH CHECK ((music.own_recording(recording_id) AND ((song_id IS NULL) OR music.own_song(song_id))));
+
+--
+-- Name: POLICY recording_song_account ON recording_song; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_song_account ON music.recording_song IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: recording recording_upload; Type: POLICY; Schema: music; Owner: -
@@ -5978,13 +6482,85 @@ ALTER TABLE music.release ENABLE ROW LEVEL SECURITY;
 -- Name: release release_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY release_account ON music.release USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+CREATE POLICY release_account ON music.release USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((c_line_contact_id IS NULL) OR music.own_contact(c_line_contact_id)) AND ((c_line_organization_id IS NULL) OR music.own_organization(c_line_organization_id)) AND ((label_id IS NULL) OR music.own_organization(label_id))));
 
 --
 -- Name: POLICY release_account ON release; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON POLICY release_account ON music.release IS 'Limits every role without its own policy to rows of the account in the request token.';
+COMMENT ON POLICY release_account ON music.release IS 'Limits every role without its own policy to rows of the account in the request token; on write, every linked record must be in the same account.';
+
+--
+-- Name: release_artist; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.release_artist ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: release_artist release_artist_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY release_artist_account ON music.release_artist USING (music.own_release(release_id)) WITH CHECK ((music.own_release(release_id) AND ((artist_id IS NULL) OR music.own_artist(artist_id))));
+
+--
+-- Name: POLICY release_artist_account ON release_artist; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY release_artist_account ON music.release_artist IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: release_distribution; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.release_distribution ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: release_distribution release_distribution_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY release_distribution_account ON music.release_distribution USING (music.own_release(release_id)) WITH CHECK ((music.own_release(release_id) AND ((distributor_id IS NULL) OR music.own_organization(distributor_id))));
+
+--
+-- Name: POLICY release_distribution_account ON release_distribution; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY release_distribution_account ON music.release_distribution IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: release_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.release_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: release_document release_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY release_document_account ON music.release_document USING (music.own_release(release_id)) WITH CHECK ((music.own_release(release_id) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY release_document_account ON release_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY release_document_account ON music.release_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: release_track; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.release_track ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: release_track release_track_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY release_track_account ON music.release_track USING (music.own_release(release_id)) WITH CHECK ((music.own_release(release_id) AND ((recording_id IS NULL) OR music.own_recording(recording_id))));
+
+--
+-- Name: POLICY release_track_account ON release_track; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY release_track_account ON music.release_track IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: song; Type: ROW SECURITY; Schema: music; Owner: -
@@ -5996,13 +6572,103 @@ ALTER TABLE music.song ENABLE ROW LEVEL SECURITY;
 -- Name: song song_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY song_account ON music.song USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+CREATE POLICY song_account ON music.song USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((derived_from_id IS NULL) OR music.own_song(derived_from_id))));
 
 --
 -- Name: POLICY song_account ON song; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON POLICY song_account ON music.song IS 'Limits every role without its own policy to rows of the account in the request token.';
+COMMENT ON POLICY song_account ON music.song IS 'Limits every role without its own policy to rows of the account in the request token; on write, every linked record must be in the same account.';
+
+--
+-- Name: song_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song_document song_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_document_account ON music.song_document USING (music.own_song(song_id)) WITH CHECK ((music.own_song(song_id) AND ((document_id IS NULL) OR music.own_document(document_id))));
+
+--
+-- Name: POLICY song_document_account ON song_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_document_account ON music.song_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: song_publisher; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song_publisher ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song_publisher song_publisher_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_publisher_account ON music.song_publisher USING (music.own_song(song_id)) WITH CHECK ((music.own_song(song_id) AND ((organization_id IS NULL) OR music.own_organization(organization_id)) AND ((for_writer_id IS NULL) OR music.own_song_writer(for_writer_id))));
+
+--
+-- Name: POLICY song_publisher_account ON song_publisher; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_publisher_account ON music.song_publisher IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: song_registration; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song_registration ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song_registration song_registration_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_registration_account ON music.song_registration USING (music.own_song(song_id)) WITH CHECK (music.own_song(song_id));
+
+--
+-- Name: POLICY song_registration_account ON song_registration; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_registration_account ON music.song_registration IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: song_title; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song_title ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song_title song_title_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_title_account ON music.song_title USING (music.own_song(song_id)) WITH CHECK (music.own_song(song_id));
+
+--
+-- Name: POLICY song_title_account ON song_title; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_title_account ON music.song_title IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: song_writer; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.song_writer ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: song_writer song_writer_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY song_writer_account ON music.song_writer USING (music.own_song(song_id)) WITH CHECK ((music.own_song(song_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id))));
+
+--
+-- Name: POLICY song_writer_account ON song_writer; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY song_writer_account ON music.song_writer IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: user_account; Type: ROW SECURITY; Schema: music; Owner: -
