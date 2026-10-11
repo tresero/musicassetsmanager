@@ -3,7 +3,8 @@
 PostgREST cannot accept a file upload, so files go through this service. It
 issues presigned URLs so the browser talks to S3 directly, serves the local
 backend when there is no S3, names files on download, and cleans up stored
-files nothing refers to.
+files nothing refers to. It also emails the invites owners send from the
+Users page.
 
 ```
 POST /upload/presign          where to send a file, or that it is already stored
@@ -16,7 +17,19 @@ mam-upload sweep [-dry-run] [-grace 24h]
 ```
 
 Authentication is the same JWT PostgREST issues. The `account_id` claim decides
-which storage configuration is used, so one service serves every account.
+which storage configuration is used, so one service serves every account. A
+token whose user has been removed from the account is refused at once, as in
+PostgREST.
+
+## Invite emails
+
+`music.send_invite` sends a notice on the `mam_invite` channel each time an
+owner invites someone or resends. The service listens for it and mails the link
+through the local mail server on port 25, so that server has to accept mail
+from localhost. Set `MAM_APP_URL` to the app's public address and
+`MAM_MAIL_FROM` to the sender; with either missing, invite emails are off and
+the log says so. A notice sent while the service is down is lost; resend the
+invite.
 
 ## Build
 
@@ -27,8 +40,8 @@ sudo install -m755 mam-upload /usr/local/bin/
 
 ## Database role
 
-The service reads the account's storage settings, and the sweep reads every
-stored location. It has its own read-only role, `mamupload`, created by
+The service reads the account's storage settings and which users belong to
+which account, and the sweep reads every stored location. It has its own read-only role, `mamupload`, created by
 `db/roles.sql` and granted what it reads by `db/schema.sql`. Give it a
 password:
 
@@ -127,3 +140,4 @@ under a real key.
 | Date | Revision |
 |---|---|
 | 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |
+| 2026-10-10 | Invite emails; tokens of removed users refused |

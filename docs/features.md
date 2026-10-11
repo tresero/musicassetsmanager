@@ -175,6 +175,12 @@ kept apart in the database by row security. A signed-in user sees and changes
 only their own account's records, and a record can only link to others in the
 same account. The shared lists are the only data every account sees.
 
+Owners invite their own staff from Settings, Users. The invite email links to a
+page where the person picks a password and joins with the role the owner chose.
+Invites can be resent, which makes the old link stop working, or cancelled.
+Owners change a user's role or remove them; a removed user is signed out on
+their next request. An account always keeps at least one Owner.
+
 ## Interface
 
 - Save and continue keeps you on the tab you were editing; Save and close
@@ -194,3 +200,4 @@ same account. The shared lists are the only data every account sees.
 |---|---|
 | 2026-09-30 | One stop computed on songs and recordings; controlled master owners; easy clear; vocals; pitch comment and pitch contacts; attaching existing documents; DDEX codes; Pitch settings. |
 | 2026-10-09 | Accounts kept apart by row security; shared lists fixed; required row fields; pitch contact quick add. |
+| 2026-10-10 | Users page and email invites. |

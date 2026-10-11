@@ -13,7 +13,6 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 
@@ -99,6 +98,116 @@ CREATE DOMAIN music.web_url AS text
 	CONSTRAINT url_format CHECK ((VALUE ~ '^https?://[^[:space:]]+$'::text));
 
 --
+-- Name: accept_invite(text, text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.accept_invite(token text, pass text) RETURNS json
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+DECLARE
+  _invite music.user_invite;
+  _user uuid;
+BEGIN
+  SELECT * INTO _invite
+    FROM music.user_invite i
+   WHERE i.token_hash = sha256(convert_to(accept_invite.token, 'UTF8'))
+     AND i.accepted_at IS NULL
+     AND i.expires_at > now()
+     FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'This invite link is no longer valid. Ask for a new one.'
+      USING ERRCODE = 'invalid_password';
+  END IF;
+
+  IF length(coalesce(accept_invite.pass, '')) < 10 THEN
+    RAISE EXCEPTION 'Choose a password of at least 10 characters.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.email = _invite.email) THEN
+    RAISE EXCEPTION '% already has a login. Sign in with it, or ask the site admin.', _invite.email
+      USING ERRCODE = 'unique_violation';
+  END IF;
+
+  INSERT INTO music.user_account (account_id, email, password_hash, role_id)
+  VALUES (_invite.account_id, _invite.email,
+          crypt(accept_invite.pass, gen_salt('bf', 10)), _invite.role_id)
+  RETURNING id INTO _user;
+
+  UPDATE music.user_invite SET accepted_at = now() WHERE id = _invite.id;
+
+  RETURN auth.session(_user);
+END;
+$$;
+
+--
+-- Name: FUNCTION accept_invite(token text, pass text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.accept_invite(token text, pass text) IS 'Turns a valid invite link into a user with the invited role, sets their password and signs them in. Owner rights because the person is not signed in yet.';
+
+--
+-- Name: account_invite_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.account_invite_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _token text := encode(public.gen_random_bytes(32), 'hex');
+  _id uuid;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM music.user_invite WHERE id = OLD.id;
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.email = NEW.email) THEN
+      RAISE EXCEPTION '% is already a user of this account.', NEW.email
+        USING ERRCODE = 'unique_violation';
+    END IF;
+    IF EXISTS (SELECT 1 FROM music.user_invite i
+                WHERE i.email = NEW.email AND i.accepted_at IS NULL) THEN
+      RAISE EXCEPTION 'An invite to % is already open. Resend it instead.', NEW.email
+        USING ERRCODE = 'unique_violation';
+    END IF;
+    INSERT INTO music.user_invite (email, role_id, token_hash)
+    VALUES (NEW.email, NEW.role_id, sha256(convert_to(_token, 'UTF8')))
+    RETURNING id INTO _id;
+  ELSE
+    IF NOT coalesce(NEW.resend, false) THEN
+      RAISE EXCEPTION 'An invite can only be resent or cancelled.';
+    END IF;
+    IF OLD.accepted_at IS NOT NULL THEN
+      RAISE EXCEPTION 'This invite was already accepted.';
+    END IF;
+    UPDATE music.user_invite
+       SET token_hash = sha256(convert_to(_token, 'UTF8')),
+           sent_at = now(),
+           expires_at = now() + interval '7 days'
+     WHERE id = OLD.id;
+    _id := OLD.id;
+  END IF;
+
+  PERFORM music.send_invite(_id, _token);
+
+  SELECT v.id, v.email, v.role_id, v.created_at, v.sent_at, v.expires_at, v.accepted_at, v.status, false
+    INTO NEW.id, NEW.email, NEW.role_id, NEW.created_at, NEW.sent_at, NEW.expires_at, NEW.accepted_at, NEW.status, NEW.resend
+    FROM api.account_invite v WHERE v.id = _id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION account_invite_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.account_invite_write() IS 'Runs as the signed-in user, so row security and the users.manage permission apply. Each send makes a new link code; an older link stops working.';
+
+--
 -- Name: account_storage_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -150,6 +259,31 @@ $$;
 --
 
 COMMENT ON FUNCTION api.account_storage_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: account_user_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.account_user_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM music.user_account WHERE id = OLD.id;
+    RETURN OLD;
+  END IF;
+
+  UPDATE music.user_account SET role_id = NEW.role_id WHERE id = OLD.id;
+  SELECT u.role_id INTO NEW.role_id FROM music.user_account u WHERE u.id = OLD.id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION account_user_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.account_user_write() IS 'Runs as the signed-in user, so row security and the users.manage permission apply.';
 
 --
 -- Name: artist_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -219,6 +353,31 @@ $$;
 --
 
 COMMENT ON FUNCTION api.artist_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: check_session(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.check_session() RETURNS void
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+BEGIN
+  IF nullif(current_setting('request.jwt.claims', true), '')::json->>'role' = 'app_user'
+     AND NOT EXISTS (SELECT 1 FROM music.user_account u
+                      WHERE u.id = music.current_app_user()
+                        AND u.account_id = music.current_account()) THEN
+    RAISE EXCEPTION 'You no longer have access to this account.'
+      USING ERRCODE = 'PT401';
+  END IF;
+END;
+$$;
+
+--
+-- Name: FUNCTION check_session(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.check_session() IS 'PostgREST db-pre-request hook. Refuses a sign-in token whose user was removed from the account, so removal takes effect at once instead of when the token expires. Owner rights only to read user_account; calling it directly does nothing.';
 
 --
 -- Name: contact_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -452,26 +611,18 @@ CREATE FUNCTION api.login(email text, pass text) RETURNS json
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
-  _account uuid;
-  _user    uuid;
+  _user uuid;
 BEGIN
-  SELECT u.account_id, u.id INTO _account, _user
+  SELECT u.id INTO _user
   FROM music.user_account u
   WHERE u.email = login.email
     AND u.password_hash = crypt(login.pass, u.password_hash);
 
-  IF _account IS NULL THEN
+  IF _user IS NULL THEN
     RAISE EXCEPTION 'invalid credentials' USING errcode = 'invalid_password';
   END IF;
 
-  RETURN json_build_object(
-    'token', auth.sign(json_build_object(
-      'role', 'app_user',
-      'account_id', _account,
-      'sub', _user,
-      'exp', extract(epoch FROM now() + interval '8 hours')::int
-    ))
-  );
+  RETURN auth.session(_user);
 END;
 $$;
 
@@ -1152,6 +1303,29 @@ CREATE FUNCTION auth.b64url(data bytea) RETURNS text
 $$;
 
 --
+-- Name: session(uuid); Type: FUNCTION; Schema: auth; Owner: -
+--
+
+CREATE FUNCTION auth.session(p_user uuid) RETURNS json
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT json_build_object(
+    'token', auth.sign(json_build_object(
+      'role', 'app_user',
+      'account_id', u.account_id,
+      'sub', u.id,
+      'exp', extract(epoch FROM now() + interval '8 hours')::int)))
+    FROM music.user_account u
+   WHERE u.id = p_user
+$$;
+
+--
+-- Name: FUNCTION session(p_user uuid); Type: COMMENT; Schema: auth; Owner: -
+--
+
+COMMENT ON FUNCTION auth.session(p_user uuid) IS 'The sign-in token for a user. Used by api.login and api.accept_invite.';
+
+--
 -- Name: set_password(text, text); Type: FUNCTION; Schema: auth; Owner: -
 --
 
@@ -1351,6 +1525,33 @@ $_$;
 --
 
 COMMENT ON FUNCTION music.gtin_valid(p text) IS 'True for a 12-digit UPC or 13-digit EAN whose check digit is correct.';
+
+--
+-- Name: keep_an_owner(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.keep_an_owner() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+      FROM music.user_account u
+      JOIN music.account_role r ON r.id = u.role_id
+     WHERE u.account_id = OLD.account_id
+       AND r.name = 'Owner') THEN
+    RAISE EXCEPTION 'An account needs at least one Owner. Make someone else an Owner first.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION keep_an_owner(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave an account without an Owner. Work outside an API request, such as deleting a whole account, is not checked.';
 
 --
 -- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -1852,6 +2053,33 @@ $$;
 COMMENT ON FUNCTION music.require_permission() IS 'Statement trigger: refuses the write with a clear error unless the signed-in user''s role has the permission named in the trigger argument. Writes outside an API request, such as migrations, are not checked.';
 
 --
+-- Name: send_invite(uuid, text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.send_invite(p_invite uuid, p_token text) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT pg_notify('mam_invite', json_build_object(
+           'email', i.email,
+           'token', p_token,
+           'account', a.name,
+           'role', r.name,
+           'invited_by', u.email)::text)
+    FROM music.user_invite i
+    JOIN music.account a ON a.id = i.account_id
+    JOIN music.account_role r ON r.id = i.role_id
+    LEFT JOIN music.user_account u ON u.id = i.invited_by
+   WHERE i.id = p_invite
+$$;
+
+--
+-- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.send_invite(p_invite uuid, p_token text) IS 'Hands an invite and its link code to mam-upload, which listens on the mam_invite channel and sends the email. The notice is delivered only if the transaction commits. Owner rights only to read the account and inviter names.';
+
+--
 -- Name: set_updated_at(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -2035,6 +2263,95 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: user_invite; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_invite (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    email music.email_address NOT NULL,
+    role_id integer NOT NULL,
+    token_hash bytea NOT NULL,
+    invited_by uuid DEFAULT music.current_app_user(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    sent_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone DEFAULT (now() + '7 days'::interval) NOT NULL,
+    accepted_at timestamp with time zone
+);
+
+ALTER TABLE ONLY music.user_invite FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE user_invite; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.user_invite IS 'An invitation to join an account with a role. Only a hash of the link code is kept; the code itself goes out once, in the email.';
+
+--
+-- Name: COLUMN user_invite.token_hash; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_invite.token_hash IS 'sha256 of the code in the emailed link.';
+
+--
+-- Name: account_invite; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_invite WITH (security_invoker='true') AS
+ SELECT id,
+    email,
+    role_id,
+    created_at,
+    sent_at,
+    expires_at,
+    accepted_at,
+        CASE
+            WHEN (accepted_at IS NOT NULL) THEN 'Accepted'::text
+            WHEN (expires_at <= now()) THEN 'Expired'::text
+            ELSE 'Pending'::text
+        END AS status,
+    false AS resend
+   FROM music.user_invite i;
+
+--
+-- Name: VIEW account_invite; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_invite IS 'The signed-in account''s invites. Insert to invite; update with resend true to send a new link; delete to cancel.';
+
+--
+-- Name: account_role; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_role (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text NOT NULL
+);
+
+--
+-- Name: TABLE account_role; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
+
+--
+-- Name: account_role; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_role WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    description
+   FROM music.account_role;
+
+--
+-- Name: VIEW account_role; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user.';
+
+--
 -- Name: account_storage; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -2084,6 +2401,52 @@ CREATE VIEW api.account_storage WITH (security_invoker='true') AS
     ((secret_key IS NOT NULL) AND (secret_key <> ''::text)) AS key_set,
     notes
    FROM music.account_storage;
+
+--
+-- Name: user_account; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_account (
+    id uuid DEFAULT uuidv7() CONSTRAINT app_user_id_not_null NOT NULL,
+    account_id uuid CONSTRAINT app_user_account_id_not_null NOT NULL,
+    email music.email_address CONSTRAINT app_user_email_not_null NOT NULL,
+    created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
+    password_hash text NOT NULL,
+    role_id integer NOT NULL,
+    is_site_admin boolean DEFAULT false NOT NULL
+);
+
+ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN user_account.role_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.role_id IS 'The user''s account role. Required, with no default, so access is always granted on purpose.';
+
+--
+-- Name: COLUMN user_account.is_site_admin; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.is_site_admin IS 'The operator of this installation, not tied to one account. Sees the shared lists.';
+
+--
+-- Name: account_user; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_user WITH (security_invoker='true') AS
+ SELECT id,
+    email,
+    role_id,
+    created_at,
+    (id = music.current_app_user()) AS is_me
+   FROM music.user_account u;
+
+--
+-- Name: VIEW account_user; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_user IS 'The signed-in account''s users. Only the role can be changed here; removing a row removes the user from the account.';
 
 --
 -- Name: artist; Type: TABLE; Schema: music; Owner: -
@@ -3820,22 +4183,6 @@ CREATE TABLE music.account (
 ALTER TABLE ONLY music.account FORCE ROW LEVEL SECURITY;
 
 --
--- Name: account_role; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.account_role (
-    id integer NOT NULL,
-    name text NOT NULL,
-    description text NOT NULL
-);
-
---
--- Name: TABLE account_role; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
-
---
 -- Name: account_role_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -4261,34 +4608,6 @@ ALTER TABLE music.song_writer ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     NO MAXVALUE
     CACHE 1
 );
-
---
--- Name: user_account; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.user_account (
-    id uuid DEFAULT uuidv7() CONSTRAINT app_user_id_not_null NOT NULL,
-    account_id uuid CONSTRAINT app_user_account_id_not_null NOT NULL,
-    email music.email_address CONSTRAINT app_user_email_not_null NOT NULL,
-    created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
-    password_hash text NOT NULL,
-    role_id integer NOT NULL,
-    is_site_admin boolean DEFAULT false NOT NULL
-);
-
-ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN user_account.role_id; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.user_account.role_id IS 'The user''s account role. Required, with no default, so access is always granted on purpose.';
-
---
--- Name: COLUMN user_account.is_site_admin; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.user_account.is_site_admin IS 'The operator of this installation, not tied to one account. Sees the shared lists.';
 
 --
 -- Name: vocal_type_id_seq; Type: SEQUENCE; Schema: music; Owner: -
@@ -4920,6 +5239,20 @@ ALTER TABLE ONLY music.song_writer
     ADD CONSTRAINT song_writer_unique UNIQUE (song_id, contact_id, role_id);
 
 --
+-- Name: user_invite user_invite_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_invite
+    ADD CONSTRAINT user_invite_pkey PRIMARY KEY (id);
+
+--
+-- Name: user_invite user_invite_token_hash_key; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_invite
+    ADD CONSTRAINT user_invite_token_hash_key UNIQUE (token_hash);
+
+--
 -- Name: vocabulary vocabulary_base_uri_key; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -5344,6 +5677,36 @@ CREATE INDEX song_writer_pro_code_idx ON music.song_writer USING btree (pro_code
 CREATE INDEX song_writer_song_id_idx ON music.song_writer USING btree (song_id);
 
 --
+-- Name: user_invite_one_pending; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX user_invite_one_pending ON music.user_invite USING btree (account_id, email) WHERE (accepted_at IS NULL);
+
+--
+-- Name: INDEX user_invite_one_pending; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.user_invite_one_pending IS 'One open invite per email per account; resend it instead of inviting again.';
+
+--
+-- Name: account_invite account_invite_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_invite_del INSTEAD OF DELETE ON api.account_invite FOR EACH ROW EXECUTE FUNCTION api.account_invite_write();
+
+--
+-- Name: account_invite account_invite_ins; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_invite_ins INSTEAD OF INSERT ON api.account_invite FOR EACH ROW EXECUTE FUNCTION api.account_invite_write();
+
+--
+-- Name: account_invite account_invite_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_invite_upd INSTEAD OF UPDATE ON api.account_invite FOR EACH ROW EXECUTE FUNCTION api.account_invite_write();
+
+--
 -- Name: account_storage account_storage_del; Type: TRIGGER; Schema: api; Owner: -
 --
 
@@ -5360,6 +5723,18 @@ CREATE TRIGGER account_storage_ins INSTEAD OF INSERT ON api.account_storage FOR 
 --
 
 CREATE TRIGGER account_storage_upd INSTEAD OF UPDATE ON api.account_storage FOR EACH ROW EXECUTE FUNCTION api.account_storage_write();
+
+--
+-- Name: account_user account_user_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_user_del INSTEAD OF DELETE ON api.account_user FOR EACH ROW EXECUTE FUNCTION api.account_user_write();
+
+--
+-- Name: account_user account_user_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_user_upd INSTEAD OF UPDATE ON api.account_user FOR EACH ROW EXECUTE FUNCTION api.account_user_write();
 
 --
 -- Name: artist artist_del; Type: TRIGGER; Schema: api; Owner: -
@@ -5810,6 +6185,24 @@ CREATE TRIGGER song_writer_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON 
 --
 
 CREATE TRIGGER song_writer_pro BEFORE INSERT ON music.song_writer FOR EACH ROW EXECUTE FUNCTION music.song_writer_default_pro();
+
+--
+-- Name: user_account user_account_keep_an_owner; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER user_account_keep_an_owner AFTER DELETE OR UPDATE OF role_id ON music.user_account NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION music.keep_an_owner();
+
+--
+-- Name: user_account user_account_users_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER user_account_users_permission BEFORE DELETE OR UPDATE ON music.user_account FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('users.manage');
+
+--
+-- Name: user_invite user_invite_users_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER user_invite_users_permission BEFORE INSERT OR DELETE OR UPDATE ON music.user_invite FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('users.manage');
 
 --
 -- Name: account_role_permission account_role_permission_permission_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -6475,6 +6868,27 @@ ALTER TABLE ONLY music.song_writer
 
 ALTER TABLE ONLY music.user_account
     ADD CONSTRAINT user_account_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id);
+
+--
+-- Name: user_invite user_invite_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_invite
+    ADD CONSTRAINT user_invite_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
+
+--
+-- Name: user_invite user_invite_invited_by_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_invite
+    ADD CONSTRAINT user_invite_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES music.user_account(id) ON DELETE SET NULL;
+
+--
+-- Name: user_invite user_invite_role_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_invite
+    ADD CONSTRAINT user_invite_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id);
 
 --
 -- Name: account; Type: ROW SECURITY; Schema: music; Owner: -
@@ -7179,6 +7593,36 @@ CREATE POLICY user_account_account ON music.user_account USING ((account_id = ( 
 COMMENT ON POLICY user_account_account ON music.user_account IS 'Limits every role without its own policy to rows of the account in the request token.';
 
 --
+-- Name: user_account user_account_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_account_upload ON music.user_account FOR SELECT TO mamupload USING (true);
+
+--
+-- Name: POLICY user_account_upload ON user_account; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY user_account_upload ON music.user_account IS 'mam-upload checks that the user in a sign-in token still belongs to its account. It sees only ids and account ids.';
+
+--
+-- Name: user_invite; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.user_invite ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_invite user_invite_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_invite_account ON music.user_invite USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY user_invite_account ON user_invite; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY user_invite_account ON music.user_invite IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
 -- Name: SCHEMA api; Type: ACL; Schema: -; Owner: -
 --
 
@@ -7193,6 +7637,13 @@ GRANT USAGE ON SCHEMA music TO app_user;
 GRANT USAGE ON SCHEMA music TO mamupload;
 
 --
+-- Name: FUNCTION accept_invite(token text, pass text); Type: ACL; Schema: api; Owner: -
+--
+
+REVOKE ALL ON FUNCTION api.accept_invite(token text, pass text) FROM PUBLIC;
+GRANT ALL ON FUNCTION api.accept_invite(token text, pass text) TO web_anon;
+
+--
 -- Name: FUNCTION account_storage_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -7203,6 +7654,14 @@ GRANT ALL ON FUNCTION api.account_storage_write() TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.artist_write() TO app_user;
+
+--
+-- Name: FUNCTION check_session(); Type: ACL; Schema: api; Owner: -
+--
+
+REVOKE ALL ON FUNCTION api.check_session() FROM PUBLIC;
+GRANT ALL ON FUNCTION api.check_session() TO app_user;
+GRANT ALL ON FUNCTION api.check_session() TO web_anon;
 
 --
 -- Name: FUNCTION contact_write(); Type: ACL; Schema: api; Owner: -
@@ -7315,6 +7774,13 @@ GRANT ALL ON FUNCTION music.recording_pitch_contact(p_recording integer) TO app_
 GRANT ALL ON FUNCTION music.release_status(p_release integer) TO app_user;
 
 --
+-- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.send_invite(p_invite uuid, p_token text) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.send_invite(p_invite uuid, p_token text) TO app_user;
+
+--
 -- Name: FUNCTION song_controlled_share(p_song integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -7331,6 +7797,90 @@ GRANT ALL ON FUNCTION music.song_one_stop_reason(p_song integer) TO app_user;
 --
 
 GRANT ALL ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) TO app_user;
+
+--
+-- Name: TABLE user_invite; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT DELETE ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(id) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.account_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(account_id) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.email; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(email),INSERT(email) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.role_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(role_id),INSERT(role_id) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.token_hash; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT INSERT(token_hash),UPDATE(token_hash) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.invited_by; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(invited_by) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.created_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(created_at) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.sent_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(sent_at),UPDATE(sent_at) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.expires_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(expires_at),UPDATE(expires_at) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: COLUMN user_invite.accepted_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(accepted_at) ON TABLE music.user_invite TO app_user;
+
+--
+-- Name: TABLE account_invite; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.account_invite TO app_user;
+
+--
+-- Name: TABLE account_role; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.account_role TO app_user;
+
+--
+-- Name: TABLE account_role; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.account_role TO app_user;
 
 --
 -- Name: TABLE account_storage; Type: ACL; Schema: music; Owner: -
@@ -7384,6 +7934,50 @@ GRANT SELECT ON TABLE music.account_storage TO mamupload;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.account_storage TO app_user;
+
+--
+-- Name: TABLE user_account; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT DELETE ON TABLE music.user_account TO app_user;
+
+--
+-- Name: COLUMN user_account.id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(id) ON TABLE music.user_account TO app_user;
+GRANT SELECT(id) ON TABLE music.user_account TO mamupload;
+
+--
+-- Name: COLUMN user_account.account_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(account_id) ON TABLE music.user_account TO app_user;
+GRANT SELECT(account_id) ON TABLE music.user_account TO mamupload;
+
+--
+-- Name: COLUMN user_account.email; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(email) ON TABLE music.user_account TO app_user;
+
+--
+-- Name: COLUMN user_account.created_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(created_at) ON TABLE music.user_account TO app_user;
+
+--
+-- Name: COLUMN user_account.role_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(role_id),UPDATE(role_id) ON TABLE music.user_account TO app_user;
+
+--
+-- Name: TABLE account_user; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,DELETE,UPDATE ON TABLE api.account_user TO app_user;
 
 --
 -- Name: TABLE artist; Type: ACL; Schema: music; Owner: -
@@ -7915,12 +8509,6 @@ GRANT SELECT ON TABLE api.vocal_type TO app_user;
 --
 
 --
--- Name: TABLE account_role; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT ON TABLE music.account_role TO app_user;
-
---
 -- Name: TABLE account_role_permission; Type: ACL; Schema: music; Owner: -
 --
 
@@ -8003,22 +8591,6 @@ GRANT USAGE ON SEQUENCE music.organization_id_seq TO app_user;
 --
 
 GRANT SELECT ON TABLE music.permission TO app_user;
-
---
--- Name: COLUMN user_account.id; Type: ACL; Schema: music; Owner: -
---
-
---
--- Name: COLUMN user_account.account_id; Type: ACL; Schema: music; Owner: -
---
-
---
--- Name: COLUMN user_account.email; Type: ACL; Schema: music; Owner: -
---
-
---
--- Name: COLUMN user_account.created_at; Type: ACL; Schema: music; Owner: -
---
 
 --
 -- Name: SEQUENCE vocal_type_id_seq; Type: ACL; Schema: music; Owner: -

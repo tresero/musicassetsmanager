@@ -64,7 +64,11 @@ db-anon-role = "web_anon"
 jwt-secret   = "at-least-32-bytes-of-random"
 server-host  = "127.0.0.1"
 server-port  = 3000
+db-pre-request = "api.check_session"
 ```
+
+`db-pre-request` makes removing a user take effect at once. Without it, a
+removed user keeps access until their sign-in expires, up to 8 hours.
 
 Generate the secret with `openssl rand -base64 48`. Under 32 bytes and
 PostgREST refuses to start.
@@ -139,14 +143,16 @@ facing the internet directly.
 ```sql
 INSERT INTO music.account (name) VALUES ('Your catalog') RETURNING id;
 
-INSERT INTO music.user_account (account_id, email, password_hash)
+INSERT INTO music.user_account (account_id, email, password_hash, role_id)
 VALUES ('<the uuid>', 'you@example.com',
-        crypt('your-password', gen_salt('bf', 10)));
+        crypt('your-password', gen_salt('bf', 10)),
+        (SELECT id FROM music.account_role WHERE name = 'Owner'));
 ```
 
-Then log in at the app's root URL.
+Then log in at the app's root URL. Invite everyone else from Settings, Users.
 ## Revision History
 
 | Date | Revision |
 |---|---|
 | 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |
+| 2026-10-10 | PostgREST db-pre-request; first user is an Owner |

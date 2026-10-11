@@ -6,6 +6,8 @@
 //   GET  /upload/file?...            local backend: serves a signed link
 //   GET  /upload/health
 //
+// It also emails invites: see invite.go.
+//
 //   mam-upload sweep [-dry-run] [-grace 24h]
 //        delete stored files that nothing in the database refers to
 //
@@ -53,6 +55,8 @@ type Config struct {
 	Listen      string
 	LocalRoot   string
 	MaxBytes    int64
+	AppURL      string
+	MailFrom    string
 }
 
 type Storage struct {
@@ -81,6 +85,8 @@ func main() {
 		Listen:      env("MAM_LISTEN", "127.0.0.1:3001"),
 		LocalRoot:   env("MAM_LOCAL_ROOT", "/var/lib/mam/files"),
 		MaxBytes:    5 << 30,
+		AppURL:      env("MAM_APP_URL", ""),
+		MailFrom:    env("MAM_MAIL_FROM", ""),
 	}
 	if cfg.DatabaseURL == "" || cfg.JWTSecret == "" {
 		log.Fatal("MAM_DATABASE_URL and MAM_JWT_SECRET are required")
@@ -108,6 +114,8 @@ func main() {
 		}
 		return
 	}
+
+	go s.listenInvites()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upload/health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
@@ -156,6 +164,20 @@ func (s *server) account(r *http.Request) (string, error) {
 	acct, _ := claims["account_id"].(string)
 	if acct == "" {
 		return "", errors.New("no account_id claim")
+	}
+	// A user removed from the account loses access at once, not when the
+	// token expires; PostgREST does the same in api.check_session.
+	sub, _ := claims["sub"].(string)
+	var member bool
+	err = s.db.QueryRowContext(r.Context(), `
+		SELECT EXISTS (SELECT 1 FROM music.user_account
+		                WHERE id::text = $1 AND account_id::text = $2)`,
+		sub, acct).Scan(&member)
+	if err != nil {
+		return "", err
+	}
+	if !member {
+		return "", errors.New("no longer a user of this account")
 	}
 	return acct, nil
 }

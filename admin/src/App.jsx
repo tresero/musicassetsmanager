@@ -1,9 +1,11 @@
-import { Admin, Resource, defaultTheme } from 'react-admin';
+import { Admin, Resource, CustomRoutes, defaultTheme } from 'react-admin';
+import { Route } from 'react-router';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 import { i18nProvider } from './i18n';
 import { AppLayout } from './AppMenu';
 import { can } from './permissions';
+import AcceptInvite from './AcceptInvite';
 
 import song from './resources/song';
 import recording from './resources/recording';
@@ -38,6 +40,8 @@ import vocabulary from './resources/vocabulary';
 import schemaType from './resources/schemaType';
 import accountStorage from './resources/accountStorage';
 import documentOrphan from './resources/documentOrphan';
+import accountUser from './resources/accountUser';
+import accountInvite from './resources/accountInvite';
 
 const theme = {
   ...defaultTheme,
@@ -98,6 +102,12 @@ export default function App() {
       <Resource name="account_storage" {...settings(accountStorage)} />
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
       <Resource name="document_orphan" {...documentOrphan} />
+      <Resource name="account_user" {...accountUser} />
+      <Resource name="account_invite" {...accountInvite} />
+      <Resource name="account_role" recordRepresentation="name" />
+      <CustomRoutes noLayout>
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+      </CustomRoutes>
         </>);
       }}
     </Admin>

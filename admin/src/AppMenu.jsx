@@ -36,6 +36,7 @@ const Folded = ({ label, children }) => {
 
 export const AppMenu = () => {
   const canSettings = useCan('settings.edit');
+  const canUsers = useCan('users.manage');
   const siteAdmin = useIsSiteAdmin();
   return (
     <Menu>
@@ -74,11 +75,11 @@ export const AppMenu = () => {
         <Menu.ResourceItem name="schema_type" />
       </Folded>}
 
-      {canSettings && <>
-        <Heading>Settings</Heading>
-        <Menu.ResourceItem name="account_storage" />
-        <Menu.ResourceItem name="pitch_setting" />
-      </>}
+      {(canSettings || canUsers) && <Heading>Settings</Heading>}
+      {canSettings && <Menu.ResourceItem name="account_storage" />}
+      {canSettings && <Menu.ResourceItem name="pitch_setting" />}
+      {canUsers && <Menu.ResourceItem name="account_user" />}
+      {canUsers && <Menu.ResourceItem name="account_invite" />}
     </Menu>
   );
 };
