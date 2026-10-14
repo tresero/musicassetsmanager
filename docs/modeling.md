@@ -34,6 +34,10 @@ a medley can reference several compositions with a sequence number. Audio files
 hang off the recording as formats of the same master: a WAV, a FLAC, and an MP3
 of one mix.
 
+Language is on both. The song's language is the lyric as written; a recording
+carries its own for a version sung in another language, and when it is blank the
+recording takes the language of its composition.
+
 ### A cover is a recording
 
 Recording someone else's song creates no new composition. Same writers, same
@@ -222,7 +226,7 @@ song and publisher.
 ## The pitch comment is generated
 
 The comment written into a pitched file is built from the catalog rather than
-typed: contact line first, then vocals, moods, tempo, genres, and sounds like,
+typed: contact line first, then vocals and language, moods, tempo, genres, and sounds like,
 dropped from the end until it fits. Fixing a mood fixes every comment that
 mentions it. The contact is chosen per recording, because different recordings
 are pitched by different people, with an exclusive agent and then an account
@@ -283,3 +287,4 @@ thing this project exists to avoid.
 | Date | Revision |
 |---|---|
 | 2026-09-30 | Control as authority by agreement; one stop computed for songs and recordings; publisher per writer; generated pitch comment. |
+| 2026-10-14 | Language on the recording, defaulting from the composition (#3). |

@@ -129,6 +129,12 @@ const RecordingForm = () => (
                            helperText="Who sings lead. Leave blank for an instrumental."
                            sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
+      <ReferenceInput source="language_code" reference="language" perPage={300}
+                      sort={{ field: 'name', order: 'ASC' }}>
+        <AutocompleteInput optionText="name" label="Language" filterToQuery={byName}
+                           helperText="Language of the vocal. Leave blank to use the song's language."
+                           sx={{ width: { xs: '100%', md: 240 } }} />
+      </ReferenceInput>
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
@@ -297,7 +303,7 @@ const RecordingForm = () => (
 
 const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_comment_auto,
                  pitch_contact_used, has_pitch_contact,
-                 one_stop, one_stop_reason,
+                 one_stop, one_stop_reason, language_used,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

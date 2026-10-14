@@ -743,7 +743,7 @@ BEGIN
                                  copyright_number, copyright_date,
                                  reversion_date, reversion_lead,
                                  description, keywords, sounds_like, notes,
-                                 status_id)
+                                 status_id, language_code)
     VALUES (_title, NEW.version_label, NEW.isrc, NEW.duration_ms, NEW.bpm,
             NEW.tempo, NEW.key_signature,
             coalesce(NEW.is_instrumental, false),
@@ -757,7 +757,7 @@ BEGIN
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
             NEW.copyright_date, NEW.reversion_date, NEW.reversion_lead,
             NEW.description, NEW.keywords, NEW.sounds_like, NEW.notes,
-            NEW.status_id)
+            NEW.status_id, NEW.language_code)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.recording
@@ -780,7 +780,8 @@ BEGIN
            reversion_lead = NEW.reversion_lead,
            description = NEW.description, keywords = NEW.keywords,
            sounds_like = NEW.sounds_like, notes = NEW.notes,
-           status_id = NEW.status_id
+           status_id = NEW.status_id,
+           language_code = NEW.language_code
      WHERE id = OLD.id;
     _id := OLD.id;
   END IF;
@@ -1837,6 +1838,28 @@ CREATE FUNCTION music.own_song_writer(p_id integer) RETURNS boolean
 COMMENT ON FUNCTION music.own_song_writer(p_id integer) IS 'True when the song_writer row is visible to the caller, which row security limits to the signed-in account. False for null.';
 
 --
+-- Name: recording_language(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.recording_language(p_recording integer) RETURNS music.iso_639_code
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT coalesce(r.language_code,
+           (SELECT s.language_code FROM music.recording_song rs
+              JOIN music.song s ON s.id = rs.song_id
+             WHERE rs.recording_id = r.id AND s.language_code IS NOT NULL
+             ORDER BY rs.song_id LIMIT 1))
+    FROM music.recording r
+   WHERE r.id = p_recording;
+$$;
+
+--
+-- Name: FUNCTION recording_language(p_recording integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.recording_language(p_recording integer) IS 'The language a recording is sung in: its own language, or when blank the language of its first linked song that has one.';
+
+--
 -- Name: recording_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -1906,10 +1929,8 @@ DECLARE
   result     text;
 BEGIN
   SELECT r.*, vt.name AS vocal_name,
-         (SELECT l.name FROM music.recording_song rs
-            JOIN music.song s ON s.id = rs.song_id
-            JOIN music.language l ON l.code = s.language_code
-           WHERE rs.recording_id = r.id ORDER BY rs.song_id LIMIT 1) AS language_name
+         (SELECT l.name FROM music.language l
+           WHERE l.code = music.recording_language(r.id)) AS language_name
     INTO rec
     FROM music.recording r
     LEFT JOIN music.vocal_type vt ON vt.id = r.vocal_type_id
@@ -3319,6 +3340,7 @@ CREATE TABLE music.recording (
     pitch_comment text,
     pitch_contact_id integer,
     parental_warning text,
+    language_code music.iso_639_code,
     CONSTRAINT recording_bpm CHECK (((bpm IS NULL) OR ((bpm >= (20)::numeric) AND (bpm <= (400)::numeric)))),
     CONSTRAINT recording_duration CHECK (((duration_ms IS NULL) OR (duration_ms > 0))),
     CONSTRAINT recording_parental_warning CHECK ((parental_warning = ANY (ARRAY['Explicit'::text, 'NotExplicit'::text, 'ExplicitContentEdited'::text]))),
@@ -3390,6 +3412,12 @@ COMMENT ON COLUMN music.recording.pitch_contact_id IS 'The person named, with em
 --
 
 COMMENT ON COLUMN music.recording.parental_warning IS 'DDEX ParentalWarningType: Explicit, NotExplicit, or ExplicitContentEdited.';
+
+--
+-- Name: COLUMN recording.language_code; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording.language_code IS 'Language of the vocal on this recording. Blank means the language of its first linked song (see music.recording_language).';
 
 --
 -- Name: recording_artist; Type: TABLE; Schema: music; Owner: -
@@ -3655,7 +3683,9 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     (music.recording_one_stop_reason(id) IS NULL) AS one_stop,
     music.recording_one_stop_reason(id) AS one_stop_reason,
     created_at,
-    updated_at
+    updated_at,
+    language_code,
+    music.recording_language(id) AS language_used
    FROM music.recording r;
 
 --
@@ -5544,6 +5574,12 @@ CREATE INDEX recording_genre_genre_id_idx ON music.recording_genre USING btree (
 CREATE INDEX recording_is_cover_idx ON music.recording USING btree (is_cover) WHERE is_cover;
 
 --
+-- Name: recording_language_code_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX recording_language_code_idx ON music.recording USING btree (language_code);
+
+--
 -- Name: recording_lower_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -6651,6 +6687,13 @@ ALTER TABLE ONLY music.recording_genre
 
 ALTER TABLE ONLY music.recording
     ADD CONSTRAINT recording_key_signature_fkey FOREIGN KEY (key_signature) REFERENCES music.key_signature(name) ON UPDATE CASCADE;
+
+--
+-- Name: recording recording_language_code_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording
+    ADD CONSTRAINT recording_language_code_fkey FOREIGN KEY (language_code) REFERENCES music.language(code) ON UPDATE CASCADE;
 
 --
 -- Name: recording_mood recording_mood_mood_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -7869,6 +7912,12 @@ GRANT ALL ON FUNCTION music.documents_of(p_table text, p_col text, p_parent inte
 GRANT ALL ON FUNCTION music.gtin_valid(p text) TO app_user;
 
 --
+-- Name: FUNCTION recording_language(p_recording integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.recording_language(p_recording integer) TO app_user;
+
+--
 -- Name: FUNCTION recording_one_stop_reason(p_recording integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -8721,7 +8770,6 @@ GRANT USAGE ON SEQUENCE music.vocal_type_id_seq TO app_user;
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: api; Owner: -
 --
 
-
 --
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: music; Owner: -
 --
@@ -8729,4 +8777,5 @@ GRANT USAGE ON SEQUENCE music.vocal_type_id_seq TO app_user;
 --
 -- PostgreSQL database dump complete
 --
+
 

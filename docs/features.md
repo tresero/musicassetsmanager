@@ -44,7 +44,9 @@ A recording is one master, separate from the composition it records.
 
 **Details**: title, which defaults from the composition when left blank;
 version; ISRC; BPM; tempo, described as it feels rather than as a number; key;
-vocals (female, male, mixed, or group); whether it is instrumental or a cover;
+vocals (female, male, mixed, or group); the language of the vocal, which
+defaults from the composition when left blank; whether it is instrumental or a
+cover;
 easy clear, set by hand for a track that can be cleared quickly; status; and a
 description, keywords, and "sounds like" for pitching.
 
@@ -204,3 +206,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-10-09 | Accounts kept apart by row security; shared lists fixed; required row fields; pitch contact quick add. |
 | 2026-10-10 | Users page and email invites. |
 | 2026-10-14 | The site admin edits the shared lists, including roles with their DDEX code and credit flag. |
+| 2026-10-14 | Recordings carry their own language, defaulting from the composition; the pitch comment uses it (#3). |
