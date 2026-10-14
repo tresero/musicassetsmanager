@@ -1527,6 +1527,25 @@ $_$;
 COMMENT ON FUNCTION music.gtin_valid(p text) IS 'True for a 12-digit UPC or 13-digit EAN whose check digit is correct.';
 
 --
+-- Name: is_site_admin(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.is_site_admin() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM music.user_account
+     WHERE id = music.current_app_user() AND is_site_admin)
+$$;
+
+--
+-- Name: FUNCTION is_site_admin(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.is_site_admin() IS 'True when the signed-in user is the site admin. Runs with owner rights because app_user cannot read other accounts'' users.';
+
+--
 -- Name: keep_an_owner(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -2051,6 +2070,28 @@ $$;
 --
 
 COMMENT ON FUNCTION music.require_permission() IS 'Statement trigger: refuses the write with a clear error unless the signed-in user''s role has the permission named in the trigger argument. Writes outside an API request, such as migrations, are not checked.';
+
+--
+-- Name: require_site_admin(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.require_site_admin() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can change the shared lists'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION require_site_admin(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.require_site_admin() IS 'Statement trigger on the shared lists: refuses a write unless the signed-in user is the site admin.';
 
 --
 -- Name: send_invite(uuid, text); Type: FUNCTION; Schema: music; Owner: -
@@ -3942,6 +3983,19 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
    FROM music.release r;
 
 --
+-- Name: role; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.role WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    role_group_id,
+    description,
+    ddex_code,
+    credit_role
+   FROM music.role;
+
+--
 -- Name: role_group; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -3952,19 +4006,6 @@ CREATE TABLE music.role_group (
     sort_order smallint DEFAULT 0 NOT NULL,
     CONSTRAINT role_group_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
-
---
--- Name: role; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.role WITH (security_invoker='true') AS
- SELECT r.id,
-    r.name,
-    r.role_group_id,
-    r.description,
-    g.name AS role_group_name
-   FROM (music.role r
-     JOIN music.role_group g ON ((g.id = r.role_group_id)));
 
 --
 -- Name: role_group; Type: VIEW; Schema: api; Owner: -
@@ -5899,6 +5940,12 @@ CREATE TRIGGER artist_edit_permission BEFORE INSERT OR UPDATE ON music.artist FO
 CREATE TRIGGER artist_member_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.artist_member FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
+-- Name: asset_status asset_status_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER asset_status_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.asset_status FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
 -- Name: audio_file audio_file_edit_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -5909,6 +5956,12 @@ CREATE TRIGGER audio_file_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON m
 --
 
 CREATE TRIGGER audio_file_touch BEFORE UPDATE ON music.audio_file FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
+
+--
+-- Name: audio_file_type audio_file_type_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER audio_file_type_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.audio_file_type FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
 
 --
 -- Name: contact contact_delete_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -5965,6 +6018,12 @@ CREATE TRIGGER contact_phone_touch BEFORE UPDATE ON music.contact_phone FOR EACH
 CREATE TRIGGER contact_touch BEFORE UPDATE ON music.contact FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: country country_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER country_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.country FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
 -- Name: document document_delete_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -5981,6 +6040,42 @@ CREATE TRIGGER document_edit_permission BEFORE INSERT OR UPDATE ON music.documen
 --
 
 CREATE TRIGGER document_storage_kind BEFORE INSERT OR UPDATE ON music.document FOR EACH ROW EXECUTE FUNCTION music.document_storage_kind();
+
+--
+-- Name: document_type document_type_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER document_type_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.document_type FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: genre genre_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER genre_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.genre FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: instrument instrument_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER instrument_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.instrument FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: key_signature key_signature_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER key_signature_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.key_signature FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: language language_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER language_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.language FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: mood mood_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER mood_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.mood FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
 
 --
 -- Name: organization organization_delete_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -6133,6 +6228,18 @@ CREATE TRIGGER release_edit_permission BEFORE INSERT OR UPDATE ON music.release 
 CREATE TRIGGER release_track_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.release_track FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
+-- Name: role_group role_group_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER role_group_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.role_group FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: role role_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER role_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.role FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
 -- Name: song song_delete_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -6203,6 +6310,18 @@ CREATE TRIGGER user_account_users_permission BEFORE DELETE OR UPDATE ON music.us
 --
 
 CREATE TRIGGER user_invite_users_permission BEFORE INSERT OR DELETE OR UPDATE ON music.user_invite FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('users.manage');
+
+--
+-- Name: vocabulary vocabulary_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER vocabulary_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.vocabulary FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: vocal_type vocal_type_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER vocal_type_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.vocal_type FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
 
 --
 -- Name: account_role_permission account_role_permission_permission_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -8013,25 +8132,25 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist_member TO app_user;
 -- Name: TABLE asset_status; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.asset_status TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.asset_status TO app_user;
 
 --
 -- Name: TABLE asset_status; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.asset_status TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.asset_status TO app_user;
 
 --
 -- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.audio_file_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
 
 --
 -- Name: TABLE audio_file_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.audio_file_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.audio_file_type TO app_user;
 
 --
 -- Name: TABLE contact_email; Type: ACL; Schema: music; Owner: -
@@ -8079,13 +8198,13 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact_phone TO app_user;
 -- Name: TABLE country; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.country TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.country TO app_user;
 
 --
 -- Name: TABLE country; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.country TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.country TO app_user;
 
 --
 -- Name: TABLE contact_document; Type: ACL; Schema: music; Owner: -
@@ -8128,7 +8247,7 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document TO app_user;
 -- Name: TABLE document_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.document_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document_type TO app_user;
 
 --
 -- Name: TABLE document_expiring; Type: ACL; Schema: api; Owner: -
@@ -8152,7 +8271,7 @@ GRANT SELECT,DELETE ON TABLE api.document_orphan TO app_user;
 -- Name: TABLE document_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.document_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document_type TO app_user;
 
 --
 -- Name: TABLE document_usage; Type: ACL; Schema: api; Owner: -
@@ -8170,61 +8289,61 @@ GRANT SELECT ON TABLE api.email_duplicate TO app_user;
 -- Name: TABLE genre; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.genre TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.genre TO app_user;
 
 --
 -- Name: TABLE genre; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.genre TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.genre TO app_user;
 
 --
 -- Name: TABLE instrument; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.instrument TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.instrument TO app_user;
 
 --
 -- Name: TABLE instrument; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.instrument TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.instrument TO app_user;
 
 --
 -- Name: TABLE key_signature; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.key_signature TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.key_signature TO app_user;
 
 --
 -- Name: TABLE key_signature; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.key_signature TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.key_signature TO app_user;
 
 --
 -- Name: TABLE language; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.language TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.language TO app_user;
 
 --
 -- Name: TABLE language; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.language TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.language TO app_user;
 
 --
 -- Name: TABLE mood; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.mood TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.mood TO app_user;
 
 --
 -- Name: TABLE mood; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.mood TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.mood TO app_user;
 
 --
 -- Name: TABLE organization; Type: ACL; Schema: music; Owner: -
@@ -8370,7 +8489,7 @@ GRANT SELECT ON TABLE api.recording_cover TO app_user;
 -- Name: TABLE role; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.role TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.role TO app_user;
 
 --
 -- Name: TABLE recording_credit_display; Type: ACL; Schema: api; Owner: -
@@ -8415,22 +8534,22 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_track TO app_user;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.release TO app_user;
 
 --
--- Name: TABLE role_group; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT ON TABLE music.role_group TO app_user;
-
---
 -- Name: TABLE role; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.role TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.role TO app_user;
+
+--
+-- Name: TABLE role_group; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.role_group TO app_user;
 
 --
 -- Name: TABLE role_group; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.role_group TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.role_group TO app_user;
 
 --
 -- Name: TABLE schema_type; Type: ACL; Schema: music; Owner: -
@@ -8442,7 +8561,7 @@ GRANT SELECT ON TABLE music.schema_type TO app_user;
 -- Name: TABLE vocabulary; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.vocabulary TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocabulary TO app_user;
 
 --
 -- Name: TABLE schema_type; Type: ACL; Schema: api; Owner: -
@@ -8490,19 +8609,19 @@ GRANT SELECT ON TABLE api.song_unregistered TO app_user;
 -- Name: TABLE vocabulary; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.vocabulary TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocabulary TO app_user;
 
 --
 -- Name: TABLE vocal_type; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.vocal_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocal_type TO app_user;
 
 --
 -- Name: TABLE vocal_type; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.vocal_type TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocal_type TO app_user;
 
 --
 -- Name: TABLE account; Type: ACL; Schema: music; Owner: -
@@ -8601,6 +8720,7 @@ GRANT USAGE ON SEQUENCE music.vocal_type_id_seq TO app_user;
 --
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: api; Owner: -
 --
+
 
 --
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: music; Owner: -

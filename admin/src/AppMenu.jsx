@@ -17,7 +17,7 @@ const Heading = ({ children }) => {
   );
 };
 
-// The shared lists are read only and shown only to the site admin, folded
+// The shared lists are shown only to the site admin, who edits them, folded
 // until asked for.
 const Folded = ({ label, children }) => {
   const [sidebarOpen] = useSidebarState();

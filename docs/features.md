@@ -140,11 +140,13 @@ times. Removing it from one record detaches it without deleting it.
 
 ## Lists
 
-The vocabularies behind the pickers are shared by every account and fixed:
-audio file types, document types, vocals, statuses, roles, instruments, genres,
-moods, keys, languages, countries, and societies. Users pick from them but
-cannot add or change entries, so made-up values don't creep in; the operator
-changes them. Anything descriptive that no list covers goes in a recording's
+The vocabularies behind the pickers are shared by every account: audio file
+types, document types, vocals, statuses, roles, role groups, instruments,
+genres, moods, keys, languages, countries, vocabularies, and societies. Users
+pick from them but cannot add or change entries, so made-up values don't creep
+in. The site admin adds, edits and deletes entries from the Lists menu; every
+list but societies and schema types can be edited there. A role carries its
+DDEX code and whether it is offered as a recording credit. Anything descriptive that no list covers goes in a recording's
 Keywords, Sounds like or Description, which are free text for that recording
 only. Version and Tempo offer suggestions but accept any text.
 
@@ -201,3 +203,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-09-30 | One stop computed on songs and recordings; controlled master owners; easy clear; vocals; pitch comment and pitch contacts; attaching existing documents; DDEX codes; Pitch settings. |
 | 2026-10-09 | Accounts kept apart by row security; shared lists fixed; required row fields; pitch contact quick add. |
 | 2026-10-10 | Users page and email invites. |
+| 2026-10-14 | The site admin edits the shared lists, including roles with their DDEX code and credit flag. |

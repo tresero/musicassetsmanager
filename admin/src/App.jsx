@@ -25,14 +25,8 @@ import country from './resources/country';
 import pro from './resources/pro';
 import proTerritory from './resources/proTerritory';
 import keySignature from './resources/keySignature';
-import mood from './resources/mood';
-import instrument from './resources/instrument';
 import genre from './resources/genre';
 import language from './resources/language';
-import assetStatus from './resources/assetStatus';
-import documentType from './resources/documentType';
-import audioFileType from './resources/audioFileType';
-import vocalType from './resources/vocalType';
 import pitchSetting from './resources/pitchSetting';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
@@ -42,6 +36,9 @@ import accountStorage from './resources/accountStorage';
 import documentOrphan from './resources/documentOrphan';
 import accountUser from './resources/accountUser';
 import accountInvite from './resources/accountInvite';
+import { sharedList } from './resources/shared';
+
+const nameList = sharedList();
 
 const theme = {
   ...defaultTheme,
@@ -68,6 +65,9 @@ export default function App() {
           can(permissions, code) ? def : { ...def, create: undefined };
         const catalog = addable('catalog.edit');
         const settings = addable('settings.edit');
+        // Only the site admin gets edit and create pages for the shared lists.
+        const shared = (def) =>
+          permissions?.site_admin ? def : { ...def, edit: undefined, create: undefined };
         return (<>
       <Resource name="song" {...catalog(song)} />
       <Resource name="recording" {...catalog(recording)} />
@@ -83,21 +83,21 @@ export default function App() {
       <Resource name="document_expiring" {...documentExpiring} />
       <Resource name="email_duplicate" {...emailDuplicate} />
 
-      <Resource name="country" {...country} />
+      <Resource name="country" {...shared(country)} />
       <Resource name="pro" {...pro} />
       <Resource name="pro_territory" {...proTerritory} />
-      <Resource name="key_signature" {...keySignature} />
-      <Resource name="mood" {...mood} />
-      <Resource name="instrument" {...instrument} />
-      <Resource name="genre" {...genre} />
-      <Resource name="language" {...language} />
-      <Resource name="asset_status" {...assetStatus} />
-      <Resource name="document_type" {...documentType} />
-      <Resource name="audio_file_type" {...audioFileType} />
-      <Resource name="vocal_type" {...vocalType} />
-      <Resource name="role_group" {...roleGroup} />
-      <Resource name="role" {...role} />
-      <Resource name="vocabulary" {...vocabulary} />
+      <Resource name="key_signature" {...shared(keySignature)} />
+      <Resource name="mood" {...shared(nameList)} />
+      <Resource name="instrument" {...shared(nameList)} />
+      <Resource name="genre" {...shared(genre)} />
+      <Resource name="language" {...shared(language)} />
+      <Resource name="asset_status" {...shared(nameList)} />
+      <Resource name="document_type" {...shared(nameList)} />
+      <Resource name="audio_file_type" {...shared(nameList)} />
+      <Resource name="vocal_type" {...shared(nameList)} />
+      <Resource name="role_group" {...shared(roleGroup)} />
+      <Resource name="role" {...shared(role)} />
+      <Resource name="vocabulary" {...shared(vocabulary)} />
       <Resource name="schema_type" {...schemaType} />
       <Resource name="account_storage" {...settings(accountStorage)} />
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
