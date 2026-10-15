@@ -18,7 +18,7 @@ import {
   versionLabels, tempos, freeText,
   byName, bySortName, byTitle,
 } from './vocab';
-import { CatalogDatagrid } from './shared';
+import { CatalogDatagrid, SharedListPicker } from './shared';
 
 const filters = [
   <SearchInput source="title@ilike" alwaysOn />,
@@ -125,7 +125,7 @@ const RecordingForm = () => (
       </ReferenceInput>
       <ReferenceInput source="vocal_type_id" reference="vocal_type" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Vocals" filterToQuery={byName}
+        <SharedListPicker label="Vocals"
                            helperText="Who sings lead. Leave blank for an instrumental."
                            sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
@@ -150,7 +150,7 @@ const RecordingForm = () => (
                     helperText="Set by hand: can be cleared quickly for sync" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <SelectInput optionText="name" label="Status"
+        <SharedListPicker label="Status"
                      sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
       <TextInput source="description" multiline fullWidth />
@@ -205,8 +205,7 @@ const RecordingForm = () => (
           </ReferenceArrayInput>
           <ReferenceArrayInput source="instrument_ids" reference="instrument" perPage={300}
                                sort={{ field: 'name', order: 'ASC' }}>
-            <AutocompleteArrayInput optionText="name" label="Instruments"
-                                    filterToQuery={byName}
+            <SharedListPicker multiple label="Instruments"
                                     helperText={false}
                                     sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
@@ -226,13 +225,11 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Tags">
       <ReferenceArrayInput source="genre_ids" reference="genre" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteArrayInput optionText="name" label="Genres"
-                                filterToQuery={byName} />
+        <SharedListPicker multiple label="Genres" />
       </ReferenceArrayInput>
       <ReferenceArrayInput source="mood_ids" reference="mood" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteArrayInput optionText="name" label="Moods"
-                                filterToQuery={byName} />
+        <SharedListPicker multiple label="Moods" />
       </ReferenceArrayInput>
       <PitchCommentInput />
     </TabbedForm.Tab>

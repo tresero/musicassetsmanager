@@ -150,7 +150,9 @@ types, document types, vocals, statuses, roles, role groups, instruments,
 genres, moods, keys, languages, countries, vocabularies, and societies. Users
 pick from them but cannot add or change entries, so made-up values don't creep
 in. The site admin adds, edits and deletes entries from the Lists menu; every
-list but societies and schema types can be edited there. A role carries its
+list but societies and schema types can be edited there. The site admin can
+also add a missing genre, mood, instrument, vocals, status, document type, or
+audio file type from its picker without leaving the form. A role carries its
 DDEX code and whether it is offered as a recording credit. Anything descriptive that no list covers goes in a recording's
 Keywords, Sounds like or Description, which are free text for that recording
 only. Version and Tempo offer suggestions but accept any text.
@@ -211,3 +213,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-10-14 | The site admin edits the shared lists, including roles with their DDEX code and credit flag. |
 | 2026-10-14 | Recordings carry their own language, defaulting from the composition; the pitch comment uses it (#3). |
 | 2026-10-14 | Multitracks available flag on recordings, shown in the pitch comment (#1). |
+| 2026-10-14 | The site admin adds name-only list entries from the pickers. |

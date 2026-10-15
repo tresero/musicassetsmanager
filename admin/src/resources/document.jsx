@@ -1,12 +1,12 @@
 import {
   List, TextField, DateField, NumberField, ReferenceField, SearchInput, Edit,
   Create, SimpleForm, TextInput, NumberInput, DateInput, SelectInput,
-  ReferenceInput, AutocompleteInput, ReferenceArrayInput,
+  ReferenceInput, ReferenceArrayInput,
   AutocompleteArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { CatalogDatagrid } from './shared';
+import { CatalogDatagrid, SharedListPicker } from './shared';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -43,8 +43,7 @@ const DocumentForm = () => (
     <TextInput source="title" required fullWidth />
     <ReferenceInput source="document_type_id" reference="document_type"
                     perPage={100} sort={{ field: 'name', order: 'ASC' }}>
-      <AutocompleteInput optionText="name" label="Type"
-                         filterToQuery={byName} />
+      <SharedListPicker label="Type" />
     </ReferenceInput>
 
     <SelectInput source="storage_kind" choices={storageKinds}

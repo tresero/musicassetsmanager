@@ -1,13 +1,12 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, DateInput,
-  ReferenceInput, AutocompleteInput,
+  ReferenceInput,
   required,
 } from 'react-admin';
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
 import { AttachDocumentInput } from './AttachDocumentInput';
-
-const byName = (q) => ({ 'name@ilike': `*${q}*` });
+import { SharedListPicker } from './shared';
 
 /*
  * Documents edited in place on the parent record.
@@ -31,8 +30,7 @@ export const DocumentsInput = () => (
       <TextInput source="title" label="Title" fullWidth validate={required()} />
       <ReferenceInput source="document_type_id" reference="document_type"
                       perPage={100} sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Type"
-                           filterToQuery={byName}
+        <SharedListPicker label="Type"
                            sx={{ width: { xs: '100%', md: 300 } }} />
       </ReferenceInput>
 

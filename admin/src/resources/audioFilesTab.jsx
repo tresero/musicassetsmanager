@@ -1,13 +1,13 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
-  ReferenceInput, AutocompleteInput,
+  ReferenceInput,
 } from 'react-admin';
 import { Box } from '@mui/material';
 import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
 import { AudioFilePlayer, RemoveAndPlay } from './AudioPlayer';
 import { DurationInput } from './DurationInput';
-import { byName } from './vocab';
+import { SharedListPicker } from './shared';
 
 const row = {
   display: 'flex',
@@ -44,8 +44,7 @@ export const AudioFilesInput = () => (
         <FileLink scoped />
         <ReferenceInput source="file_type_id" reference="audio_file_type"
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>
-          <AutocompleteInput optionText="name" label="Type"
-                             filterToQuery={byName}
+          <SharedListPicker label="Type"
                              helperText={false}
                              sx={{ width: { xs: '100%', md: 180 } }} />
         </ReferenceInput>

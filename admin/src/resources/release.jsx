@@ -11,8 +11,8 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
-import { byName, bySortName, byTitle } from './vocab';
-import { CatalogDatagrid } from './shared';
+import { bySortName, byTitle } from './vocab';
+import { CatalogDatagrid, SharedListPicker } from './shared';
 
 const filters = [<SearchInput source="title@ilike" alwaysOn />];
 
@@ -114,7 +114,7 @@ const ReleaseForm = () => (
                    sx={{ width: { xs: '100%', md: 220 } }} />
         <ReferenceInput source="primary_genre_id" reference="genre" perPage={200}
                         sort={{ field: 'name', order: 'ASC' }}>
-          <AutocompleteInput optionText="name" label="Primary genre" filterToQuery={byName}
+          <SharedListPicker label="Primary genre"
                              helperText="The one genre stores file it under, like Latin"
                              sx={{ width: { xs: '100%', md: 260 } }} />
         </ReferenceInput>

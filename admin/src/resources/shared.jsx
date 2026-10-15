@@ -1,7 +1,10 @@
 import {
   List, Datagrid, TextField, Edit, Create, SimpleForm, TextInput, required,
+  AutocompleteInput, AutocompleteArrayInput, useChoicesContext,
 } from 'react-admin';
 import { useCan, useIsSiteAdmin } from '../permissions';
+import { QuickCreateName } from './quickCreate';
+import { byName } from './vocab';
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
 // database refuses everyone else.
@@ -33,6 +36,18 @@ export const sharedList = ({ list = NameList, Inputs = NameInputs } = {}) => ({
   create: () => <Create redirect="list"><SimpleForm><Inputs /></SimpleForm></Create>,
   recordRepresentation: 'name',
 });
+
+// The picker for a shared list that needs only a name, inside its
+// ReferenceInput or ReferenceArrayInput. The site admin can add a missing
+// entry from the picker without leaving the form; nobody else sees Create.
+export const SharedListPicker = ({ multiple = false, ...props }) => {
+  const { resource } = useChoicesContext();
+  const siteAdmin = useIsSiteAdmin();
+  const Input = multiple ? AutocompleteArrayInput : AutocompleteInput;
+  return <Input optionText="name" filterToQuery={byName}
+                create={siteAdmin ? <QuickCreateName resource={resource} /> : undefined}
+                {...props} />;
+};
 
 // A list of whole records. Bulk delete shows only for roles that may delete.
 export const CatalogDatagrid = ({ bulkActionButtons, ...props }) => {
