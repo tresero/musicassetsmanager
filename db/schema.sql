@@ -743,7 +743,7 @@ BEGIN
                                  copyright_number, copyright_date,
                                  reversion_date, reversion_lead,
                                  description, keywords, sounds_like, notes,
-                                 status_id, language_code)
+                                 status_id, language_code, multitracks_available)
     VALUES (_title, NEW.version_label, NEW.isrc, NEW.duration_ms, NEW.bpm,
             NEW.tempo, NEW.key_signature,
             coalesce(NEW.is_instrumental, false),
@@ -757,7 +757,8 @@ BEGIN
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
             NEW.copyright_date, NEW.reversion_date, NEW.reversion_lead,
             NEW.description, NEW.keywords, NEW.sounds_like, NEW.notes,
-            NEW.status_id, NEW.language_code)
+            NEW.status_id, NEW.language_code,
+            coalesce(NEW.multitracks_available, false))
     RETURNING id INTO _id;
   ELSE
     UPDATE music.recording
@@ -781,7 +782,8 @@ BEGIN
            description = NEW.description, keywords = NEW.keywords,
            sounds_like = NEW.sounds_like, notes = NEW.notes,
            status_id = NEW.status_id,
-           language_code = NEW.language_code
+           language_code = NEW.language_code,
+           multitracks_available = coalesce(NEW.multitracks_available, false)
      WHERE id = OLD.id;
     _id := OLD.id;
   END IF;
@@ -1920,6 +1922,7 @@ DECLARE
   phone      text;
   has_stems  boolean;
   has_alts   boolean;
+  avail      text[];
   head       text;
   seg_text   text[];
   seg_line   integer[];
@@ -1954,13 +1957,20 @@ BEGIN
     FROM music.audio_file f JOIN music.audio_file_type t ON t.id = f.file_type_id
    WHERE f.recording_id = p_recording;
 
+  avail := array_remove(ARRAY[
+    CASE WHEN has_stems THEN 'Stems' END,
+    CASE WHEN rec.multitracks_available THEN 'Multitracks' END,
+    CASE WHEN has_alts THEN 'Alts' END], NULL);
+
   head := concat_ws(' ',
     CASE WHEN music.recording_one_stop_reason(p_recording) IS NULL THEN 'ONE-STOP' END,
     who_name,
     CASE WHEN email IS NOT NULL OR phone IS NOT NULL THEN '- ' || concat_ws(' ', email, phone) END,
-    CASE WHEN has_stems AND has_alts THEN 'Stems & Alts Available'
-         WHEN has_stems THEN 'Stems Available'
-         WHEN has_alts THEN 'Alts Available' END);
+    CASE cardinality(avail)
+      WHEN 0 THEN NULL
+      WHEN 1 THEN avail[1] || ' Available'
+      ELSE array_to_string(avail[1:cardinality(avail) - 1], ', ')
+           || ' & ' || avail[cardinality(avail)] || ' Available' END);
 
   seg_text := ARRAY[
     CASE WHEN rec.is_instrumental THEN 'Instrumental'
@@ -1999,7 +2009,7 @@ $_$;
 --
 
 COMMENT ON FUNCTION music.recording_pitch_comment_auto(p_recording integer, p_limit integer) IS 'The comment written into a pitched file, built from the catalog: one stop,
-the contact (see music.recording_pitch_contact) and whether stems and alternates exist, then vocals and
+the contact (see music.recording_pitch_contact) and whether stems, multitracks and alternates are available, then vocals and
 language, moods, tempo, genres, and sounds like. Segments are dropped from
 the end until it fits the limit; the contact line never is.';
 
@@ -3341,6 +3351,7 @@ CREATE TABLE music.recording (
     pitch_contact_id integer,
     parental_warning text,
     language_code music.iso_639_code,
+    multitracks_available boolean DEFAULT false NOT NULL,
     CONSTRAINT recording_bpm CHECK (((bpm IS NULL) OR ((bpm >= (20)::numeric) AND (bpm <= (400)::numeric)))),
     CONSTRAINT recording_duration CHECK (((duration_ms IS NULL) OR (duration_ms > 0))),
     CONSTRAINT recording_parental_warning CHECK ((parental_warning = ANY (ARRAY['Explicit'::text, 'NotExplicit'::text, 'ExplicitContentEdited'::text]))),
@@ -3418,6 +3429,12 @@ COMMENT ON COLUMN music.recording.parental_warning IS 'DDEX ParentalWarningType:
 --
 
 COMMENT ON COLUMN music.recording.language_code IS 'Language of the vocal on this recording. Blank means the language of its first linked song (see music.recording_language).';
+
+--
+-- Name: COLUMN recording.multitracks_available; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording.multitracks_available IS 'Set by hand: the multitrack session can be supplied. Multitracks are not uploaded as audio files; the pitch comment says Multitracks Available when this is set.';
 
 --
 -- Name: recording_artist; Type: TABLE; Schema: music; Owner: -
@@ -3685,7 +3702,8 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     created_at,
     updated_at,
     language_code,
-    music.recording_language(id) AS language_used
+    music.recording_language(id) AS language_used,
+    multitracks_available
    FROM music.recording r;
 
 --

@@ -35,7 +35,7 @@ const blockSx = {
 
 export const AudioFilesInput = () => (
   <ArrayInput source="audio_files" label={false}
-              helperText="Drop a file on a row; its format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip.">
+              helperText="Drop a file on a row; its format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip. The type decides what the pitch comment offers: any Stem adds Stems Available, and any type other than Full Mix or Stem adds Alts Available.">
     <SimpleFormIterator sx={blockSx} disableReordering
                         removeButton={<RemoveAndPlay player={<AudioFilePlayer />} />}>
 

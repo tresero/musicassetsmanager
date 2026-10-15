@@ -65,15 +65,18 @@ that is not 100. Points % is a share of master income agreed in lieu of pay.
 **Tags**: genres and moods, the terms supervisors search by, and the pitch
 comment: the text DISCO writes into a pitched MP3, generated from the catalog.
 It opens with the contact line, never dropped: ONE-STOP when the recording is,
-the pitch contact's name, email, and phone, and whether stems and alternates
-exist. Vocals and language, moods, tempo, genres, and sounds like follow,
+the pitch contact's name, email, and phone, and whether stems, multitracks,
+and alternates are available. Vocals and language, moods, tempo, genres, and sounds like follow,
 trimmed from the end to fit 255 characters. The pitch contact is chosen per
 recording, falling back to an active exclusive agent and then to the default
 contact in Settings. The tab shows the comment with a count and a Copy button,
 and a recording can carry its own text instead.
 
 **Audio**: the master and its alternates, timed cuts, and stems, each typed and
-described. See Audio files below.
+described, and a Multitracks available flag set by hand, since multitrack
+sessions are not uploaded. A Stem file makes the pitch comment say Stems
+Available, and any type other than Full Mix or Stem says Alts Available. See
+Audio files below.
 
 **Master**: country of recording, country of commissioning, the P line year,
 and the owners with their shares, each marked controlled when you can license
@@ -207,3 +210,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-10-10 | Users page and email invites. |
 | 2026-10-14 | The site admin edits the shared lists, including roles with their DDEX code and credit flag. |
 | 2026-10-14 | Recordings carry their own language, defaulting from the composition; the pitch comment uses it (#3). |
+| 2026-10-14 | Multitracks available flag on recordings, shown in the pitch comment (#1). |

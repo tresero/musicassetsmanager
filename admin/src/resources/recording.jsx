@@ -238,6 +238,8 @@ const RecordingForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Audio">
+      <BooleanInput source="multitracks_available" label="Multitracks available"
+                    helperText="Set by hand when the multitrack session can be supplied. Multitracks aren't uploaded here. Adds Multitracks Available to the pitch comment." />
       <AudioFilesInput />
     </TabbedForm.Tab>
 
