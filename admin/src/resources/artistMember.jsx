@@ -3,6 +3,7 @@ import {
   Edit, Create, SimpleForm, TextInput, DateInput,
   ReferenceInput, AutocompleteInput,
 } from 'react-admin';
+import { bySearch } from './vocab';
 
 const AmList = () => (
   <List perPage={50}>
@@ -19,11 +20,11 @@ const AmForm = () => (
   <SimpleForm>
     <ReferenceInput source="artist_id" reference="artist" perPage={100}
                     sort={{ field: 'name', order: 'ASC' }}>
-      <AutocompleteInput optionText="name" label="Artist" required />
+      <AutocompleteInput optionText="name" label="Artist" filterToQuery={bySearch} required />
     </ReferenceInput>
     <ReferenceInput source="contact_id" reference="contact" perPage={100}
                     sort={{ field: 'sort_name', order: 'ASC' }}>
-      <AutocompleteInput optionText="display_name" label="Person" required />
+      <AutocompleteInput optionText="display_name" label="Person" filterToQuery={bySearch} required />
     </ReferenceInput>
     <DateInput source="begin_date" label="From" />
     <DateInput source="end_date" label="To" />

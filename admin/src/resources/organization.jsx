@@ -9,7 +9,7 @@ import { IsniInput } from './IsniInput';
 import { byName, byCode, proOptionText, proInputText } from './vocab';
 import { CatalogDatagrid } from './shared';
 
-const filters = [<SearchInput source="name@ilike" alwaysOn />];
+const filters = [<SearchInput source="search@ilike" alwaysOn />];
 
 const OrgList = () => (
   <List filters={filters} sort={{ field: 'name', order: 'ASC' }} perPage={50}>

@@ -9,7 +9,7 @@ import { PersonInput } from './partyInputs';
 import { IsniInput } from './IsniInput';
 import { CatalogDatagrid } from './shared';
 
-const filters = [<SearchInput source="name@ilike" alwaysOn />];
+const filters = [<SearchInput source="search@ilike" alwaysOn />];
 
 const artistKinds = [
   { id: 'person', name: 'Person' },

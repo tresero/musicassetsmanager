@@ -21,7 +21,7 @@ import {
 import { CatalogDatagrid, SharedListPicker } from './shared';
 
 const filters = [
-  <SearchInput source="title@ilike" alwaysOn />,
+  <SearchInput source="search@ilike" alwaysOn />,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
   <NullableBooleanInput source="has_pitch_contact" label="Has pitch contact" />,
@@ -200,6 +200,7 @@ const RecordingForm = () => (
           <ReferenceArrayInput source="role_ids" reference="recording_role" perPage={50}
                                sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteArrayInput optionText="name" label="Roles"
+                                    filterToQuery={byName}
                                     helperText={false}
                                     sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>

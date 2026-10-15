@@ -7,12 +7,10 @@ import {
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { CatalogDatagrid, SharedListPicker } from './shared';
+import { byName, byTitle, bySortName } from './vocab';
 
-const filters = [<SearchInput source="title@ilike" alwaysOn />];
+const filters = [<SearchInput source="search@ilike" alwaysOn />];
 
-const byName  = (q) => ({ 'name@ilike': `*${q}*` });
-const byTitle = (q) => ({ 'title@ilike': `*${q}*` });
-const bySortName = (q) => ({ 'sort_name@ilike': `*${q}*` });
 
 const storageKinds = [
   { id: 'url',      name: 'URL' },

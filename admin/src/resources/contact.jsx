@@ -11,7 +11,7 @@ import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput } from './IsniInput';
 import { CatalogDatagrid } from './shared';
 
-const filters = [<SearchInput source="sort_name@ilike" alwaysOn />];
+const filters = [<SearchInput source="search@ilike" alwaysOn />];
 
 // No divider between rows, and fields centered so a Select does not sit
 // below an Autocomplete.

@@ -152,7 +152,8 @@ pick from them but cannot add or change entries, so made-up values don't creep
 in. The site admin adds, edits and deletes entries from the Lists menu; every
 list but societies and schema types can be edited there. The site admin can
 also add a missing genre, mood, instrument, vocals, status, document type, or
-audio file type from its picker without leaving the form. A role carries its
+audio file type from its picker without leaving the form. Names are unique
+regardless of case: typing rock picks Rock rather than offering to add it. A role carries its
 DDEX code and whether it is offered as a recording credit. Anything descriptive that no list covers goes in a recording's
 Keywords, Sounds like or Description, which are free text for that recording
 only. Version and Tempo offer suggestions but accept any text.
@@ -186,6 +187,10 @@ same account. The shared lists are the only data every account sees.
 
 Owners invite their own staff from Settings, Users. The invite email links to a
 page where the person picks a password and joins with the role the owner chose.
+Email addresses are matched regardless of case, at sign-in and on invites.
+
+Every search box and picker ignores case and accents: corazon finds Corazón,
+and music finds Musician.
 Invites can be resent, which makes the old link stop working, or cancelled.
 Owners change a user's role or remove them; a removed user is signed out on
 their next request. An account always keeps at least one Owner.
@@ -214,3 +219,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-10-14 | Recordings carry their own language, defaulting from the composition; the pitch comment uses it (#3). |
 | 2026-10-14 | Multitracks available flag on recordings, shown in the pitch comment (#1). |
 | 2026-10-14 | The site admin adds name-only list entries from the pickers. |
+| 2026-10-14 | Shared list names and sign-in emails are matched regardless of case; searches ignore case and accents (#21). |

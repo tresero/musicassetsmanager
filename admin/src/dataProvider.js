@@ -8,7 +8,7 @@ const httpClient = (url, options = {}) => {
   return fetchUtils.fetchJson(url, options);
 };
 
-export default postgrestRestProvider({
+const provider = postgrestRestProvider({
   apiUrl: '/api',
   httpClient,
   defaultListOp: 'eq',
@@ -26,3 +26,28 @@ export default postgrestRestProvider({
   ]),
   schema: defaultSchema,
 });
+
+// The api views' search value is lowercased without accents (music.fold), so
+// the typed text is folded the same way: corazón, Corazon and CORAZÓN all
+// find Corazón.
+const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Searches before #21 were saved in the browser under these keys. No input
+// shows them any more, so a saved one would filter the list invisibly.
+const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike'];
+
+const foldSearch = (params) => {
+  if (!params?.filter) return params;
+  const filter = { ...params.filter };
+  OLD_SEARCH_KEYS.forEach((key) => delete filter[key]);
+  const value = filter['search@ilike'];
+  if (typeof value === 'string') filter['search@ilike'] = fold(value);
+  return { ...params, filter };
+};
+
+export default {
+  ...provider,
+  getList: (resource, params) => provider.getList(resource, foldSearch(params)),
+  getManyReference: (resource, params) =>
+    provider.getManyReference(resource, foldSearch(params)),
+};

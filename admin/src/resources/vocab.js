@@ -35,9 +35,12 @@ export const storageKinds = [
 
 export const freeText = (v) => ({ id: v, name: v });
 
-export const byName     = (q) => ({ 'name@ilike': `*${q}*` });
-export const bySortName = (q) => ({ 'sort_name@ilike': `*${q}*` });
-export const byTitle    = (q) => ({ 'title@ilike': `*${q}*` });
+// Name, sort name and title searches all use the view's search value, which
+// is lowercased without accents; dataProvider folds the typed text to match.
+export const bySearch   = (q) => ({ 'search@ilike': `*${q}*` });
+export const byName     = bySearch;
+export const bySortName = bySearch;
+export const byTitle    = bySearch;
 export const byCode     = (q) => ({ 'code@ilike': `*${q}*` });
 
 export const proOptionText = (r) => (r ? `${r.code} — ${r.name}` : '');

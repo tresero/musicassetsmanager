@@ -126,7 +126,7 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.email = _invite.email) THEN
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE lower(u.email) = lower(_invite.email)) THEN
     RAISE EXCEPTION '% already has a login. Sign in with it, or ask the site admin.', _invite.email
       USING ERRCODE = 'unique_violation';
   END IF;
@@ -165,12 +165,13 @@ BEGIN
   END IF;
 
   IF TG_OP = 'INSERT' THEN
-    IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.email = NEW.email) THEN
+    NEW.email := lower(btrim(NEW.email));
+    IF EXISTS (SELECT 1 FROM music.user_account u WHERE lower(u.email) = NEW.email) THEN
       RAISE EXCEPTION '% is already a user of this account.', NEW.email
         USING ERRCODE = 'unique_violation';
     END IF;
     IF EXISTS (SELECT 1 FROM music.user_invite i
-                WHERE i.email = NEW.email AND i.accepted_at IS NULL) THEN
+                WHERE lower(i.email) = NEW.email AND i.accepted_at IS NULL) THEN
       RAISE EXCEPTION 'An invite to % is already open. Resend it instead.', NEW.email
         USING ERRCODE = 'unique_violation';
     END IF;
@@ -615,7 +616,7 @@ DECLARE
 BEGIN
   SELECT u.id INTO _user
   FROM music.user_account u
-  WHERE u.email = login.email
+  WHERE lower(u.email) = lower(btrim(login.email))
     AND u.password_hash = crypt(login.pass, u.password_hash);
 
   IF _user IS NULL THEN
@@ -1121,302 +1122,6 @@ $$;
 COMMENT ON FUNCTION api.release_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
 
 --
--- Name: set_storage_secret(text); Type: FUNCTION; Schema: api; Owner: -
---
-
-CREATE FUNCTION api.set_storage_secret(secret text) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  UPDATE music.account_storage
-     SET secret_key = nullif(btrim(secret), '')
-   WHERE account_id = music.current_account();
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'no storage row for this account';
-  END IF;
-END;
-$$;
-
---
--- Name: FUNCTION set_storage_secret(secret text); Type: COMMENT; Schema: api; Owner: -
---
-
-COMMENT ON FUNCTION api.set_storage_secret(secret text) IS 'Runs as the signed-in user, so row security limits every write to that account.';
-
---
--- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
---
-
-CREATE FUNCTION api.song_write() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  _id integer;
-BEGIN
-  IF TG_OP = 'DELETE' THEN
-    DELETE FROM music.song WHERE id = OLD.id;
-    RETURN OLD;
-  END IF;
-
-  IF TG_OP = 'INSERT' THEN
-    INSERT INTO music.song (title, iswc, lyrics, notes,
-                            public_domain_p, easy_clear,
-                            derived_from_id, derivation_type, based_on,
-                            copyright_date, copyright_number,
-                            reversion_date, reversion_lead, language_code)
-    VALUES (NEW.title, NEW.iswc, NEW.lyrics, NEW.notes,
-            coalesce(NEW.public_domain_p, false),
-            coalesce(NEW.easy_clear, false),
-            NEW.derived_from_id, NEW.derivation_type,
-            nullif(btrim(coalesce(NEW.based_on,'')), ''),
-            NEW.copyright_date, NEW.copyright_number,
-            NEW.reversion_date, NEW.reversion_lead, NEW.language_code)
-    RETURNING id INTO _id;
-  ELSE
-    UPDATE music.song
-       SET title = NEW.title, iswc = NEW.iswc, lyrics = NEW.lyrics,
-           notes = NEW.notes,
-           public_domain_p = coalesce(NEW.public_domain_p, false),
-           easy_clear = coalesce(NEW.easy_clear, false),
-           derived_from_id = NEW.derived_from_id,
-           derivation_type = NEW.derivation_type,
-           based_on = nullif(btrim(coalesce(NEW.based_on,'')), ''),
-           copyright_date = NEW.copyright_date,
-           copyright_number = NEW.copyright_number,
-           reversion_date = NEW.reversion_date,
-           reversion_lead = NEW.reversion_lead,
-           language_code = NEW.language_code
-     WHERE id = OLD.id;
-    _id := OLD.id;
-  END IF;
-
-  DELETE FROM music.song_title t
-   WHERE t.song_id = _id
-     AND t.id NOT IN (SELECT (x->>'id')::integer
-                        FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
-                       WHERE x->>'id' IS NOT NULL);
-  UPDATE music.song_title t
-     SET title = x->>'title',
-         title_type = coalesce(nullif(x->>'title_type',''), 'alternate'),
-         language_code = nullif(x->>'language_code','')
-    FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
-   WHERE t.id = (x->>'id')::integer AND t.song_id = _id;
-  INSERT INTO music.song_title (song_id, title, title_type, language_code)
-  SELECT _id, x->>'title',
-         coalesce(nullif(x->>'title_type',''), 'alternate'),
-         nullif(x->>'language_code','')
-    FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
-   WHERE x->>'id' IS NULL AND nullif(btrim(x->>'title'),'') IS NOT NULL;
-
-  DELETE FROM music.song_registration r
-   WHERE r.song_id = _id
-     AND r.id NOT IN (SELECT (x->>'id')::integer
-                        FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
-                       WHERE x->>'id' IS NOT NULL);
-  UPDATE music.song_registration r
-     SET pro_code = x->>'pro_code',
-         work_number = nullif(x->>'work_number',''),
-         registered_on = nullif(x->>'registered_on','')::date,
-         notes = nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
-   WHERE r.id = (x->>'id')::integer AND r.song_id = _id;
-  INSERT INTO music.song_registration (song_id, pro_code, work_number,
-                                       registered_on, notes)
-  SELECT _id, x->>'pro_code', nullif(x->>'work_number',''),
-         nullif(x->>'registered_on','')::date, nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
-   WHERE x->>'id' IS NULL AND nullif(btrim(x->>'pro_code'),'') IS NOT NULL;
-
-  DELETE FROM music.song_writer w
-   WHERE w.song_id = _id
-     AND w.id NOT IN (SELECT (x->>'id')::integer
-                        FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
-                       WHERE x->>'id' IS NOT NULL);
-  UPDATE music.song_writer w
-     SET contact_id = (x->>'contact_id')::integer,
-         role_id = (x->>'role_id')::integer,
-         pro_code = nullif(x->>'pro_code',''),
-         share = coalesce((x->>'share')::numeric, 0),
-         controlled = coalesce((x->>'controlled')::boolean, false),
-         notes = nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
-   WHERE w.id = (x->>'id')::integer AND w.song_id = _id;
-  INSERT INTO music.song_writer (song_id, contact_id, role_id, pro_code,
-                                 share, controlled, notes)
-  SELECT _id, (x->>'contact_id')::integer, (x->>'role_id')::integer,
-         nullif(x->>'pro_code',''),
-         coalesce((x->>'share')::numeric, 0),
-         coalesce((x->>'controlled')::boolean, false),
-         nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
-   WHERE x->>'id' IS NULL AND x->>'contact_id' IS NOT NULL
-     AND x->>'role_id' IS NOT NULL;
-
-  DELETE FROM music.song_publisher p
-   WHERE p.song_id = _id
-     AND p.id NOT IN (SELECT (x->>'id')::integer
-                        FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
-                       WHERE x->>'id' IS NOT NULL);
-  UPDATE music.song_publisher p
-     SET organization_id = (x->>'organization_id')::integer,
-         role_id = (x->>'role_id')::integer,
-         share = coalesce((x->>'share')::numeric, 0),
-         controlled = coalesce((x->>'controlled')::boolean, false),
-         for_writer_id = nullif(x->>'for_writer_id','')::integer,
-         notes = nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
-   WHERE p.id = (x->>'id')::integer AND p.song_id = _id;
-  INSERT INTO music.song_publisher (song_id, organization_id, role_id,
-                                    share, controlled, for_writer_id, notes)
-  SELECT _id, (x->>'organization_id')::integer, (x->>'role_id')::integer,
-         coalesce((x->>'share')::numeric, 0),
-         coalesce((x->>'controlled')::boolean, false),
-         nullif(x->>'for_writer_id','')::integer,
-         nullif(x->>'notes','')
-    FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
-   WHERE x->>'id' IS NULL AND x->>'organization_id' IS NOT NULL
-     AND x->>'role_id' IS NOT NULL;
-
-  PERFORM music.sync_documents('song_document', 'song_id', _id, NEW.documents);
-
-  NEW.id := _id;
-  SELECT s.title, s.iswc, s.based_on, s.created_at, s.updated_at
-    INTO NEW.title, NEW.iswc, NEW.based_on, NEW.created_at, NEW.updated_at
-    FROM music.song s WHERE s.id = _id;
-
-  RETURN NEW;
-END;
-$$;
-
---
--- Name: FUNCTION song_write(); Type: COMMENT; Schema: api; Owner: -
---
-
-COMMENT ON FUNCTION api.song_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
-
---
--- Name: b64url(bytea); Type: FUNCTION; Schema: auth; Owner: -
---
-
-CREATE FUNCTION auth.b64url(data bytea) RETURNS text
-    LANGUAGE sql IMMUTABLE
-    AS $$
-  SELECT translate(encode(data, 'base64'), E'+/=\n', '-_')
-$$;
-
---
--- Name: session(uuid); Type: FUNCTION; Schema: auth; Owner: -
---
-
-CREATE FUNCTION auth.session(p_user uuid) RETURNS json
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT json_build_object(
-    'token', auth.sign(json_build_object(
-      'role', 'app_user',
-      'account_id', u.account_id,
-      'sub', u.id,
-      'exp', extract(epoch FROM now() + interval '8 hours')::int)))
-    FROM music.user_account u
-   WHERE u.id = p_user
-$$;
-
---
--- Name: FUNCTION session(p_user uuid); Type: COMMENT; Schema: auth; Owner: -
---
-
-COMMENT ON FUNCTION auth.session(p_user uuid) IS 'The sign-in token for a user. Used by api.login and api.accept_invite.';
-
---
--- Name: set_password(text, text); Type: FUNCTION; Schema: auth; Owner: -
---
-
-CREATE FUNCTION auth.set_password(p_email text, p_password text) RETURNS void
-    LANGUAGE sql SECURITY DEFINER
-    AS $$
-  UPDATE music.user_account
-  SET password_hash = crypt(p_password, gen_salt('bf', 10))
-  WHERE email = p_email
-$$;
-
---
--- Name: sign(json); Type: FUNCTION; Schema: auth; Owner: -
---
-
-CREATE FUNCTION auth.sign(payload json) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  WITH parts AS (
-    SELECT auth.b64url(convert_to('{"alg":"HS256","typ":"JWT"}', 'utf8')) AS h,
-           auth.b64url(convert_to(payload::text, 'utf8')) AS p
-  )
-  SELECT h || '.' || p || '.' ||
-         auth.b64url(hmac(h || '.' || p, current_setting('app.jwt_secret'), 'sha256'))
-  FROM parts
-$$;
-
---
--- Name: can(text); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.can(p_code text) RETURNS boolean
-    LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'pg_catalog'
-    AS $$
-  SELECT EXISTS (
-    SELECT 1
-      FROM music.user_account u
-      JOIN music.account_role_permission rp ON rp.role_id = u.role_id
-      JOIN music.permission p ON p.id = rp.permission_id
-     WHERE u.id = music.current_app_user()
-       AND u.account_id = music.current_account()
-       AND p.code = p_code)
-$$;
-
---
--- Name: FUNCTION can(p_code text); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.can(p_code text) IS 'True when the signed-in user''s role has the permission. Owner rights only to read the user''s own role; it changes nothing.';
-
---
--- Name: check_representation_exclusive(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.check_representation_exclusive() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  clash record;
-BEGIN
-  SELECT r.id, r.is_exclusive,
-         coalesce(o.name, c.display_name) AS party
-    INTO clash
-    FROM music.recording_representation r
-    LEFT JOIN music.organization o ON o.id = r.organization_id
-    LEFT JOIN music.contact c ON c.id = r.contact_id
-   WHERE r.recording_id = NEW.recording_id
-     AND r.id <> NEW.id
-     AND (NEW.is_exclusive OR r.is_exclusive)
-     AND daterange(coalesce(r.signed_on, '-infinity'), coalesce(r.ends_on, 'infinity'), '[]')
-      && daterange(coalesce(NEW.signed_on, '-infinity'), coalesce(NEW.ends_on, 'infinity'), '[]')
-   LIMIT 1;
-
-  IF FOUND THEN
-    RAISE EXCEPTION '%',
-      CASE WHEN clash.is_exclusive
-           THEN format('This recording is signed exclusively to %s for overlapping dates.', clash.party)
-           ELSE format('An exclusive deal cannot overlap the existing deal with %s.', clash.party)
-      END
-      USING HINT = 'Give one deal an end date before the other starts, or make both non-exclusive.';
-  END IF;
-
-  RETURN NULL;
-END;
-$$;
-
---
 -- Name: current_account(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -1426,57 +1131,189 @@ CREATE FUNCTION music.current_account() RETURNS uuid
   SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'account_id')::uuid
 $$;
 
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
 --
--- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
+-- Name: artist; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.current_app_user() RETURNS uuid
+CREATE TABLE music.artist (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    name text NOT NULL,
+    sort_name text,
+    kind text DEFAULT 'person'::text NOT NULL,
+    isni music.isni_number,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT artist_kind CHECK ((kind = ANY (ARRAY['person'::text, 'group'::text]))),
+    CONSTRAINT artist_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+ALTER TABLE ONLY music.artist FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: artist_member; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.artist_member (
+    artist_id integer NOT NULL,
+    contact_id integer NOT NULL,
+    begin_date date,
+    end_date date,
+    notes text,
+    CONSTRAINT artist_member_dates CHECK (((end_date IS NULL) OR (begin_date IS NULL) OR (end_date >= begin_date)))
+);
+
+ALTER TABLE ONLY music.artist_member FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: contact; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.contact (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    first_name text,
+    last_name text,
+    display_name text GENERATED ALWAYS AS (btrim(((COALESCE(first_name, ''::text) || ' '::text) || COALESCE(last_name, ''::text)))) STORED,
+    sort_name text GENERATED ALWAYS AS (btrim(((COALESCE(last_name, ''::text) || ', '::text) || COALESCE(first_name, ''::text)), ', '::text)) STORED,
+    pro_code text,
+    member_ipi music.ipi_name_number,
+    isni music.isni_number,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    credit_name text,
+    CONSTRAINT contact_has_name CHECK ((COALESCE(first_name, last_name) IS NOT NULL))
+);
+
+ALTER TABLE ONLY music.contact FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN contact.credit_name; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.contact.credit_name IS 'Name this person performs and is credited under, when it differs from
+their legal name. Blank means credit them by their own name. A single
+credit can still override it through recording_credit.credited_as.';
+
+--
+-- Name: artist; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.artist WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    sort_name,
+    kind,
+    isni AS isni_own,
+    COALESCE((isni)::text,
+        CASE
+            WHEN (kind = 'person'::text) THEN (( SELECT c.isni
+               FROM (music.artist_member m
+                 JOIN music.contact c ON ((c.id = m.contact_id)))
+              WHERE ((m.artist_id = a.id) AND (c.isni IS NOT NULL))
+             LIMIT 1))::text
+            ELSE NULL::text
+        END) AS isni,
+    ((isni IS NULL) AND (kind = 'person'::text) AND (EXISTS ( SELECT 1
+           FROM (music.artist_member m
+             JOIN music.contact c ON ((c.id = m.contact_id)))
+          WHERE ((m.artist_id = a.id) AND (c.isni IS NOT NULL))))) AS isni_inherited,
+    notes,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('contact_id', m.contact_id, 'begin_date', m.begin_date, 'end_date', m.end_date, 'notes', m.notes) ORDER BY m.begin_date NULLS FIRST, m.contact_id) AS jsonb_agg
+           FROM music.artist_member m
+          WHERE (m.artist_id = a.id)), '[]'::jsonb) AS members,
+    ( SELECT count(*) AS count
+           FROM music.artist_member m
+          WHERE (m.artist_id = a.id)) AS member_count,
+    created_at,
+    updated_at
+   FROM music.artist a;
+
+--
+-- Name: search(api.artist); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.artist) RETURNS text
     LANGUAGE sql STABLE
-    AS $$ SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'sub')::uuid $$;
+    AS $_$ SELECT music.fold($1.name) $_$;
 
 --
--- Name: FUNCTION current_app_user(); Type: COMMENT; Schema: music; Owner: -
+-- Name: FUNCTION search(api.artist); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.current_app_user() IS 'The signed-in user from the request token; null outside an API request.';
+COMMENT ON FUNCTION api.search(api.artist) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
--- Name: default_audio_file_type(text); Type: FUNCTION; Schema: music; Owner: -
+-- Name: asset_status; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.default_audio_file_type(p_format text) RETURNS integer
+CREATE TABLE music.asset_status (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT asset_status_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: asset_status; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.asset_status WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.asset_status;
+
+--
+-- Name: search(api.asset_status); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.asset_status) RETURNS text
     LANGUAGE sql STABLE
-    AS $$
-  SELECT id FROM music.audio_file_type
-   WHERE name = CASE WHEN upper(coalesce(p_format, '')) = 'ZIP'
-                     THEN 'Stem' ELSE 'Full Mix' END
-$$;
+    AS $_$ SELECT music.fold($1.name) $_$;
 
 --
--- Name: document_storage_kind(); Type: FUNCTION; Schema: music; Owner: -
+-- Name: FUNCTION search(api.asset_status); Type: COMMENT; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.document_storage_kind() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF TG_OP = 'UPDATE' AND NEW.storage_uri IS NOT DISTINCT FROM OLD.storage_uri THEN
-    NEW.storage_kind := OLD.storage_kind;
-    RETURN NEW;
-  END IF;
+COMMENT ON FUNCTION api.search(api.asset_status) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
-  IF NEW.storage_uri ~* '^https?://' THEN
-    NEW.storage_kind := 'url';
-  ELSE
-    NEW.storage_kind := coalesce(
-      (SELECT s.kind FROM music.account_storage s
-        WHERE s.account_id = NEW.account_id),
-      NEW.storage_kind);
-  END IF;
+--
+-- Name: audio_file_type; Type: TABLE; Schema: music; Owner: -
+--
 
-  RETURN NEW;
-END;
-$$;
+CREATE TABLE music.audio_file_type (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT audio_file_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: audio_file_type; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.audio_file_type WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.audio_file_type;
+
+--
+-- Name: search(api.audio_file_type); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.audio_file_type) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.audio_file_type); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.audio_file_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
 -- Name: documents_of(text, text, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -1511,333 +1348,561 @@ END;
 $_$;
 
 --
--- Name: gtin_valid(text); Type: FUNCTION; Schema: music; Owner: -
+-- Name: contact_email; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.gtin_valid(p text) RETURNS boolean
-    LANGUAGE sql IMMUTABLE
-    AS $_$
-  SELECT p ~ '^[0-9]{12,13}$'
-     AND (SELECT (10 - sum(substr(p, length(p) - i, 1)::int
-                         * CASE WHEN i % 2 = 1 THEN 3 ELSE 1 END) % 10) % 10
-            FROM generate_series(1, length(p) - 1) i) = right(p, 1)::int
-$_$;
+CREATE TABLE music.contact_email (
+    id integer NOT NULL,
+    contact_id integer,
+    email music.email_address NOT NULL,
+    is_primary boolean DEFAULT false NOT NULL,
+    note text,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_id integer,
+    CONSTRAINT contact_email_owner_chk CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
+    CONSTRAINT email_trimmed CHECK (((email)::text = btrim((email)::text)))
+);
+
+ALTER TABLE ONLY music.contact_email FORCE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION gtin_valid(p text); Type: COMMENT; Schema: music; Owner: -
+-- Name: contact_organization; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.gtin_valid(p text) IS 'True for a 12-digit UPC or 13-digit EAN whose check digit is correct.';
+CREATE TABLE music.contact_organization (
+    contact_id integer NOT NULL,
+    organization_id integer NOT NULL,
+    title text,
+    is_primary boolean DEFAULT false NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY music.contact_organization FORCE ROW LEVEL SECURITY;
 
 --
--- Name: is_site_admin(); Type: FUNCTION; Schema: music; Owner: -
+-- Name: contact_phone; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.is_site_admin() RETURNS boolean
-    LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'pg_catalog'
-    AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM music.user_account
-     WHERE id = music.current_app_user() AND is_site_admin)
-$$;
+CREATE TABLE music.contact_phone (
+    id integer NOT NULL,
+    contact_id integer,
+    country_code smallint DEFAULT 1 NOT NULL,
+    number text NOT NULL,
+    extension text,
+    is_primary boolean DEFAULT false NOT NULL,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_id integer,
+    CONSTRAINT contact_phone_owner_chk CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
+    CONSTRAINT phone_cc_range CHECK (((country_code >= 1) AND (country_code <= 999))),
+    CONSTRAINT phone_trimmed CHECK (((number = btrim(number)) AND (number <> ''::text)))
+);
+
+ALTER TABLE ONLY music.contact_phone FORCE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION is_site_admin(); Type: COMMENT; Schema: music; Owner: -
+-- Name: TABLE contact_phone; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.is_site_admin() IS 'True when the signed-in user is the site admin. Runs with owner rights because app_user cannot read other accounts'' users.';
+COMMENT ON TABLE music.contact_phone IS 'Deliberately denormalized: one row per contact per number, so a shared line
+(company switchboard) is stored once per contact rather than once globally.
+Tradeoff accepted for data-entry speed. Consequences: updating a shared number
+touches N rows; reverse lookup requires matching free-text formats. The
+normalized form would be a phone table plus a contact_phone junction.';
 
 --
--- Name: keep_an_owner(); Type: FUNCTION; Schema: music; Owner: -
+-- Name: COLUMN contact_phone.country_code; Type: COMMENT; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.keep_an_owner() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF music.current_app_user() IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-      FROM music.user_account u
-      JOIN music.account_role r ON r.id = u.role_id
-     WHERE u.account_id = OLD.account_id
-       AND r.name = 'Owner') THEN
-    RAISE EXCEPTION 'An account needs at least one Owner. Make someone else an Owner first.'
-      USING ERRCODE = 'check_violation';
-  END IF;
-  RETURN NULL;
-END;
-$$;
+COMMENT ON COLUMN music.contact_phone.country_code IS 'ITU calling code, not an FK to country. Codes are not 1:1 with countries
+(1 covers US/CA/Caribbean, 7 covers RU/KZ). Defaults to 1.';
 
 --
--- Name: FUNCTION keep_an_owner(); Type: COMMENT; Schema: music; Owner: -
+-- Name: COLUMN contact_phone.number; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave an account without an Owner. Work outside an API request, such as deleting a whole account, is not checked.';
+COMMENT ON COLUMN music.contact_phone.number IS 'Free text, deliberately unvalidated beyond non-empty. No E.164 canonicalization.';
 
 --
--- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: contact; Type: VIEW; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.merge_contact(p_keep integer, p_drop integer) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  d      music.contact%ROWTYPE;
-  fk     record;
-  ux     record;
-  others text;
-BEGIN
-  IF p_keep = p_drop THEN
-    RAISE EXCEPTION 'Cannot merge a person into themselves (%).', p_keep;
-  END IF;
-  SELECT * INTO d FROM music.contact WHERE id = p_drop;
-  IF NOT FOUND THEN RAISE EXCEPTION 'No person with id %.', p_drop; END IF;
-  IF NOT EXISTS (SELECT 1 FROM music.contact WHERE id = p_keep) THEN
-    RAISE EXCEPTION 'No person with id %.', p_keep;
-  END IF;
-  FOR fk IN
-    SELECT c.conrelid AS rel, c.conrelid::regclass AS tbl, a.attname AS col, a.attnum
-      FROM pg_constraint c
-      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
-     WHERE c.confrelid = 'music.contact'::regclass AND c.contype = 'f'
-       AND array_length(c.conkey, 1) = 1
-  LOOP
-    FOR ux IN
-      SELECT i.indkey FROM pg_index i
-       WHERE i.indrelid = fk.rel AND i.indisunique
-         AND i.indexprs IS NULL AND i.indpred IS NULL
-         AND fk.attnum = ANY (i.indkey)
-    LOOP
-      SELECT string_agg(format('k.%1$I IS NOT DISTINCT FROM x.%1$I', att.attname), ' AND ')
-        INTO others
-        FROM unnest(ux.indkey) AS u(attnum)
-        JOIN pg_attribute att ON att.attrelid = fk.rel AND att.attnum = u.attnum
-       WHERE u.attnum <> fk.attnum;
-      EXECUTE format(
-        'DELETE FROM %s x WHERE x.%I = $1 AND EXISTS (SELECT 1 FROM %s k WHERE k.%I = $2%s)',
-        fk.tbl, fk.col, fk.tbl, fk.col, coalesce(' AND ' || others, ''))
-      USING p_drop, p_keep;
-    END LOOP;
-    EXECUTE format('UPDATE %s SET %I = $1 WHERE %I = $2', fk.tbl, fk.col, fk.col)
-      USING p_keep, p_drop;
-  END LOOP;
-  UPDATE music.contact SET member_ipi = NULL, isni = NULL WHERE id = p_drop;
-  UPDATE music.contact k
-     SET member_ipi  = coalesce(k.member_ipi, d.member_ipi),
-         isni        = coalesce(k.isni, d.isni),
-         pro_code    = coalesce(k.pro_code, d.pro_code),
-         credit_name = coalesce(k.credit_name, d.credit_name),
-         notes       = CASE WHEN nullif(btrim(d.notes), '') IS NULL OR d.notes = k.notes THEN k.notes
-                            ELSE concat_ws(E'\n', k.notes, d.notes) END
-   WHERE k.id = p_keep;
-  DELETE FROM music.contact WHERE id = p_drop;
-END;
-$_$;
+CREATE VIEW api.contact WITH (security_invoker='true') AS
+ SELECT id,
+    first_name,
+    last_name,
+    display_name,
+    sort_name,
+    credit_name,
+    pro_code,
+    member_ipi,
+    isni,
+    notes,
+    ( SELECT e.email
+           FROM music.contact_email e
+          WHERE ((e.contact_id = c.id) AND e.is_primary AND (e.retired_at IS NULL))
+         LIMIT 1) AS primary_email,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', e.id, 'email', e.email, 'is_primary', e.is_primary, 'note', e.note) ORDER BY e.is_primary DESC, e.id) AS jsonb_agg
+           FROM music.contact_email e
+          WHERE (e.contact_id = c.id)), '[]'::jsonb) AS emails,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'country_code', p.country_code, 'number', p.number, 'extension', p.extension, 'is_primary', p.is_primary, 'note', p.note) ORDER BY p.is_primary DESC, p.id) AS jsonb_agg
+           FROM music.contact_phone p
+          WHERE (p.contact_id = c.id)), '[]'::jsonb) AS phones,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('organization_id', o.organization_id, 'title', o.title, 'is_primary', o.is_primary) ORDER BY o.is_primary DESC, o.organization_id) AS jsonb_agg
+           FROM music.contact_organization o
+          WHERE (o.contact_id = c.id)), '[]'::jsonb) AS organizations,
+    music.documents_of('contact_document'::text, 'contact_id'::text, id) AS documents,
+    created_at,
+    updated_at
+   FROM music.contact c;
 
 --
--- Name: FUNCTION merge_contact(p_keep integer, p_drop integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: search(api.contact); Type: FUNCTION; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.merge_contact(p_keep integer, p_drop integer) IS 'Merges a duplicate person into the one kept: every reference moves to the
-kept record, skipping any that would duplicate one it already has; an IPI,
-ISNI, society, or performing name only the duplicate had is carried over;
-then the duplicate is deleted.';
+CREATE FUNCTION api.search(api.contact) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.sort_name) $_$;
 
 --
--- Name: merge_document(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: FUNCTION search(api.contact); Type: COMMENT; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.merge_document(p_keep integer, p_drop integer) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  d      music.document%ROWTYPE;
-  fk     record;
-  ux     record;
-  others text;
-BEGIN
-  IF p_keep = p_drop THEN
-    RAISE EXCEPTION 'Cannot merge a document into itself (%).', p_keep;
-  END IF;
-  SELECT * INTO d FROM music.document WHERE id = p_drop;
-  IF NOT FOUND THEN RAISE EXCEPTION 'No document with id %.', p_drop; END IF;
-  IF NOT EXISTS (SELECT 1 FROM music.document WHERE id = p_keep) THEN
-    RAISE EXCEPTION 'No document with id %.', p_keep;
-  END IF;
-  FOR fk IN
-    SELECT c.conrelid AS rel, c.conrelid::regclass AS tbl, a.attname AS col, a.attnum
-      FROM pg_constraint c
-      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
-     WHERE c.confrelid = 'music.document'::regclass AND c.contype = 'f'
-       AND array_length(c.conkey, 1) = 1
-  LOOP
-    FOR ux IN
-      SELECT i.indkey FROM pg_index i
-       WHERE i.indrelid = fk.rel AND i.indisunique
-         AND i.indexprs IS NULL AND i.indpred IS NULL
-         AND fk.attnum = ANY (i.indkey)
-    LOOP
-      SELECT string_agg(format('k.%1$I IS NOT DISTINCT FROM x.%1$I', att.attname), ' AND ')
-        INTO others
-        FROM unnest(ux.indkey) AS u(attnum)
-        JOIN pg_attribute att ON att.attrelid = fk.rel AND att.attnum = u.attnum
-       WHERE u.attnum <> fk.attnum;
-      EXECUTE format(
-        'DELETE FROM %s x WHERE x.%I = $1 AND EXISTS (SELECT 1 FROM %s k WHERE k.%I = $2%s)',
-        fk.tbl, fk.col, fk.tbl, fk.col, coalesce(' AND ' || others, ''))
-      USING p_drop, p_keep;
-    END LOOP;
-    EXECUTE format('UPDATE %s SET %I = $1 WHERE %I = $2', fk.tbl, fk.col, fk.col)
-      USING p_keep, p_drop;
-  END LOOP;
-  DELETE FROM music.document WHERE id = p_drop;
-  UPDATE music.document k
-     SET document_type_id = coalesce(k.document_type_id, d.document_type_id),
-         external_ref     = coalesce(k.external_ref, d.external_ref),
-         mime_type        = coalesce(k.mime_type, d.mime_type),
-         byte_size        = coalesce(k.byte_size, d.byte_size),
-         sha256           = coalesce(k.sha256, d.sha256),
-         document_date    = coalesce(k.document_date, d.document_date),
-         signed_on        = coalesce(k.signed_on, d.signed_on),
-         expires_on       = coalesce(k.expires_on, d.expires_on),
-         notes            = CASE WHEN nullif(btrim(d.notes), '') IS NULL OR d.notes = k.notes THEN k.notes
-                                 ELSE concat_ws(E'\n', k.notes, d.notes) END
-   WHERE k.id = p_keep;
-END;
-$_$;
+COMMENT ON FUNCTION api.search(api.contact) IS 'The sort_name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
--- Name: FUNCTION merge_document(p_keep integer, p_drop integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: country; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.merge_document(p_keep integer, p_drop integer) IS 'Merges a duplicate document into the one kept: every attachment moves to it, blank fields are filled from the duplicate, and the duplicate is deleted.';
+CREATE TABLE music.country (
+    code music.iso_3166_alpha2 NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT country_name_len CHECK ((length(name) <= 128)),
+    CONSTRAINT country_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
 
 --
--- Name: own_artist(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: country; Type: VIEW; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_artist(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.artist WHERE id = p_id) $$;
+CREATE VIEW api.country WITH (security_invoker='true') AS
+ SELECT code,
+    name
+   FROM music.country;
 
 --
--- Name: FUNCTION own_artist(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: search(api.country); Type: FUNCTION; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_artist(p_id integer) IS 'True when the artist row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE FUNCTION api.search(api.country) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
 
 --
--- Name: own_contact(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: FUNCTION search(api.country); Type: COMMENT; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_contact(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.contact WHERE id = p_id) $$;
+COMMENT ON FUNCTION api.search(api.country) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
--- Name: FUNCTION own_contact(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: contact_document; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_contact(p_id integer) IS 'True when the contact row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE TABLE music.contact_document (
+    contact_id integer NOT NULL,
+    document_id integer NOT NULL,
+    notes text
+);
+
+ALTER TABLE ONLY music.contact_document FORCE ROW LEVEL SECURITY;
 
 --
--- Name: own_credit(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: document; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.own_credit(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording_credit WHERE id = p_id) $$;
+CREATE TABLE music.document (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    title text NOT NULL,
+    document_type_id integer,
+    storage_kind text DEFAULT 'local'::text NOT NULL,
+    storage_uri text NOT NULL,
+    external_ref text,
+    mime_type text,
+    byte_size bigint,
+    sha256 text,
+    document_date date,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    signed_on date,
+    expires_on date,
+    CONSTRAINT document_dates CHECK (((expires_on IS NULL) OR (signed_on IS NULL) OR (expires_on >= signed_on))),
+    CONSTRAINT document_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'paperless'::text, 'url'::text]))),
+    CONSTRAINT document_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
+);
+
+ALTER TABLE ONLY music.document FORCE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION own_credit(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: organization_document; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_credit(p_id integer) IS 'True when the recording_credit row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE TABLE music.organization_document (
+    organization_id integer NOT NULL,
+    document_id integer NOT NULL,
+    notes text
+);
+
+ALTER TABLE ONLY music.organization_document FORCE ROW LEVEL SECURITY;
 
 --
--- Name: own_document(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: recording_document; Type: TABLE; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.own_document(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.document WHERE id = p_id) $$;
+CREATE TABLE music.recording_document (
+    recording_id integer NOT NULL,
+    document_id integer NOT NULL,
+    notes text
+);
+
+ALTER TABLE ONLY music.recording_document FORCE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION own_document(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: song_document; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_document(p_id integer) IS 'True when the document row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE TABLE music.song_document (
+    song_id integer NOT NULL,
+    document_id integer NOT NULL,
+    notes text
+);
+
+ALTER TABLE ONLY music.song_document FORCE ROW LEVEL SECURITY;
 
 --
--- Name: own_organization(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: document; Type: VIEW; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_organization(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.organization WHERE id = p_id) $$;
+CREATE VIEW api.document WITH (security_invoker='true') AS
+ SELECT id,
+    title,
+    document_type_id,
+    storage_kind,
+    storage_uri,
+    external_ref,
+    mime_type,
+    byte_size,
+    sha256,
+    document_date,
+    signed_on,
+    expires_on,
+    notes,
+    COALESCE(( SELECT array_agg(sd.song_id ORDER BY sd.song_id) AS array_agg
+           FROM music.song_document sd
+          WHERE (sd.document_id = d.id)), '{}'::integer[]) AS song_ids,
+    COALESCE(( SELECT array_agg(rd.recording_id ORDER BY rd.recording_id) AS array_agg
+           FROM music.recording_document rd
+          WHERE (rd.document_id = d.id)), '{}'::integer[]) AS recording_ids,
+    COALESCE(( SELECT array_agg(cd.contact_id ORDER BY cd.contact_id) AS array_agg
+           FROM music.contact_document cd
+          WHERE (cd.document_id = d.id)), '{}'::integer[]) AS contact_ids,
+    COALESCE(( SELECT array_agg(od.organization_id ORDER BY od.organization_id) AS array_agg
+           FROM music.organization_document od
+          WHERE (od.document_id = d.id)), '{}'::integer[]) AS organization_ids,
+    created_at,
+    updated_at
+   FROM music.document d;
 
 --
--- Name: FUNCTION own_organization(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: search(api.document); Type: FUNCTION; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_organization(p_id integer) IS 'True when the organization row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE FUNCTION api.search(api.document) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.title) $_$;
 
 --
--- Name: own_recording(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: FUNCTION search(api.document); Type: COMMENT; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_recording(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording WHERE id = p_id) $$;
+COMMENT ON FUNCTION api.search(api.document) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
--- Name: FUNCTION own_recording(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: document_type; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_recording(p_id integer) IS 'True when the recording row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE TABLE music.document_type (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT document_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
 
 --
--- Name: own_release(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: document_type; Type: VIEW; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_release(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.release WHERE id = p_id) $$;
+CREATE VIEW api.document_type WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.document_type;
 
 --
--- Name: FUNCTION own_release(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: search(api.document_type); Type: FUNCTION; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_release(p_id integer) IS 'True when the release row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE FUNCTION api.search(api.document_type) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
 
 --
--- Name: own_song(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: FUNCTION search(api.document_type); Type: COMMENT; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_song(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.song WHERE id = p_id) $$;
+COMMENT ON FUNCTION api.search(api.document_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
--- Name: FUNCTION own_song(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: genre; Type: TABLE; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_song(p_id integer) IS 'True when the song row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE TABLE music.genre (
+    id integer NOT NULL,
+    name text NOT NULL,
+    parent_id integer,
+    schema_class_id integer,
+    mo_term text,
+    CONSTRAINT genre_no_self CHECK (((parent_id IS NULL) OR (parent_id <> id))),
+    CONSTRAINT genre_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
 
 --
--- Name: own_song_writer(integer); Type: FUNCTION; Schema: music; Owner: -
+-- Name: genre; Type: VIEW; Schema: api; Owner: -
 --
 
-CREATE FUNCTION music.own_song_writer(p_id integer) RETURNS boolean
-    LANGUAGE sql STABLE PARALLEL SAFE
-    AS $$ SELECT EXISTS (SELECT 1 FROM music.song_writer WHERE id = p_id) $$;
+CREATE VIEW api.genre WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    parent_id,
+    schema_class_id,
+    mo_term
+   FROM music.genre;
 
 --
--- Name: FUNCTION own_song_writer(p_id integer); Type: COMMENT; Schema: music; Owner: -
+-- Name: search(api.genre); Type: FUNCTION; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION music.own_song_writer(p_id integer) IS 'True when the song_writer row is visible to the caller, which row security limits to the signed-in account. False for null.';
+CREATE FUNCTION api.search(api.genre) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.genre); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.genre) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: instrument; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.instrument (
+    id integer NOT NULL,
+    name text NOT NULL,
+    ddex_code text,
+    CONSTRAINT instrument_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: COLUMN instrument.ddex_code; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.instrument.ddex_code IS 'DDEX InstrumentType value (allowed value sets version 011). UserDefined when
+DDEX has no value, in which case exports carry the instrument''s own name.';
+
+--
+-- Name: instrument; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.instrument WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.instrument;
+
+--
+-- Name: search(api.instrument); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.instrument) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.instrument); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.instrument) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: key_signature; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.key_signature (
+    name text NOT NULL,
+    tonic text NOT NULL,
+    mode text NOT NULL,
+    accidentals smallint NOT NULL,
+    CONSTRAINT key_sig_mode CHECK ((mode = ANY (ARRAY['major'::text, 'minor'::text]))),
+    CONSTRAINT key_sig_range CHECK (((accidentals >= '-7'::integer) AND (accidentals <= 7))),
+    CONSTRAINT key_sig_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: key_signature; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.key_signature WITH (security_invoker='true') AS
+ SELECT name,
+    tonic,
+    mode,
+    accidentals
+   FROM music.key_signature;
+
+--
+-- Name: search(api.key_signature); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.key_signature) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.key_signature); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.key_signature) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: language; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.language (
+    code music.iso_639_code NOT NULL,
+    name text NOT NULL,
+    iso_name text,
+    CONSTRAINT language_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: language; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.language WITH (security_invoker='true') AS
+ SELECT code,
+    name,
+    iso_name
+   FROM music.language;
+
+--
+-- Name: search(api.language); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.language) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.language); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.language) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: mood; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.mood (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT mood_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: mood; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.mood WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.mood;
+
+--
+-- Name: search(api.mood); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.mood) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.mood); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.mood) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: organization; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.organization (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    name text NOT NULL,
+    pro_code text,
+    member_ipi music.ipi_name_number,
+    isni music.isni_number,
+    country music.iso_3166_alpha2,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+ALTER TABLE ONLY music.organization FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: organization; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.organization WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    pro_code,
+    member_ipi,
+    isni,
+    country,
+    notes,
+    music.documents_of('organization_document'::text, 'organization_id'::text, id) AS documents,
+    created_at,
+    updated_at
+   FROM music.organization o;
+
+--
+-- Name: search(api.organization); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.organization) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.organization); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.organization) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
 -- Name: recording_language(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -2049,1242 +2114,6 @@ $$;
 COMMENT ON FUNCTION music.recording_pitch_contact(p_recording integer) IS 'Who a recording''s pitch comment names: its own pitch contact, else an active
 exclusive agent, else the account''s default contact. No row means nobody,
 which the recording list flags.';
-
---
--- Name: release_status(integer); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.release_status(p_release integer) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT CASE
-    WHEN NOT EXISTS (SELECT 1 FROM music.release_distribution d WHERE d.release_id = p_release)
-      THEN 'Draft'
-    WHEN EXISTS (SELECT 1 FROM music.release_distribution d
-                  WHERE d.release_id = p_release AND d.live_on <= current_date
-                    AND (d.taken_down_on IS NULL OR d.taken_down_on > current_date))
-      THEN 'Live'
-    WHEN EXISTS (SELECT 1 FROM music.release_distribution d
-                  WHERE d.release_id = p_release AND d.taken_down_on IS NULL
-                    AND (d.live_on IS NULL OR d.live_on > current_date))
-      THEN 'Submitted'
-    ELSE 'Taken down'
-  END
-$$;
-
---
--- Name: FUNCTION release_status(p_release integer); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.release_status(p_release integer) IS 'Draft with no distributions; Live while any distribution is live; Submitted
-when one is awaiting its live date; otherwise Taken down.';
-
---
--- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.require_permission() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF music.current_app_user() IS NOT NULL AND NOT music.can(TG_ARGV[0]) THEN
-    RAISE EXCEPTION 'Your role does not allow %',
-      (SELECT description FROM music.permission WHERE code = TG_ARGV[0])
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  RETURN NULL;
-END;
-$$;
-
---
--- Name: FUNCTION require_permission(); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.require_permission() IS 'Statement trigger: refuses the write with a clear error unless the signed-in user''s role has the permission named in the trigger argument. Writes outside an API request, such as migrations, are not checked.';
-
---
--- Name: require_site_admin(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.require_site_admin() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF music.current_app_user() IS NOT NULL AND NOT music.is_site_admin() THEN
-    RAISE EXCEPTION 'Only the site admin can change the shared lists'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  RETURN NULL;
-END;
-$$;
-
---
--- Name: FUNCTION require_site_admin(); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.require_site_admin() IS 'Statement trigger on the shared lists: refuses a write unless the signed-in user is the site admin.';
-
---
--- Name: send_invite(uuid, text); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.send_invite(p_invite uuid, p_token text) RETURNS void
-    LANGUAGE sql SECURITY DEFINER
-    SET search_path TO 'pg_catalog'
-    AS $$
-  SELECT pg_notify('mam_invite', json_build_object(
-           'email', i.email,
-           'token', p_token,
-           'account', a.name,
-           'role', r.name,
-           'invited_by', u.email)::text)
-    FROM music.user_invite i
-    JOIN music.account a ON a.id = i.account_id
-    JOIN music.account_role r ON r.id = i.role_id
-    LEFT JOIN music.user_account u ON u.id = i.invited_by
-   WHERE i.id = p_invite
-$$;
-
---
--- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.send_invite(p_invite uuid, p_token text) IS 'Hands an invite and its link code to mam-upload, which listens on the mam_invite channel and sends the email. The notice is delivered only if the transaction commits. Owner rights only to read the account and inviter names.';
-
---
--- Name: set_updated_at(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.set_updated_at() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  NEW.updated_at := now();
-  RETURN NEW;
-END;
-$$;
-
---
--- Name: song_controlled_share(integer); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.song_controlled_share(p_song integer) RETURNS numeric
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT CASE
-    WHEN s.public_domain_p THEN 100
-    WHEN EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
-      THEN coalesce((SELECT sum(p.share) FROM music.song_publisher p
-                      WHERE p.song_id = s.id AND p.controlled), 0)
-    ELSE coalesce((SELECT sum(w.share) FROM music.song_writer w
-                    WHERE w.song_id = s.id AND w.controlled), 0)
-  END
-  FROM music.song s WHERE s.id = p_song
-$$;
-
---
--- Name: FUNCTION song_controlled_share(p_song integer); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.song_controlled_share(p_song integer) IS 'Percent of a composition''s publishing you can license: controlled publisher
-shares, or controlled writer shares when the song has no publisher. A public
-domain work counts as 100.';
-
---
--- Name: song_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.song_one_stop_reason(p_song integer) RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT CASE
-    WHEN s.public_domain_p THEN NULL
-    WHEN NOT EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
-     AND NOT EXISTS (SELECT 1 FROM music.song_writer w WHERE w.song_id = s.id)
-      THEN 'No writers or publishers entered'
-    WHEN music.song_controlled_share(s.id) <> 100
-      THEN format('Publishing controlled %s%%, not 100', trim_scale(music.song_controlled_share(s.id)))
-  END
-  FROM music.song s WHERE s.id = p_song
-$$;
-
---
--- Name: FUNCTION song_one_stop_reason(p_song integer); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.song_one_stop_reason(p_song integer) IS 'Why a composition is not one stop, or NULL when it is: the publishing you
-control totals 100, counting controlled publisher shares, or controlled
-writer shares when there is no publisher. A public domain work is one stop.';
-
---
--- Name: song_writer_default_pro(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.song_writer_default_pro() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF NEW.pro_code IS NULL THEN
-    SELECT c.pro_code INTO NEW.pro_code
-      FROM music.contact c WHERE c.id = NEW.contact_id;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
---
--- Name: sync_documents(text, text, integer, jsonb); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  d     jsonb;
-  _doc  integer;
-  _uri  text;
-  _kind text;
-  _keep integer[] := '{}';
-BEGIN
-  FOR d IN SELECT * FROM jsonb_array_elements(coalesce(p_docs, '[]'::jsonb))
-  LOOP
-    IF nullif(btrim(coalesce(d->>'title','')), '') IS NULL THEN
-      CONTINUE;
-    END IF;
-
-    _uri := btrim(coalesce(d->>'storage_uri', ''));
-
-    _kind := CASE
-      WHEN _uri ~* '^https?://' THEN 'url'
-      ELSE coalesce(nullif(d->>'storage_kind',''), 'url')
-    END;
-
-    IF d->>'id' IS NOT NULL THEN
-      _doc := (d->>'id')::integer;
-      UPDATE music.document
-         SET title            = btrim(d->>'title'),
-             document_type_id = nullif(d->>'document_type_id','')::integer,
-             storage_kind     = _kind,
-             storage_uri      = coalesce(nullif(_uri,''), storage_uri),
-             mime_type        = nullif(d->>'mime_type',''),
-             byte_size        = nullif(d->>'byte_size','')::bigint,
-             document_date    = nullif(d->>'document_date','')::date,
-             signed_on        = nullif(d->>'signed_on','')::date,
-             expires_on       = nullif(d->>'expires_on','')::date,
-             notes            = nullif(d->>'notes','')
-       WHERE id = _doc;
-    ELSE
-      _doc := NULL;
-      IF _kind IN ('local', 's3') THEN
-        SELECT id INTO _doc FROM music.document
-         WHERE account_id = music.current_account()
-           AND storage_uri = _uri
-           AND storage_kind IN ('local', 's3');
-      END IF;
-      IF _doc IS NULL THEN
-        INSERT INTO music.document
-          (title, document_type_id, storage_kind, storage_uri,
-           mime_type, byte_size, document_date, signed_on, expires_on, notes)
-        VALUES (btrim(d->>'title'),
-                nullif(d->>'document_type_id','')::integer,
-                _kind,
-                _uri,
-                nullif(d->>'mime_type',''),
-                nullif(d->>'byte_size','')::bigint,
-                nullif(d->>'document_date','')::date,
-                nullif(d->>'signed_on','')::date,
-                nullif(d->>'expires_on','')::date,
-                nullif(d->>'notes',''))
-        RETURNING id INTO _doc;
-      ELSE
-        UPDATE music.document
-           SET document_type_id = coalesce(document_type_id, nullif(d->>'document_type_id','')::integer),
-               mime_type        = coalesce(mime_type, nullif(d->>'mime_type','')),
-               byte_size        = coalesce(byte_size, nullif(d->>'byte_size','')::bigint),
-               document_date    = coalesce(document_date, nullif(d->>'document_date','')::date),
-               signed_on        = coalesce(signed_on, nullif(d->>'signed_on','')::date),
-               expires_on       = coalesce(expires_on, nullif(d->>'expires_on','')::date),
-               notes            = coalesce(notes, nullif(d->>'notes',''))
-         WHERE id = _doc;
-      END IF;
-    END IF;
-
-    _keep := _keep || _doc;
-
-    EXECUTE format(
-      'INSERT INTO music.%I (%I, document_id) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING', p_table, p_col)
-      USING p_parent, _doc;
-  END LOOP;
-
-  EXECUTE format(
-    'DELETE FROM music.%I WHERE %I = $1 AND document_id <> ALL ($2)',
-    p_table, p_col)
-    USING p_parent, _keep;
-END;
-$_$;
-
---
--- Name: FUNCTION sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) IS 'Saves the documents listed on a song, recording, person, company, or release and links them to it. A new row whose file is already a document links that document instead of creating a second one; its blank fields are filled from the row. Rows no longer listed are detached; the document itself survives.';
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
---
--- Name: user_invite; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.user_invite (
-    id uuid DEFAULT uuidv7() NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    email music.email_address NOT NULL,
-    role_id integer NOT NULL,
-    token_hash bytea NOT NULL,
-    invited_by uuid DEFAULT music.current_app_user(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    sent_at timestamp with time zone DEFAULT now() NOT NULL,
-    expires_at timestamp with time zone DEFAULT (now() + '7 days'::interval) NOT NULL,
-    accepted_at timestamp with time zone
-);
-
-ALTER TABLE ONLY music.user_invite FORCE ROW LEVEL SECURITY;
-
---
--- Name: TABLE user_invite; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.user_invite IS 'An invitation to join an account with a role. Only a hash of the link code is kept; the code itself goes out once, in the email.';
-
---
--- Name: COLUMN user_invite.token_hash; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.user_invite.token_hash IS 'sha256 of the code in the emailed link.';
-
---
--- Name: account_invite; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.account_invite WITH (security_invoker='true') AS
- SELECT id,
-    email,
-    role_id,
-    created_at,
-    sent_at,
-    expires_at,
-    accepted_at,
-        CASE
-            WHEN (accepted_at IS NOT NULL) THEN 'Accepted'::text
-            WHEN (expires_at <= now()) THEN 'Expired'::text
-            ELSE 'Pending'::text
-        END AS status,
-    false AS resend
-   FROM music.user_invite i;
-
---
--- Name: VIEW account_invite; Type: COMMENT; Schema: api; Owner: -
---
-
-COMMENT ON VIEW api.account_invite IS 'The signed-in account''s invites. Insert to invite; update with resend true to send a new link; delete to cancel.';
-
---
--- Name: account_role; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.account_role (
-    id integer NOT NULL,
-    name text NOT NULL,
-    description text NOT NULL
-);
-
---
--- Name: TABLE account_role; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
-
---
--- Name: account_role; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.account_role WITH (security_invoker='true') AS
- SELECT id,
-    name,
-    description
-   FROM music.account_role;
-
---
--- Name: VIEW account_role; Type: COMMENT; Schema: api; Owner: -
---
-
-COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user.';
-
---
--- Name: account_storage; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.account_storage (
-    account_id uuid NOT NULL,
-    kind text DEFAULT 'local'::text NOT NULL,
-    endpoint text,
-    region text,
-    bucket text,
-    base_path text,
-    public_base_url text,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    access_key_enc bytea,
-    secret_key_enc bytea,
-    access_key_id text,
-    secret_key text,
-    CONSTRAINT account_storage_bucket_trimmed CHECK (((bucket IS NULL) OR (bucket = btrim(bucket)))),
-    CONSTRAINT account_storage_kind CHECK ((kind = ANY (ARRAY['local'::text, 's3'::text, 'webdav'::text, 'sftp'::text]))),
-    CONSTRAINT account_storage_s3 CHECK (((kind <> 's3'::text) OR (bucket IS NOT NULL)))
-);
-
-ALTER TABLE ONLY music.account_storage FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN account_storage.secret_key; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.account_storage.secret_key IS 'Plain text, deliberately. Not exposed through the api schema. Backups
-are the realistic exposure, so keep the backup repository encrypted and
-scope the S3 key to one bucket.';
-
---
--- Name: account_storage; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.account_storage WITH (security_invoker='true') AS
- SELECT account_id,
-    kind,
-    endpoint,
-    region,
-    bucket,
-    base_path,
-    public_base_url,
-    access_key_id,
-    ((secret_key IS NOT NULL) AND (secret_key <> ''::text)) AS key_set,
-    notes
-   FROM music.account_storage;
-
---
--- Name: user_account; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.user_account (
-    id uuid DEFAULT uuidv7() CONSTRAINT app_user_id_not_null NOT NULL,
-    account_id uuid CONSTRAINT app_user_account_id_not_null NOT NULL,
-    email music.email_address CONSTRAINT app_user_email_not_null NOT NULL,
-    created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
-    password_hash text NOT NULL,
-    role_id integer NOT NULL,
-    is_site_admin boolean DEFAULT false NOT NULL
-);
-
-ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN user_account.role_id; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.user_account.role_id IS 'The user''s account role. Required, with no default, so access is always granted on purpose.';
-
---
--- Name: COLUMN user_account.is_site_admin; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.user_account.is_site_admin IS 'The operator of this installation, not tied to one account. Sees the shared lists.';
-
---
--- Name: account_user; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.account_user WITH (security_invoker='true') AS
- SELECT id,
-    email,
-    role_id,
-    created_at,
-    (id = music.current_app_user()) AS is_me
-   FROM music.user_account u;
-
---
--- Name: VIEW account_user; Type: COMMENT; Schema: api; Owner: -
---
-
-COMMENT ON VIEW api.account_user IS 'The signed-in account''s users. Only the role can be changed here; removing a row removes the user from the account.';
-
---
--- Name: artist; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.artist (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    name text NOT NULL,
-    sort_name text,
-    kind text DEFAULT 'person'::text NOT NULL,
-    isni music.isni_number,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT artist_kind CHECK ((kind = ANY (ARRAY['person'::text, 'group'::text]))),
-    CONSTRAINT artist_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
-ALTER TABLE ONLY music.artist FORCE ROW LEVEL SECURITY;
-
---
--- Name: artist_member; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.artist_member (
-    artist_id integer NOT NULL,
-    contact_id integer NOT NULL,
-    begin_date date,
-    end_date date,
-    notes text,
-    CONSTRAINT artist_member_dates CHECK (((end_date IS NULL) OR (begin_date IS NULL) OR (end_date >= begin_date)))
-);
-
-ALTER TABLE ONLY music.artist_member FORCE ROW LEVEL SECURITY;
-
---
--- Name: contact; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.contact (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    first_name text,
-    last_name text,
-    display_name text GENERATED ALWAYS AS (btrim(((COALESCE(first_name, ''::text) || ' '::text) || COALESCE(last_name, ''::text)))) STORED,
-    sort_name text GENERATED ALWAYS AS (btrim(((COALESCE(last_name, ''::text) || ', '::text) || COALESCE(first_name, ''::text)), ', '::text)) STORED,
-    pro_code text,
-    member_ipi music.ipi_name_number,
-    isni music.isni_number,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    credit_name text,
-    CONSTRAINT contact_has_name CHECK ((COALESCE(first_name, last_name) IS NOT NULL))
-);
-
-ALTER TABLE ONLY music.contact FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN contact.credit_name; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.contact.credit_name IS 'Name this person performs and is credited under, when it differs from
-their legal name. Blank means credit them by their own name. A single
-credit can still override it through recording_credit.credited_as.';
-
---
--- Name: artist; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.artist WITH (security_invoker='true') AS
- SELECT id,
-    name,
-    sort_name,
-    kind,
-    isni AS isni_own,
-    COALESCE((isni)::text,
-        CASE
-            WHEN (kind = 'person'::text) THEN (( SELECT c.isni
-               FROM (music.artist_member m
-                 JOIN music.contact c ON ((c.id = m.contact_id)))
-              WHERE ((m.artist_id = a.id) AND (c.isni IS NOT NULL))
-             LIMIT 1))::text
-            ELSE NULL::text
-        END) AS isni,
-    ((isni IS NULL) AND (kind = 'person'::text) AND (EXISTS ( SELECT 1
-           FROM (music.artist_member m
-             JOIN music.contact c ON ((c.id = m.contact_id)))
-          WHERE ((m.artist_id = a.id) AND (c.isni IS NOT NULL))))) AS isni_inherited,
-    notes,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('contact_id', m.contact_id, 'begin_date', m.begin_date, 'end_date', m.end_date, 'notes', m.notes) ORDER BY m.begin_date NULLS FIRST, m.contact_id) AS jsonb_agg
-           FROM music.artist_member m
-          WHERE (m.artist_id = a.id)), '[]'::jsonb) AS members,
-    ( SELECT count(*) AS count
-           FROM music.artist_member m
-          WHERE (m.artist_id = a.id)) AS member_count,
-    created_at,
-    updated_at
-   FROM music.artist a;
-
---
--- Name: artist_member; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.artist_member WITH (security_invoker='true') AS
- SELECT artist_id,
-    contact_id,
-    begin_date,
-    end_date,
-    notes
-   FROM music.artist_member;
-
---
--- Name: asset_status; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.asset_status (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT asset_status_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: asset_status; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.asset_status WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.asset_status;
-
---
--- Name: audio_file_type; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.audio_file_type (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT audio_file_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: audio_file_type; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.audio_file_type WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.audio_file_type;
-
---
--- Name: contact_email; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.contact_email (
-    id integer NOT NULL,
-    contact_id integer,
-    email music.email_address NOT NULL,
-    is_primary boolean DEFAULT false NOT NULL,
-    note text,
-    retired_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    organization_id integer,
-    CONSTRAINT contact_email_owner_chk CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
-    CONSTRAINT email_trimmed CHECK (((email)::text = btrim((email)::text)))
-);
-
-ALTER TABLE ONLY music.contact_email FORCE ROW LEVEL SECURITY;
-
---
--- Name: contact_organization; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.contact_organization (
-    contact_id integer NOT NULL,
-    organization_id integer NOT NULL,
-    title text,
-    is_primary boolean DEFAULT false NOT NULL,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-ALTER TABLE ONLY music.contact_organization FORCE ROW LEVEL SECURITY;
-
---
--- Name: contact_phone; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.contact_phone (
-    id integer NOT NULL,
-    contact_id integer,
-    country_code smallint DEFAULT 1 NOT NULL,
-    number text NOT NULL,
-    extension text,
-    is_primary boolean DEFAULT false NOT NULL,
-    note text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    organization_id integer,
-    CONSTRAINT contact_phone_owner_chk CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
-    CONSTRAINT phone_cc_range CHECK (((country_code >= 1) AND (country_code <= 999))),
-    CONSTRAINT phone_trimmed CHECK (((number = btrim(number)) AND (number <> ''::text)))
-);
-
-ALTER TABLE ONLY music.contact_phone FORCE ROW LEVEL SECURITY;
-
---
--- Name: TABLE contact_phone; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.contact_phone IS 'Deliberately denormalized: one row per contact per number, so a shared line
-(company switchboard) is stored once per contact rather than once globally.
-Tradeoff accepted for data-entry speed. Consequences: updating a shared number
-touches N rows; reverse lookup requires matching free-text formats. The
-normalized form would be a phone table plus a contact_phone junction.';
-
---
--- Name: COLUMN contact_phone.country_code; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.contact_phone.country_code IS 'ITU calling code, not an FK to country. Codes are not 1:1 with countries
-(1 covers US/CA/Caribbean, 7 covers RU/KZ). Defaults to 1.';
-
---
--- Name: COLUMN contact_phone.number; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.contact_phone.number IS 'Free text, deliberately unvalidated beyond non-empty. No E.164 canonicalization.';
-
---
--- Name: contact; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.contact WITH (security_invoker='true') AS
- SELECT id,
-    first_name,
-    last_name,
-    display_name,
-    sort_name,
-    credit_name,
-    pro_code,
-    member_ipi,
-    isni,
-    notes,
-    ( SELECT e.email
-           FROM music.contact_email e
-          WHERE ((e.contact_id = c.id) AND e.is_primary AND (e.retired_at IS NULL))
-         LIMIT 1) AS primary_email,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', e.id, 'email', e.email, 'is_primary', e.is_primary, 'note', e.note) ORDER BY e.is_primary DESC, e.id) AS jsonb_agg
-           FROM music.contact_email e
-          WHERE (e.contact_id = c.id)), '[]'::jsonb) AS emails,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'country_code', p.country_code, 'number', p.number, 'extension', p.extension, 'is_primary', p.is_primary, 'note', p.note) ORDER BY p.is_primary DESC, p.id) AS jsonb_agg
-           FROM music.contact_phone p
-          WHERE (p.contact_id = c.id)), '[]'::jsonb) AS phones,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('organization_id', o.organization_id, 'title', o.title, 'is_primary', o.is_primary) ORDER BY o.is_primary DESC, o.organization_id) AS jsonb_agg
-           FROM music.contact_organization o
-          WHERE (o.contact_id = c.id)), '[]'::jsonb) AS organizations,
-    music.documents_of('contact_document'::text, 'contact_id'::text, id) AS documents,
-    created_at,
-    updated_at
-   FROM music.contact c;
-
---
--- Name: contact_email; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.contact_email WITH (security_invoker='true') AS
- SELECT id,
-    contact_id,
-    email,
-    is_primary,
-    note,
-    retired_at,
-    created_at,
-    updated_at
-   FROM music.contact_email;
-
---
--- Name: contact_organization; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.contact_organization WITH (security_invoker='true') AS
- SELECT contact_id,
-    organization_id,
-    title,
-    is_primary,
-    notes,
-    created_at
-   FROM music.contact_organization;
-
---
--- Name: contact_phone; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.contact_phone WITH (security_invoker='true') AS
- SELECT id,
-    contact_id,
-    country_code,
-    number,
-    extension,
-    is_primary,
-    note,
-    created_at,
-    updated_at
-   FROM music.contact_phone;
-
---
--- Name: country; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.country (
-    code music.iso_3166_alpha2 NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT country_name_len CHECK ((length(name) <= 128)),
-    CONSTRAINT country_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: country; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.country WITH (security_invoker='true') AS
- SELECT code,
-    name
-   FROM music.country;
-
---
--- Name: contact_document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.contact_document (
-    contact_id integer NOT NULL,
-    document_id integer NOT NULL,
-    notes text
-);
-
-ALTER TABLE ONLY music.contact_document FORCE ROW LEVEL SECURITY;
-
---
--- Name: document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.document (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    title text NOT NULL,
-    document_type_id integer,
-    storage_kind text DEFAULT 'local'::text NOT NULL,
-    storage_uri text NOT NULL,
-    external_ref text,
-    mime_type text,
-    byte_size bigint,
-    sha256 text,
-    document_date date,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    signed_on date,
-    expires_on date,
-    CONSTRAINT document_dates CHECK (((expires_on IS NULL) OR (signed_on IS NULL) OR (expires_on >= signed_on))),
-    CONSTRAINT document_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'paperless'::text, 'url'::text]))),
-    CONSTRAINT document_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
-);
-
-ALTER TABLE ONLY music.document FORCE ROW LEVEL SECURITY;
-
---
--- Name: organization_document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.organization_document (
-    organization_id integer NOT NULL,
-    document_id integer NOT NULL,
-    notes text
-);
-
-ALTER TABLE ONLY music.organization_document FORCE ROW LEVEL SECURITY;
-
---
--- Name: recording_document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.recording_document (
-    recording_id integer NOT NULL,
-    document_id integer NOT NULL,
-    notes text
-);
-
-ALTER TABLE ONLY music.recording_document FORCE ROW LEVEL SECURITY;
-
---
--- Name: song_document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song_document (
-    song_id integer NOT NULL,
-    document_id integer NOT NULL,
-    notes text
-);
-
-ALTER TABLE ONLY music.song_document FORCE ROW LEVEL SECURITY;
-
---
--- Name: document; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.document WITH (security_invoker='true') AS
- SELECT id,
-    title,
-    document_type_id,
-    storage_kind,
-    storage_uri,
-    external_ref,
-    mime_type,
-    byte_size,
-    sha256,
-    document_date,
-    signed_on,
-    expires_on,
-    notes,
-    COALESCE(( SELECT array_agg(sd.song_id ORDER BY sd.song_id) AS array_agg
-           FROM music.song_document sd
-          WHERE (sd.document_id = d.id)), '{}'::integer[]) AS song_ids,
-    COALESCE(( SELECT array_agg(rd.recording_id ORDER BY rd.recording_id) AS array_agg
-           FROM music.recording_document rd
-          WHERE (rd.document_id = d.id)), '{}'::integer[]) AS recording_ids,
-    COALESCE(( SELECT array_agg(cd.contact_id ORDER BY cd.contact_id) AS array_agg
-           FROM music.contact_document cd
-          WHERE (cd.document_id = d.id)), '{}'::integer[]) AS contact_ids,
-    COALESCE(( SELECT array_agg(od.organization_id ORDER BY od.organization_id) AS array_agg
-           FROM music.organization_document od
-          WHERE (od.document_id = d.id)), '{}'::integer[]) AS organization_ids,
-    created_at,
-    updated_at
-   FROM music.document d;
-
---
--- Name: document_type; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.document_type (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT document_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: document_expiring; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.document_expiring WITH (security_invoker='true') AS
- SELECT d.id,
-    d.title,
-    d.expires_on,
-    t.name AS document_type,
-    (d.expires_on - CURRENT_DATE) AS days_left
-   FROM (music.document d
-     LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
-  WHERE ((d.expires_on IS NOT NULL) AND (d.expires_on <= (CURRENT_DATE + 90)));
-
---
--- Name: release_document; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.release_document (
-    release_id integer NOT NULL,
-    document_id integer NOT NULL
-);
-
-ALTER TABLE ONLY music.release_document FORCE ROW LEVEL SECURITY;
-
---
--- Name: document_orphan; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.document_orphan WITH (security_invoker='true') AS
- SELECT d.id,
-    d.title,
-    t.name AS document_type,
-    d.storage_kind,
-    d.storage_uri,
-    d.document_date,
-    d.created_at
-   FROM (music.document d
-     LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
-  WHERE ((NOT (EXISTS ( SELECT 1
-           FROM music.song_document x
-          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
-           FROM music.recording_document x
-          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
-           FROM music.contact_document x
-          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
-           FROM music.organization_document x
-          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
-           FROM music.release_document x
-          WHERE (x.document_id = d.id)))));
-
---
--- Name: document_type; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.document_type WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.document_type;
-
---
--- Name: document_usage; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.document_usage WITH (security_invoker='true') AS
- SELECT id AS document_id,
-    ( SELECT count(*) AS count
-           FROM music.song_document x
-          WHERE (x.document_id = d.id)) AS song_count,
-    ( SELECT count(*) AS count
-           FROM music.recording_document x
-          WHERE (x.document_id = d.id)) AS recording_count,
-    ( SELECT count(*) AS count
-           FROM music.contact_document x
-          WHERE (x.document_id = d.id)) AS contact_count,
-    ( SELECT count(*) AS count
-           FROM music.organization_document x
-          WHERE (x.document_id = d.id)) AS organization_count
-   FROM music.document d;
-
---
--- Name: email_duplicate; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.email_duplicate WITH (security_invoker='true') AS
- SELECT lower((email)::text) AS email,
-    count(*) AS contact_count,
-    array_agg(contact_id ORDER BY contact_id) AS contact_ids
-   FROM music.contact_email e
-  WHERE (retired_at IS NULL)
-  GROUP BY (lower((email)::text))
- HAVING (count(*) > 1);
-
---
--- Name: genre; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.genre (
-    id integer NOT NULL,
-    name text NOT NULL,
-    parent_id integer,
-    schema_class_id integer,
-    mo_term text,
-    CONSTRAINT genre_no_self CHECK (((parent_id IS NULL) OR (parent_id <> id))),
-    CONSTRAINT genre_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: genre; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.genre WITH (security_invoker='true') AS
- SELECT id,
-    name,
-    parent_id,
-    schema_class_id,
-    mo_term
-   FROM music.genre;
-
---
--- Name: instrument; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.instrument (
-    id integer NOT NULL,
-    name text NOT NULL,
-    ddex_code text,
-    CONSTRAINT instrument_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: COLUMN instrument.ddex_code; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.instrument.ddex_code IS 'DDEX InstrumentType value (allowed value sets version 011). UserDefined when
-DDEX has no value, in which case exports carry the instrument''s own name.';
-
---
--- Name: instrument; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.instrument WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.instrument;
-
---
--- Name: key_signature; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.key_signature (
-    name text NOT NULL,
-    tonic text NOT NULL,
-    mode text NOT NULL,
-    accidentals smallint NOT NULL,
-    CONSTRAINT key_sig_mode CHECK ((mode = ANY (ARRAY['major'::text, 'minor'::text]))),
-    CONSTRAINT key_sig_range CHECK (((accidentals >= '-7'::integer) AND (accidentals <= 7))),
-    CONSTRAINT key_sig_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: key_signature; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.key_signature WITH (security_invoker='true') AS
- SELECT name,
-    tonic,
-    mode,
-    accidentals
-   FROM music.key_signature;
-
---
--- Name: language; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.language (
-    code music.iso_639_code NOT NULL,
-    name text NOT NULL,
-    iso_name text,
-    CONSTRAINT language_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: language; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.language WITH (security_invoker='true') AS
- SELECT code,
-    name,
-    iso_name
-   FROM music.language;
-
---
--- Name: mood; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.mood (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT mood_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: mood; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.mood WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.mood;
-
---
--- Name: organization; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.organization (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    name text NOT NULL,
-    pro_code text,
-    member_ipi music.ipi_name_number,
-    isni music.isni_number,
-    country music.iso_3166_alpha2,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
-ALTER TABLE ONLY music.organization FORCE ROW LEVEL SECURITY;
-
---
--- Name: organization; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.organization WITH (security_invoker='true') AS
- SELECT id,
-    name,
-    pro_code,
-    member_ipi,
-    isni,
-    country,
-    notes,
-    music.documents_of('organization_document'::text, 'organization_id'::text, id) AS documents,
-    created_at,
-    updated_at
-   FROM music.organization o;
-
---
--- Name: pitch_setting; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.pitch_setting (
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    default_contact_id integer
-);
-
-ALTER TABLE ONLY music.pitch_setting FORCE ROW LEVEL SECURITY;
-
---
--- Name: TABLE pitch_setting; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.pitch_setting IS 'Per-account pitching defaults. default_contact_id is the person named in a
-pitch comment when a recording has no pitch contact of its own.';
-
---
--- Name: pitch_setting; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.pitch_setting WITH (security_invoker='true') AS
- SELECT account_id AS id,
-    default_contact_id
-   FROM music.pitch_setting
-  WHERE (account_id = music.current_account());
-
---
--- Name: pro; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.pro (
-    code text NOT NULL,
-    name text NOT NULL,
-    cisac_code music.cisac_society_code,
-    home_country music.iso_3166_alpha2 NOT NULL,
-    CONSTRAINT pro_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: pro; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.pro WITH (security_invoker='true') AS
- SELECT p.code,
-    p.name,
-    p.cisac_code,
-    p.home_country,
-    c.name AS home_country_name
-   FROM (music.pro p
-     JOIN music.country c ON (((c.code)::text = (p.home_country)::text)));
-
---
--- Name: pro_territory; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.pro_territory (
-    pro_code text NOT NULL,
-    country_code music.iso_3166_alpha2 NOT NULL
-);
-
---
--- Name: pro_territory; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.pro_territory WITH (security_invoker='true') AS
- SELECT pro_code,
-    country_code
-   FROM music.pro_territory;
 
 --
 -- Name: audio_file; Type: TABLE; Schema: music; Owner: -
@@ -3707,90 +2536,18 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
    FROM music.recording r;
 
 --
--- Name: song; Type: TABLE; Schema: music; Owner: -
+-- Name: search(api.recording); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE TABLE music.song (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    title text NOT NULL,
-    iswc music.iswc,
-    lyrics text,
-    notes text,
-    public_domain_p boolean DEFAULT false NOT NULL,
-    derived_from_id integer,
-    derivation_type text,
-    copyright_date date,
-    copyright_number text,
-    reversion_date date,
-    reversion_lead smallint,
-    language_code music.iso_639_code,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    based_on text,
-    easy_clear boolean DEFAULT false NOT NULL,
-    CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
-    CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
-    CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
-    CONSTRAINT song_reversion_lead CHECK (((reversion_lead IS NULL) OR ((reversion_lead >= 0) AND (reversion_lead <= 20)))),
-    CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
-);
-
-ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
+CREATE FUNCTION api.search(api.recording) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.title) $_$;
 
 --
--- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
+-- Name: FUNCTION search(api.recording); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON COLUMN music.song.based_on IS 'Source work not in this catalog: a public domain tune, or something whose
-composition row does not exist here. Free text. Use derived_from_id instead
-when the source is a real row.';
-
---
--- Name: COLUMN song.easy_clear; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
-stop, which is computed from the controlled shares.';
-
---
--- Name: song_writer; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song_writer (
-    id integer NOT NULL,
-    song_id integer NOT NULL,
-    contact_id integer NOT NULL,
-    role_id integer NOT NULL,
-    share numeric(7,4) DEFAULT 0 NOT NULL,
-    controlled boolean DEFAULT false NOT NULL,
-    notes text,
-    pro_code text,
-    CONSTRAINT song_writer_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
-);
-
-ALTER TABLE ONLY music.song_writer FORCE ROW LEVEL SECURITY;
-
---
--- Name: recording_cover; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.recording_cover WITH (security_invoker='true') AS
- SELECT r.id,
-    r.title,
-    r.version_label,
-    r.isrc,
-    s.title AS composition,
-    ( SELECT string_agg(c.display_name, ', '::text ORDER BY c.display_name) AS string_agg
-           FROM (music.song_writer w
-             JOIN music.contact c ON ((c.id = w.contact_id)))
-          WHERE (w.song_id = s.id)) AS writers
-   FROM ((music.recording r
-     JOIN music.recording_song rs ON ((rs.recording_id = r.id)))
-     JOIN music.song s ON ((s.id = rs.song_id)))
-  WHERE (NOT (EXISTS ( SELECT 1
-           FROM music.song_writer w
-          WHERE ((w.song_id = s.id) AND w.controlled))));
+COMMENT ON FUNCTION api.search(api.recording) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
 
 --
 -- Name: role; Type: TABLE; Schema: music; Owner: -
@@ -3821,31 +2578,6 @@ COMMENT ON COLUMN music.role.credit_role IS 'Offered in the Roles picker on a re
 roles, not publishing, ownership, or business relationships.';
 
 --
--- Name: recording_credit_display; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.recording_credit_display WITH (security_invoker='true') AS
- SELECT c.id,
-    c.recording_id,
-    r.title AS recording_title,
-    c.contact_id,
-    c.organization_id,
-    COALESCE(c.credited_as, ct.credit_name, ct.display_name, o.name) AS credited_name,
-    ct.display_name AS legal_name,
-    ( SELECT string_agg(ro.name, ', '::text ORDER BY ro.name) AS string_agg
-           FROM (music.recording_credit_role cr
-             JOIN music.role ro ON ((ro.id = cr.role_id)))
-          WHERE (cr.credit_id = c.id)) AS roles,
-    ( SELECT string_agg(i.name, ', '::text ORDER BY i.name) AS string_agg
-           FROM (music.recording_credit_instrument ci
-             JOIN music.instrument i ON ((i.id = ci.instrument_id)))
-          WHERE (ci.credit_id = c.id)) AS instruments
-   FROM (((music.recording_credit c
-     JOIN music.recording r ON ((r.id = c.recording_id)))
-     LEFT JOIN music.contact ct ON ((ct.id = c.contact_id)))
-     LEFT JOIN music.organization o ON ((o.id = c.organization_id)));
-
---
 -- Name: recording_role; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -3854,6 +2586,68 @@ CREATE VIEW api.recording_role WITH (security_invoker='true') AS
     name
    FROM music.role
   WHERE credit_role;
+
+--
+-- Name: search(api.recording_role); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.recording_role) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.recording_role); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.recording_role) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: gtin_valid(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.gtin_valid(p text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    AS $_$
+  SELECT p ~ '^[0-9]{12,13}$'
+     AND (SELECT (10 - sum(substr(p, length(p) - i, 1)::int
+                         * CASE WHEN i % 2 = 1 THEN 3 ELSE 1 END) % 10) % 10
+            FROM generate_series(1, length(p) - 1) i) = right(p, 1)::int
+$_$;
+
+--
+-- Name: FUNCTION gtin_valid(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.gtin_valid(p text) IS 'True for a 12-digit UPC or 13-digit EAN whose check digit is correct.';
+
+--
+-- Name: release_status(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.release_status(p_release integer) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT CASE
+    WHEN NOT EXISTS (SELECT 1 FROM music.release_distribution d WHERE d.release_id = p_release)
+      THEN 'Draft'
+    WHEN EXISTS (SELECT 1 FROM music.release_distribution d
+                  WHERE d.release_id = p_release AND d.live_on <= current_date
+                    AND (d.taken_down_on IS NULL OR d.taken_down_on > current_date))
+      THEN 'Live'
+    WHEN EXISTS (SELECT 1 FROM music.release_distribution d
+                  WHERE d.release_id = p_release AND d.taken_down_on IS NULL
+                    AND (d.live_on IS NULL OR d.live_on > current_date))
+      THEN 'Submitted'
+    ELSE 'Taken down'
+  END
+$$;
+
+--
+-- Name: FUNCTION release_status(p_release integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.release_status(p_release integer) IS 'Draft with no distributions; Live while any distribution is live; Submitted
+when one is awaiting its live date; otherwise Taken down.';
 
 --
 -- Name: release; Type: TABLE; Schema: music; Owner: -
@@ -4031,6 +2825,1594 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
    FROM music.release r;
 
 --
+-- Name: search(api.release); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.release) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.title) $_$;
+
+--
+-- Name: FUNCTION search(api.release); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.release) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: song_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_one_stop_reason(p_song integer) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT CASE
+    WHEN s.public_domain_p THEN NULL
+    WHEN NOT EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
+     AND NOT EXISTS (SELECT 1 FROM music.song_writer w WHERE w.song_id = s.id)
+      THEN 'No writers or publishers entered'
+    WHEN music.song_controlled_share(s.id) <> 100
+      THEN format('Publishing controlled %s%%, not 100', trim_scale(music.song_controlled_share(s.id)))
+  END
+  FROM music.song s WHERE s.id = p_song
+$$;
+
+--
+-- Name: FUNCTION song_one_stop_reason(p_song integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.song_one_stop_reason(p_song integer) IS 'Why a composition is not one stop, or NULL when it is: the publishing you
+control totals 100, counting controlled publisher shares, or controlled
+writer shares when there is no publisher. A public domain work is one stop.';
+
+--
+-- Name: song; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    title text NOT NULL,
+    iswc music.iswc,
+    lyrics text,
+    notes text,
+    public_domain_p boolean DEFAULT false NOT NULL,
+    derived_from_id integer,
+    derivation_type text,
+    copyright_date date,
+    copyright_number text,
+    reversion_date date,
+    reversion_lead smallint,
+    language_code music.iso_639_code,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    based_on text,
+    easy_clear boolean DEFAULT false NOT NULL,
+    CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
+    CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
+    CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
+    CONSTRAINT song_reversion_lead CHECK (((reversion_lead IS NULL) OR ((reversion_lead >= 0) AND (reversion_lead <= 20)))),
+    CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
+);
+
+ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.based_on IS 'Source work not in this catalog: a public domain tune, or something whose
+composition row does not exist here. Free text. Use derived_from_id instead
+when the source is a real row.';
+
+--
+-- Name: COLUMN song.easy_clear; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
+stop, which is computed from the controlled shares.';
+
+--
+-- Name: song_publisher; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song_publisher (
+    id integer NOT NULL,
+    song_id integer NOT NULL,
+    organization_id integer NOT NULL,
+    role_id integer NOT NULL,
+    share numeric(7,4) DEFAULT 0 NOT NULL,
+    controlled boolean DEFAULT false NOT NULL,
+    for_writer_id integer,
+    notes text,
+    CONSTRAINT song_publisher_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
+);
+
+ALTER TABLE ONLY music.song_publisher FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: song_registration; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song_registration (
+    id integer NOT NULL,
+    song_id integer NOT NULL,
+    pro_code text NOT NULL,
+    work_number text,
+    registered_on date,
+    notes text
+);
+
+ALTER TABLE ONLY music.song_registration FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: song_title; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song_title (
+    id integer NOT NULL,
+    song_id integer NOT NULL,
+    title text NOT NULL,
+    title_type text DEFAULT 'alternate'::text NOT NULL,
+    language_code music.iso_639_code,
+    CONSTRAINT song_title_alt_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
+    CONSTRAINT song_title_type CHECK ((title_type = ANY (ARRAY['alternate'::text, 'translated'::text, 'working'::text, 'formal'::text, 'part'::text])))
+);
+
+ALTER TABLE ONLY music.song_title FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: song_writer; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song_writer (
+    id integer NOT NULL,
+    song_id integer NOT NULL,
+    contact_id integer NOT NULL,
+    role_id integer NOT NULL,
+    share numeric(7,4) DEFAULT 0 NOT NULL,
+    controlled boolean DEFAULT false NOT NULL,
+    notes text,
+    pro_code text,
+    CONSTRAINT song_writer_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
+);
+
+ALTER TABLE ONLY music.song_writer FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: song; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.song WITH (security_invoker='true') AS
+ SELECT id,
+    title,
+    iswc,
+    lyrics,
+    notes,
+    public_domain_p,
+    easy_clear,
+    derived_from_id,
+    derivation_type,
+    based_on,
+    copyright_date,
+    copyright_number,
+    reversion_date,
+    reversion_lead,
+    language_code,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', t.id, 'title', t.title, 'title_type', t.title_type, 'language_code', t.language_code) ORDER BY t.id) AS jsonb_agg
+           FROM music.song_title t
+          WHERE (t.song_id = s.id)), '[]'::jsonb) AS titles,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', r.id, 'pro_code', r.pro_code, 'work_number', r.work_number, 'registered_on', r.registered_on, 'notes', r.notes) ORDER BY r.id) AS jsonb_agg
+           FROM music.song_registration r
+          WHERE (r.song_id = s.id)), '[]'::jsonb) AS registrations,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', w.id, 'contact_id', w.contact_id, 'role_id', w.role_id, 'pro_code', w.pro_code, 'share', w.share, 'controlled', w.controlled, 'notes', w.notes) ORDER BY w.id) AS jsonb_agg
+           FROM music.song_writer w
+          WHERE (w.song_id = s.id)), '[]'::jsonb) AS writers,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'organization_id', p.organization_id, 'role_id', p.role_id, 'share', p.share, 'controlled', p.controlled, 'for_writer_id', p.for_writer_id, 'notes', p.notes) ORDER BY p.id) AS jsonb_agg
+           FROM music.song_publisher p
+          WHERE (p.song_id = s.id)), '[]'::jsonb) AS publishers,
+    music.documents_of('song_document'::text, 'song_id'::text, id) AS documents,
+    COALESCE(( SELECT sum(w.share) AS sum
+           FROM music.song_writer w
+          WHERE (w.song_id = s.id)), (0)::numeric) AS writer_total,
+    COALESCE(( SELECT sum(p.share) AS sum
+           FROM music.song_publisher p
+          WHERE (p.song_id = s.id)), (0)::numeric) AS publisher_total,
+    (music.song_one_stop_reason(id) IS NULL) AS one_stop,
+    music.song_one_stop_reason(id) AS one_stop_reason,
+    created_at,
+    updated_at
+   FROM music.song s;
+
+--
+-- Name: search(api.song); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.song) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.title) $_$;
+
+--
+-- Name: FUNCTION search(api.song); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.song) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: vocal_type; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.vocal_type (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT vocal_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: vocal_type; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.vocal_type WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.vocal_type;
+
+--
+-- Name: search(api.vocal_type); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.vocal_type) RETURNS text
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.fold($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.vocal_type); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.vocal_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+
+--
+-- Name: set_storage_secret(text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.set_storage_secret(secret text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  UPDATE music.account_storage
+     SET secret_key = nullif(btrim(secret), '')
+   WHERE account_id = music.current_account();
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'no storage row for this account';
+  END IF;
+END;
+$$;
+
+--
+-- Name: FUNCTION set_storage_secret(secret text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.set_storage_secret(secret text) IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.song_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _id integer;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM music.song WHERE id = OLD.id;
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO music.song (title, iswc, lyrics, notes,
+                            public_domain_p, easy_clear,
+                            derived_from_id, derivation_type, based_on,
+                            copyright_date, copyright_number,
+                            reversion_date, reversion_lead, language_code)
+    VALUES (NEW.title, NEW.iswc, NEW.lyrics, NEW.notes,
+            coalesce(NEW.public_domain_p, false),
+            coalesce(NEW.easy_clear, false),
+            NEW.derived_from_id, NEW.derivation_type,
+            nullif(btrim(coalesce(NEW.based_on,'')), ''),
+            NEW.copyright_date, NEW.copyright_number,
+            NEW.reversion_date, NEW.reversion_lead, NEW.language_code)
+    RETURNING id INTO _id;
+  ELSE
+    UPDATE music.song
+       SET title = NEW.title, iswc = NEW.iswc, lyrics = NEW.lyrics,
+           notes = NEW.notes,
+           public_domain_p = coalesce(NEW.public_domain_p, false),
+           easy_clear = coalesce(NEW.easy_clear, false),
+           derived_from_id = NEW.derived_from_id,
+           derivation_type = NEW.derivation_type,
+           based_on = nullif(btrim(coalesce(NEW.based_on,'')), ''),
+           copyright_date = NEW.copyright_date,
+           copyright_number = NEW.copyright_number,
+           reversion_date = NEW.reversion_date,
+           reversion_lead = NEW.reversion_lead,
+           language_code = NEW.language_code
+     WHERE id = OLD.id;
+    _id := OLD.id;
+  END IF;
+
+  DELETE FROM music.song_title t
+   WHERE t.song_id = _id
+     AND t.id NOT IN (SELECT (x->>'id')::integer
+                        FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
+                       WHERE x->>'id' IS NOT NULL);
+  UPDATE music.song_title t
+     SET title = x->>'title',
+         title_type = coalesce(nullif(x->>'title_type',''), 'alternate'),
+         language_code = nullif(x->>'language_code','')
+    FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
+   WHERE t.id = (x->>'id')::integer AND t.song_id = _id;
+  INSERT INTO music.song_title (song_id, title, title_type, language_code)
+  SELECT _id, x->>'title',
+         coalesce(nullif(x->>'title_type',''), 'alternate'),
+         nullif(x->>'language_code','')
+    FROM jsonb_array_elements(coalesce(NEW.titles,'[]')) x
+   WHERE x->>'id' IS NULL AND nullif(btrim(x->>'title'),'') IS NOT NULL;
+
+  DELETE FROM music.song_registration r
+   WHERE r.song_id = _id
+     AND r.id NOT IN (SELECT (x->>'id')::integer
+                        FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
+                       WHERE x->>'id' IS NOT NULL);
+  UPDATE music.song_registration r
+     SET pro_code = x->>'pro_code',
+         work_number = nullif(x->>'work_number',''),
+         registered_on = nullif(x->>'registered_on','')::date,
+         notes = nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
+   WHERE r.id = (x->>'id')::integer AND r.song_id = _id;
+  INSERT INTO music.song_registration (song_id, pro_code, work_number,
+                                       registered_on, notes)
+  SELECT _id, x->>'pro_code', nullif(x->>'work_number',''),
+         nullif(x->>'registered_on','')::date, nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.registrations,'[]')) x
+   WHERE x->>'id' IS NULL AND nullif(btrim(x->>'pro_code'),'') IS NOT NULL;
+
+  DELETE FROM music.song_writer w
+   WHERE w.song_id = _id
+     AND w.id NOT IN (SELECT (x->>'id')::integer
+                        FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
+                       WHERE x->>'id' IS NOT NULL);
+  UPDATE music.song_writer w
+     SET contact_id = (x->>'contact_id')::integer,
+         role_id = (x->>'role_id')::integer,
+         pro_code = nullif(x->>'pro_code',''),
+         share = coalesce((x->>'share')::numeric, 0),
+         controlled = coalesce((x->>'controlled')::boolean, false),
+         notes = nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
+   WHERE w.id = (x->>'id')::integer AND w.song_id = _id;
+  INSERT INTO music.song_writer (song_id, contact_id, role_id, pro_code,
+                                 share, controlled, notes)
+  SELECT _id, (x->>'contact_id')::integer, (x->>'role_id')::integer,
+         nullif(x->>'pro_code',''),
+         coalesce((x->>'share')::numeric, 0),
+         coalesce((x->>'controlled')::boolean, false),
+         nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.writers,'[]')) x
+   WHERE x->>'id' IS NULL AND x->>'contact_id' IS NOT NULL
+     AND x->>'role_id' IS NOT NULL;
+
+  DELETE FROM music.song_publisher p
+   WHERE p.song_id = _id
+     AND p.id NOT IN (SELECT (x->>'id')::integer
+                        FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
+                       WHERE x->>'id' IS NOT NULL);
+  UPDATE music.song_publisher p
+     SET organization_id = (x->>'organization_id')::integer,
+         role_id = (x->>'role_id')::integer,
+         share = coalesce((x->>'share')::numeric, 0),
+         controlled = coalesce((x->>'controlled')::boolean, false),
+         for_writer_id = nullif(x->>'for_writer_id','')::integer,
+         notes = nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
+   WHERE p.id = (x->>'id')::integer AND p.song_id = _id;
+  INSERT INTO music.song_publisher (song_id, organization_id, role_id,
+                                    share, controlled, for_writer_id, notes)
+  SELECT _id, (x->>'organization_id')::integer, (x->>'role_id')::integer,
+         coalesce((x->>'share')::numeric, 0),
+         coalesce((x->>'controlled')::boolean, false),
+         nullif(x->>'for_writer_id','')::integer,
+         nullif(x->>'notes','')
+    FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
+   WHERE x->>'id' IS NULL AND x->>'organization_id' IS NOT NULL
+     AND x->>'role_id' IS NOT NULL;
+
+  PERFORM music.sync_documents('song_document', 'song_id', _id, NEW.documents);
+
+  NEW.id := _id;
+  SELECT s.title, s.iswc, s.based_on, s.created_at, s.updated_at
+    INTO NEW.title, NEW.iswc, NEW.based_on, NEW.created_at, NEW.updated_at
+    FROM music.song s WHERE s.id = _id;
+
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION song_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.song_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: b64url(bytea); Type: FUNCTION; Schema: auth; Owner: -
+--
+
+CREATE FUNCTION auth.b64url(data bytea) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  SELECT translate(encode(data, 'base64'), E'+/=\n', '-_')
+$$;
+
+--
+-- Name: session(uuid); Type: FUNCTION; Schema: auth; Owner: -
+--
+
+CREATE FUNCTION auth.session(p_user uuid) RETURNS json
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT json_build_object(
+    'token', auth.sign(json_build_object(
+      'role', 'app_user',
+      'account_id', u.account_id,
+      'sub', u.id,
+      'exp', extract(epoch FROM now() + interval '8 hours')::int)))
+    FROM music.user_account u
+   WHERE u.id = p_user
+$$;
+
+--
+-- Name: FUNCTION session(p_user uuid); Type: COMMENT; Schema: auth; Owner: -
+--
+
+COMMENT ON FUNCTION auth.session(p_user uuid) IS 'The sign-in token for a user. Used by api.login and api.accept_invite.';
+
+--
+-- Name: set_password(text, text); Type: FUNCTION; Schema: auth; Owner: -
+--
+
+CREATE FUNCTION auth.set_password(p_email text, p_password text) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    AS $$
+  UPDATE music.user_account
+  SET password_hash = crypt(p_password, gen_salt('bf', 10))
+  WHERE lower(email) = lower(btrim(p_email))
+$$;
+
+--
+-- Name: sign(json); Type: FUNCTION; Schema: auth; Owner: -
+--
+
+CREATE FUNCTION auth.sign(payload json) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  WITH parts AS (
+    SELECT auth.b64url(convert_to('{"alg":"HS256","typ":"JWT"}', 'utf8')) AS h,
+           auth.b64url(convert_to(payload::text, 'utf8')) AS p
+  )
+  SELECT h || '.' || p || '.' ||
+         auth.b64url(hmac(h || '.' || p, current_setting('app.jwt_secret'), 'sha256'))
+  FROM parts
+$$;
+
+--
+-- Name: can(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.can(p_code text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+      FROM music.user_account u
+      JOIN music.account_role_permission rp ON rp.role_id = u.role_id
+      JOIN music.permission p ON p.id = rp.permission_id
+     WHERE u.id = music.current_app_user()
+       AND u.account_id = music.current_account()
+       AND p.code = p_code)
+$$;
+
+--
+-- Name: FUNCTION can(p_code text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.can(p_code text) IS 'True when the signed-in user''s role has the permission. Owner rights only to read the user''s own role; it changes nothing.';
+
+--
+-- Name: check_representation_exclusive(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.check_representation_exclusive() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  clash record;
+BEGIN
+  SELECT r.id, r.is_exclusive,
+         coalesce(o.name, c.display_name) AS party
+    INTO clash
+    FROM music.recording_representation r
+    LEFT JOIN music.organization o ON o.id = r.organization_id
+    LEFT JOIN music.contact c ON c.id = r.contact_id
+   WHERE r.recording_id = NEW.recording_id
+     AND r.id <> NEW.id
+     AND (NEW.is_exclusive OR r.is_exclusive)
+     AND daterange(coalesce(r.signed_on, '-infinity'), coalesce(r.ends_on, 'infinity'), '[]')
+      && daterange(coalesce(NEW.signed_on, '-infinity'), coalesce(NEW.ends_on, 'infinity'), '[]')
+   LIMIT 1;
+
+  IF FOUND THEN
+    RAISE EXCEPTION '%',
+      CASE WHEN clash.is_exclusive
+           THEN format('This recording is signed exclusively to %s for overlapping dates.', clash.party)
+           ELSE format('An exclusive deal cannot overlap the existing deal with %s.', clash.party)
+      END
+      USING HINT = 'Give one deal an end date before the other starts, or make both non-exclusive.';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.current_app_user() RETURNS uuid
+    LANGUAGE sql STABLE
+    AS $$ SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'sub')::uuid $$;
+
+--
+-- Name: FUNCTION current_app_user(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.current_app_user() IS 'The signed-in user from the request token; null outside an API request.';
+
+--
+-- Name: default_audio_file_type(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.default_audio_file_type(p_format text) RETURNS integer
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT id FROM music.audio_file_type
+   WHERE name = CASE WHEN upper(coalesce(p_format, '')) = 'ZIP'
+                     THEN 'Stem' ELSE 'Full Mix' END
+$$;
+
+--
+-- Name: document_storage_kind(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.document_storage_kind() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.storage_uri IS NOT DISTINCT FROM OLD.storage_uri THEN
+    NEW.storage_kind := OLD.storage_kind;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.storage_uri ~* '^https?://' THEN
+    NEW.storage_kind := 'url';
+  ELSE
+    NEW.storage_kind := coalesce(
+      (SELECT s.kind FROM music.account_storage s
+        WHERE s.account_id = NEW.account_id),
+      NEW.storage_kind);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: fold(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.fold(p text) RETURNS text
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT lower(public.unaccent('public.unaccent'::regdictionary, p));
+$$;
+
+--
+-- Name: FUNCTION fold(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.fold(p text) IS 'Text lowercased with accents removed, so Canción, cancion and CANCION compare equal. Used by the api.search computed fields.';
+
+--
+-- Name: is_site_admin(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.is_site_admin() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM music.user_account
+     WHERE id = music.current_app_user() AND is_site_admin)
+$$;
+
+--
+-- Name: FUNCTION is_site_admin(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.is_site_admin() IS 'True when the signed-in user is the site admin. Runs with owner rights because app_user cannot read other accounts'' users.';
+
+--
+-- Name: keep_an_owner(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.keep_an_owner() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+      FROM music.user_account u
+      JOIN music.account_role r ON r.id = u.role_id
+     WHERE u.account_id = OLD.account_id
+       AND r.name = 'Owner') THEN
+    RAISE EXCEPTION 'An account needs at least one Owner. Make someone else an Owner first.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION keep_an_owner(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave an account without an Owner. Work outside an API request, such as deleting a whole account, is not checked.';
+
+--
+-- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.merge_contact(p_keep integer, p_drop integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  d      music.contact%ROWTYPE;
+  fk     record;
+  ux     record;
+  others text;
+BEGIN
+  IF p_keep = p_drop THEN
+    RAISE EXCEPTION 'Cannot merge a person into themselves (%).', p_keep;
+  END IF;
+  SELECT * INTO d FROM music.contact WHERE id = p_drop;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No person with id %.', p_drop; END IF;
+  IF NOT EXISTS (SELECT 1 FROM music.contact WHERE id = p_keep) THEN
+    RAISE EXCEPTION 'No person with id %.', p_keep;
+  END IF;
+  FOR fk IN
+    SELECT c.conrelid AS rel, c.conrelid::regclass AS tbl, a.attname AS col, a.attnum
+      FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+     WHERE c.confrelid = 'music.contact'::regclass AND c.contype = 'f'
+       AND array_length(c.conkey, 1) = 1
+  LOOP
+    FOR ux IN
+      SELECT i.indkey FROM pg_index i
+       WHERE i.indrelid = fk.rel AND i.indisunique
+         AND i.indexprs IS NULL AND i.indpred IS NULL
+         AND fk.attnum = ANY (i.indkey)
+    LOOP
+      SELECT string_agg(format('k.%1$I IS NOT DISTINCT FROM x.%1$I', att.attname), ' AND ')
+        INTO others
+        FROM unnest(ux.indkey) AS u(attnum)
+        JOIN pg_attribute att ON att.attrelid = fk.rel AND att.attnum = u.attnum
+       WHERE u.attnum <> fk.attnum;
+      EXECUTE format(
+        'DELETE FROM %s x WHERE x.%I = $1 AND EXISTS (SELECT 1 FROM %s k WHERE k.%I = $2%s)',
+        fk.tbl, fk.col, fk.tbl, fk.col, coalesce(' AND ' || others, ''))
+      USING p_drop, p_keep;
+    END LOOP;
+    EXECUTE format('UPDATE %s SET %I = $1 WHERE %I = $2', fk.tbl, fk.col, fk.col)
+      USING p_keep, p_drop;
+  END LOOP;
+  UPDATE music.contact SET member_ipi = NULL, isni = NULL WHERE id = p_drop;
+  UPDATE music.contact k
+     SET member_ipi  = coalesce(k.member_ipi, d.member_ipi),
+         isni        = coalesce(k.isni, d.isni),
+         pro_code    = coalesce(k.pro_code, d.pro_code),
+         credit_name = coalesce(k.credit_name, d.credit_name),
+         notes       = CASE WHEN nullif(btrim(d.notes), '') IS NULL OR d.notes = k.notes THEN k.notes
+                            ELSE concat_ws(E'\n', k.notes, d.notes) END
+   WHERE k.id = p_keep;
+  DELETE FROM music.contact WHERE id = p_drop;
+END;
+$_$;
+
+--
+-- Name: FUNCTION merge_contact(p_keep integer, p_drop integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.merge_contact(p_keep integer, p_drop integer) IS 'Merges a duplicate person into the one kept: every reference moves to the
+kept record, skipping any that would duplicate one it already has; an IPI,
+ISNI, society, or performing name only the duplicate had is carried over;
+then the duplicate is deleted.';
+
+--
+-- Name: merge_document(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.merge_document(p_keep integer, p_drop integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  d      music.document%ROWTYPE;
+  fk     record;
+  ux     record;
+  others text;
+BEGIN
+  IF p_keep = p_drop THEN
+    RAISE EXCEPTION 'Cannot merge a document into itself (%).', p_keep;
+  END IF;
+  SELECT * INTO d FROM music.document WHERE id = p_drop;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No document with id %.', p_drop; END IF;
+  IF NOT EXISTS (SELECT 1 FROM music.document WHERE id = p_keep) THEN
+    RAISE EXCEPTION 'No document with id %.', p_keep;
+  END IF;
+  FOR fk IN
+    SELECT c.conrelid AS rel, c.conrelid::regclass AS tbl, a.attname AS col, a.attnum
+      FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+     WHERE c.confrelid = 'music.document'::regclass AND c.contype = 'f'
+       AND array_length(c.conkey, 1) = 1
+  LOOP
+    FOR ux IN
+      SELECT i.indkey FROM pg_index i
+       WHERE i.indrelid = fk.rel AND i.indisunique
+         AND i.indexprs IS NULL AND i.indpred IS NULL
+         AND fk.attnum = ANY (i.indkey)
+    LOOP
+      SELECT string_agg(format('k.%1$I IS NOT DISTINCT FROM x.%1$I', att.attname), ' AND ')
+        INTO others
+        FROM unnest(ux.indkey) AS u(attnum)
+        JOIN pg_attribute att ON att.attrelid = fk.rel AND att.attnum = u.attnum
+       WHERE u.attnum <> fk.attnum;
+      EXECUTE format(
+        'DELETE FROM %s x WHERE x.%I = $1 AND EXISTS (SELECT 1 FROM %s k WHERE k.%I = $2%s)',
+        fk.tbl, fk.col, fk.tbl, fk.col, coalesce(' AND ' || others, ''))
+      USING p_drop, p_keep;
+    END LOOP;
+    EXECUTE format('UPDATE %s SET %I = $1 WHERE %I = $2', fk.tbl, fk.col, fk.col)
+      USING p_keep, p_drop;
+  END LOOP;
+  DELETE FROM music.document WHERE id = p_drop;
+  UPDATE music.document k
+     SET document_type_id = coalesce(k.document_type_id, d.document_type_id),
+         external_ref     = coalesce(k.external_ref, d.external_ref),
+         mime_type        = coalesce(k.mime_type, d.mime_type),
+         byte_size        = coalesce(k.byte_size, d.byte_size),
+         sha256           = coalesce(k.sha256, d.sha256),
+         document_date    = coalesce(k.document_date, d.document_date),
+         signed_on        = coalesce(k.signed_on, d.signed_on),
+         expires_on       = coalesce(k.expires_on, d.expires_on),
+         notes            = CASE WHEN nullif(btrim(d.notes), '') IS NULL OR d.notes = k.notes THEN k.notes
+                                 ELSE concat_ws(E'\n', k.notes, d.notes) END
+   WHERE k.id = p_keep;
+END;
+$_$;
+
+--
+-- Name: FUNCTION merge_document(p_keep integer, p_drop integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.merge_document(p_keep integer, p_drop integer) IS 'Merges a duplicate document into the one kept: every attachment moves to it, blank fields are filled from the duplicate, and the duplicate is deleted.';
+
+--
+-- Name: own_artist(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_artist(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.artist WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_artist(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_artist(p_id integer) IS 'True when the artist row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_contact(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_contact(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.contact WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_contact(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_contact(p_id integer) IS 'True when the contact row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_credit(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_credit(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording_credit WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_credit(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_credit(p_id integer) IS 'True when the recording_credit row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_document(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_document(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.document WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_document(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_document(p_id integer) IS 'True when the document row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_organization(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_organization(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.organization WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_organization(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_organization(p_id integer) IS 'True when the organization row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_recording(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_recording(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.recording WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_recording(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_recording(p_id integer) IS 'True when the recording row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_release(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_release(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.release WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_release(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_release(p_id integer) IS 'True when the release row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_song(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_song(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.song WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_song(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_song(p_id integer) IS 'True when the song row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: own_song_writer(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_song_writer(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.song_writer WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_song_writer(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_song_writer(p_id integer) IS 'True when the song_writer row is visible to the caller, which row security limits to the signed-in account. False for null.';
+
+--
+-- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.require_permission() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT music.can(TG_ARGV[0]) THEN
+    RAISE EXCEPTION 'Your role does not allow %',
+      (SELECT description FROM music.permission WHERE code = TG_ARGV[0])
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION require_permission(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.require_permission() IS 'Statement trigger: refuses the write with a clear error unless the signed-in user''s role has the permission named in the trigger argument. Writes outside an API request, such as migrations, are not checked.';
+
+--
+-- Name: require_site_admin(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.require_site_admin() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF music.current_app_user() IS NOT NULL AND NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can change the shared lists'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION require_site_admin(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.require_site_admin() IS 'Statement trigger on the shared lists: refuses a write unless the signed-in user is the site admin.';
+
+--
+-- Name: send_invite(uuid, text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.send_invite(p_invite uuid, p_token text) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT pg_notify('mam_invite', json_build_object(
+           'email', i.email,
+           'token', p_token,
+           'account', a.name,
+           'role', r.name,
+           'invited_by', u.email)::text)
+    FROM music.user_invite i
+    JOIN music.account a ON a.id = i.account_id
+    JOIN music.account_role r ON r.id = i.role_id
+    LEFT JOIN music.user_account u ON u.id = i.invited_by
+   WHERE i.id = p_invite
+$$;
+
+--
+-- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.send_invite(p_invite uuid, p_token text) IS 'Hands an invite and its link code to mam-upload, which listens on the mam_invite channel and sends the email. The notice is delivered only if the transaction commits. Owner rights only to read the account and inviter names.';
+
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: song_controlled_share(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_controlled_share(p_song integer) RETURNS numeric
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT CASE
+    WHEN s.public_domain_p THEN 100
+    WHEN EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
+      THEN coalesce((SELECT sum(p.share) FROM music.song_publisher p
+                      WHERE p.song_id = s.id AND p.controlled), 0)
+    ELSE coalesce((SELECT sum(w.share) FROM music.song_writer w
+                    WHERE w.song_id = s.id AND w.controlled), 0)
+  END
+  FROM music.song s WHERE s.id = p_song
+$$;
+
+--
+-- Name: FUNCTION song_controlled_share(p_song integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.song_controlled_share(p_song integer) IS 'Percent of a composition''s publishing you can license: controlled publisher
+shares, or controlled writer shares when the song has no publisher. A public
+domain work counts as 100.';
+
+--
+-- Name: song_writer_default_pro(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_writer_default_pro() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.pro_code IS NULL THEN
+    SELECT c.pro_code INTO NEW.pro_code
+      FROM music.contact c WHERE c.id = NEW.contact_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: sync_documents(text, text, integer, jsonb); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) RETURNS void
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  d     jsonb;
+  _doc  integer;
+  _uri  text;
+  _kind text;
+  _keep integer[] := '{}';
+BEGIN
+  FOR d IN SELECT * FROM jsonb_array_elements(coalesce(p_docs, '[]'::jsonb))
+  LOOP
+    IF nullif(btrim(coalesce(d->>'title','')), '') IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    _uri := btrim(coalesce(d->>'storage_uri', ''));
+
+    _kind := CASE
+      WHEN _uri ~* '^https?://' THEN 'url'
+      ELSE coalesce(nullif(d->>'storage_kind',''), 'url')
+    END;
+
+    IF d->>'id' IS NOT NULL THEN
+      _doc := (d->>'id')::integer;
+      UPDATE music.document
+         SET title            = btrim(d->>'title'),
+             document_type_id = nullif(d->>'document_type_id','')::integer,
+             storage_kind     = _kind,
+             storage_uri      = coalesce(nullif(_uri,''), storage_uri),
+             mime_type        = nullif(d->>'mime_type',''),
+             byte_size        = nullif(d->>'byte_size','')::bigint,
+             document_date    = nullif(d->>'document_date','')::date,
+             signed_on        = nullif(d->>'signed_on','')::date,
+             expires_on       = nullif(d->>'expires_on','')::date,
+             notes            = nullif(d->>'notes','')
+       WHERE id = _doc;
+    ELSE
+      _doc := NULL;
+      IF _kind IN ('local', 's3') THEN
+        SELECT id INTO _doc FROM music.document
+         WHERE account_id = music.current_account()
+           AND storage_uri = _uri
+           AND storage_kind IN ('local', 's3');
+      END IF;
+      IF _doc IS NULL THEN
+        INSERT INTO music.document
+          (title, document_type_id, storage_kind, storage_uri,
+           mime_type, byte_size, document_date, signed_on, expires_on, notes)
+        VALUES (btrim(d->>'title'),
+                nullif(d->>'document_type_id','')::integer,
+                _kind,
+                _uri,
+                nullif(d->>'mime_type',''),
+                nullif(d->>'byte_size','')::bigint,
+                nullif(d->>'document_date','')::date,
+                nullif(d->>'signed_on','')::date,
+                nullif(d->>'expires_on','')::date,
+                nullif(d->>'notes',''))
+        RETURNING id INTO _doc;
+      ELSE
+        UPDATE music.document
+           SET document_type_id = coalesce(document_type_id, nullif(d->>'document_type_id','')::integer),
+               mime_type        = coalesce(mime_type, nullif(d->>'mime_type','')),
+               byte_size        = coalesce(byte_size, nullif(d->>'byte_size','')::bigint),
+               document_date    = coalesce(document_date, nullif(d->>'document_date','')::date),
+               signed_on        = coalesce(signed_on, nullif(d->>'signed_on','')::date),
+               expires_on       = coalesce(expires_on, nullif(d->>'expires_on','')::date),
+               notes            = coalesce(notes, nullif(d->>'notes',''))
+         WHERE id = _doc;
+      END IF;
+    END IF;
+
+    _keep := _keep || _doc;
+
+    EXECUTE format(
+      'INSERT INTO music.%I (%I, document_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING', p_table, p_col)
+      USING p_parent, _doc;
+  END LOOP;
+
+  EXECUTE format(
+    'DELETE FROM music.%I WHERE %I = $1 AND document_id <> ALL ($2)',
+    p_table, p_col)
+    USING p_parent, _keep;
+END;
+$_$;
+
+--
+-- Name: FUNCTION sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) IS 'Saves the documents listed on a song, recording, person, company, or release and links them to it. A new row whose file is already a document links that document instead of creating a second one; its blank fields are filled from the row. Rows no longer listed are detached; the document itself survives.';
+
+--
+-- Name: user_invite; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_invite (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    email music.email_address NOT NULL,
+    role_id integer NOT NULL,
+    token_hash bytea NOT NULL,
+    invited_by uuid DEFAULT music.current_app_user(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    sent_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone DEFAULT (now() + '7 days'::interval) NOT NULL,
+    accepted_at timestamp with time zone
+);
+
+ALTER TABLE ONLY music.user_invite FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE user_invite; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.user_invite IS 'An invitation to join an account with a role. Only a hash of the link code is kept; the code itself goes out once, in the email.';
+
+--
+-- Name: COLUMN user_invite.token_hash; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_invite.token_hash IS 'sha256 of the code in the emailed link.';
+
+--
+-- Name: account_invite; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_invite WITH (security_invoker='true') AS
+ SELECT id,
+    email,
+    role_id,
+    created_at,
+    sent_at,
+    expires_at,
+    accepted_at,
+        CASE
+            WHEN (accepted_at IS NOT NULL) THEN 'Accepted'::text
+            WHEN (expires_at <= now()) THEN 'Expired'::text
+            ELSE 'Pending'::text
+        END AS status,
+    false AS resend
+   FROM music.user_invite i;
+
+--
+-- Name: VIEW account_invite; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_invite IS 'The signed-in account''s invites. Insert to invite; update with resend true to send a new link; delete to cancel.';
+
+--
+-- Name: account_role; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_role (
+    id integer NOT NULL,
+    name text NOT NULL,
+    description text NOT NULL
+);
+
+--
+-- Name: TABLE account_role; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
+
+--
+-- Name: account_role; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_role WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    description
+   FROM music.account_role;
+
+--
+-- Name: VIEW account_role; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user.';
+
+--
+-- Name: account_storage; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_storage (
+    account_id uuid NOT NULL,
+    kind text DEFAULT 'local'::text NOT NULL,
+    endpoint text,
+    region text,
+    bucket text,
+    base_path text,
+    public_base_url text,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    access_key_enc bytea,
+    secret_key_enc bytea,
+    access_key_id text,
+    secret_key text,
+    CONSTRAINT account_storage_bucket_trimmed CHECK (((bucket IS NULL) OR (bucket = btrim(bucket)))),
+    CONSTRAINT account_storage_kind CHECK ((kind = ANY (ARRAY['local'::text, 's3'::text, 'webdav'::text, 'sftp'::text]))),
+    CONSTRAINT account_storage_s3 CHECK (((kind <> 's3'::text) OR (bucket IS NOT NULL)))
+);
+
+ALTER TABLE ONLY music.account_storage FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN account_storage.secret_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.account_storage.secret_key IS 'Plain text, deliberately. Not exposed through the api schema. Backups
+are the realistic exposure, so keep the backup repository encrypted and
+scope the S3 key to one bucket.';
+
+--
+-- Name: account_storage; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_storage WITH (security_invoker='true') AS
+ SELECT account_id,
+    kind,
+    endpoint,
+    region,
+    bucket,
+    base_path,
+    public_base_url,
+    access_key_id,
+    ((secret_key IS NOT NULL) AND (secret_key <> ''::text)) AS key_set,
+    notes
+   FROM music.account_storage;
+
+--
+-- Name: user_account; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_account (
+    id uuid DEFAULT uuidv7() CONSTRAINT app_user_id_not_null NOT NULL,
+    account_id uuid CONSTRAINT app_user_account_id_not_null NOT NULL,
+    email music.email_address CONSTRAINT app_user_email_not_null NOT NULL,
+    created_at timestamp with time zone DEFAULT now() CONSTRAINT app_user_created_at_not_null NOT NULL,
+    password_hash text NOT NULL,
+    role_id integer NOT NULL,
+    is_site_admin boolean DEFAULT false NOT NULL
+);
+
+ALTER TABLE ONLY music.user_account FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN user_account.role_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.role_id IS 'The user''s account role. Required, with no default, so access is always granted on purpose.';
+
+--
+-- Name: COLUMN user_account.is_site_admin; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_account.is_site_admin IS 'The operator of this installation, not tied to one account. Sees the shared lists.';
+
+--
+-- Name: account_user; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.account_user WITH (security_invoker='true') AS
+ SELECT id,
+    email,
+    role_id,
+    created_at,
+    (id = music.current_app_user()) AS is_me
+   FROM music.user_account u;
+
+--
+-- Name: VIEW account_user; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.account_user IS 'The signed-in account''s users. Only the role can be changed here; removing a row removes the user from the account.';
+
+--
+-- Name: artist_member; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.artist_member WITH (security_invoker='true') AS
+ SELECT artist_id,
+    contact_id,
+    begin_date,
+    end_date,
+    notes
+   FROM music.artist_member;
+
+--
+-- Name: contact_email; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.contact_email WITH (security_invoker='true') AS
+ SELECT id,
+    contact_id,
+    email,
+    is_primary,
+    note,
+    retired_at,
+    created_at,
+    updated_at
+   FROM music.contact_email;
+
+--
+-- Name: contact_organization; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.contact_organization WITH (security_invoker='true') AS
+ SELECT contact_id,
+    organization_id,
+    title,
+    is_primary,
+    notes,
+    created_at
+   FROM music.contact_organization;
+
+--
+-- Name: contact_phone; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.contact_phone WITH (security_invoker='true') AS
+ SELECT id,
+    contact_id,
+    country_code,
+    number,
+    extension,
+    is_primary,
+    note,
+    created_at,
+    updated_at
+   FROM music.contact_phone;
+
+--
+-- Name: document_expiring; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.document_expiring WITH (security_invoker='true') AS
+ SELECT d.id,
+    d.title,
+    d.expires_on,
+    t.name AS document_type,
+    (d.expires_on - CURRENT_DATE) AS days_left
+   FROM (music.document d
+     LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
+  WHERE ((d.expires_on IS NOT NULL) AND (d.expires_on <= (CURRENT_DATE + 90)));
+
+--
+-- Name: release_document; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.release_document (
+    release_id integer NOT NULL,
+    document_id integer NOT NULL
+);
+
+ALTER TABLE ONLY music.release_document FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: document_orphan; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.document_orphan WITH (security_invoker='true') AS
+ SELECT d.id,
+    d.title,
+    t.name AS document_type,
+    d.storage_kind,
+    d.storage_uri,
+    d.document_date,
+    d.created_at
+   FROM (music.document d
+     LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
+  WHERE ((NOT (EXISTS ( SELECT 1
+           FROM music.song_document x
+          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
+           FROM music.recording_document x
+          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
+           FROM music.contact_document x
+          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
+           FROM music.organization_document x
+          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
+           FROM music.release_document x
+          WHERE (x.document_id = d.id)))));
+
+--
+-- Name: document_usage; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.document_usage WITH (security_invoker='true') AS
+ SELECT id AS document_id,
+    ( SELECT count(*) AS count
+           FROM music.song_document x
+          WHERE (x.document_id = d.id)) AS song_count,
+    ( SELECT count(*) AS count
+           FROM music.recording_document x
+          WHERE (x.document_id = d.id)) AS recording_count,
+    ( SELECT count(*) AS count
+           FROM music.contact_document x
+          WHERE (x.document_id = d.id)) AS contact_count,
+    ( SELECT count(*) AS count
+           FROM music.organization_document x
+          WHERE (x.document_id = d.id)) AS organization_count
+   FROM music.document d;
+
+--
+-- Name: email_duplicate; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.email_duplicate WITH (security_invoker='true') AS
+ SELECT lower((email)::text) AS email,
+    count(*) AS contact_count,
+    array_agg(contact_id ORDER BY contact_id) AS contact_ids
+   FROM music.contact_email e
+  WHERE (retired_at IS NULL)
+  GROUP BY (lower((email)::text))
+ HAVING (count(*) > 1);
+
+--
+-- Name: pitch_setting; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.pitch_setting (
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    default_contact_id integer
+);
+
+ALTER TABLE ONLY music.pitch_setting FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE pitch_setting; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.pitch_setting IS 'Per-account pitching defaults. default_contact_id is the person named in a
+pitch comment when a recording has no pitch contact of its own.';
+
+--
+-- Name: pitch_setting; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.pitch_setting WITH (security_invoker='true') AS
+ SELECT account_id AS id,
+    default_contact_id
+   FROM music.pitch_setting
+  WHERE (account_id = music.current_account());
+
+--
+-- Name: pro; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.pro (
+    code text NOT NULL,
+    name text NOT NULL,
+    cisac_code music.cisac_society_code,
+    home_country music.iso_3166_alpha2 NOT NULL,
+    CONSTRAINT pro_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: pro; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.pro WITH (security_invoker='true') AS
+ SELECT p.code,
+    p.name,
+    p.cisac_code,
+    p.home_country,
+    c.name AS home_country_name
+   FROM (music.pro p
+     JOIN music.country c ON (((c.code)::text = (p.home_country)::text)));
+
+--
+-- Name: pro_territory; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.pro_territory (
+    pro_code text NOT NULL,
+    country_code music.iso_3166_alpha2 NOT NULL
+);
+
+--
+-- Name: pro_territory; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.pro_territory WITH (security_invoker='true') AS
+ SELECT pro_code,
+    country_code
+   FROM music.pro_territory;
+
+--
+-- Name: recording_cover; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.recording_cover WITH (security_invoker='true') AS
+ SELECT r.id,
+    r.title,
+    r.version_label,
+    r.isrc,
+    s.title AS composition,
+    ( SELECT string_agg(c.display_name, ', '::text ORDER BY c.display_name) AS string_agg
+           FROM (music.song_writer w
+             JOIN music.contact c ON ((c.id = w.contact_id)))
+          WHERE (w.song_id = s.id)) AS writers
+   FROM ((music.recording r
+     JOIN music.recording_song rs ON ((rs.recording_id = r.id)))
+     JOIN music.song s ON ((s.id = rs.song_id)))
+  WHERE (NOT (EXISTS ( SELECT 1
+           FROM music.song_writer w
+          WHERE ((w.song_id = s.id) AND w.controlled))));
+
+--
+-- Name: recording_credit_display; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.recording_credit_display WITH (security_invoker='true') AS
+ SELECT c.id,
+    c.recording_id,
+    r.title AS recording_title,
+    c.contact_id,
+    c.organization_id,
+    COALESCE(c.credited_as, ct.credit_name, ct.display_name, o.name) AS credited_name,
+    ct.display_name AS legal_name,
+    ( SELECT string_agg(ro.name, ', '::text ORDER BY ro.name) AS string_agg
+           FROM (music.recording_credit_role cr
+             JOIN music.role ro ON ((ro.id = cr.role_id)))
+          WHERE (cr.credit_id = c.id)) AS roles,
+    ( SELECT string_agg(i.name, ', '::text ORDER BY i.name) AS string_agg
+           FROM (music.recording_credit_instrument ci
+             JOIN music.instrument i ON ((i.id = ci.instrument_id)))
+          WHERE (ci.credit_id = c.id)) AS instruments
+   FROM (((music.recording_credit c
+     JOIN music.recording r ON ((r.id = c.recording_id)))
+     LEFT JOIN music.contact ct ON ((ct.id = c.contact_id)))
+     LEFT JOIN music.organization o ON ((o.id = c.organization_id)));
+
+--
 -- Name: role; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -4103,100 +4485,6 @@ CREATE VIEW api.schema_type WITH (security_invoker='true') AS
      JOIN music.vocabulary v ON ((v.prefix = s.vocabulary)));
 
 --
--- Name: song_publisher; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song_publisher (
-    id integer NOT NULL,
-    song_id integer NOT NULL,
-    organization_id integer NOT NULL,
-    role_id integer NOT NULL,
-    share numeric(7,4) DEFAULT 0 NOT NULL,
-    controlled boolean DEFAULT false NOT NULL,
-    for_writer_id integer,
-    notes text,
-    CONSTRAINT song_publisher_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
-);
-
-ALTER TABLE ONLY music.song_publisher FORCE ROW LEVEL SECURITY;
-
---
--- Name: song_registration; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song_registration (
-    id integer NOT NULL,
-    song_id integer NOT NULL,
-    pro_code text NOT NULL,
-    work_number text,
-    registered_on date,
-    notes text
-);
-
-ALTER TABLE ONLY music.song_registration FORCE ROW LEVEL SECURITY;
-
---
--- Name: song_title; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song_title (
-    id integer NOT NULL,
-    song_id integer NOT NULL,
-    title text NOT NULL,
-    title_type text DEFAULT 'alternate'::text NOT NULL,
-    language_code music.iso_639_code,
-    CONSTRAINT song_title_alt_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
-    CONSTRAINT song_title_type CHECK ((title_type = ANY (ARRAY['alternate'::text, 'translated'::text, 'working'::text, 'formal'::text, 'part'::text])))
-);
-
-ALTER TABLE ONLY music.song_title FORCE ROW LEVEL SECURITY;
-
---
--- Name: song; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.song WITH (security_invoker='true') AS
- SELECT id,
-    title,
-    iswc,
-    lyrics,
-    notes,
-    public_domain_p,
-    easy_clear,
-    derived_from_id,
-    derivation_type,
-    based_on,
-    copyright_date,
-    copyright_number,
-    reversion_date,
-    reversion_lead,
-    language_code,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', t.id, 'title', t.title, 'title_type', t.title_type, 'language_code', t.language_code) ORDER BY t.id) AS jsonb_agg
-           FROM music.song_title t
-          WHERE (t.song_id = s.id)), '[]'::jsonb) AS titles,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', r.id, 'pro_code', r.pro_code, 'work_number', r.work_number, 'registered_on', r.registered_on, 'notes', r.notes) ORDER BY r.id) AS jsonb_agg
-           FROM music.song_registration r
-          WHERE (r.song_id = s.id)), '[]'::jsonb) AS registrations,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', w.id, 'contact_id', w.contact_id, 'role_id', w.role_id, 'pro_code', w.pro_code, 'share', w.share, 'controlled', w.controlled, 'notes', w.notes) ORDER BY w.id) AS jsonb_agg
-           FROM music.song_writer w
-          WHERE (w.song_id = s.id)), '[]'::jsonb) AS writers,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'organization_id', p.organization_id, 'role_id', p.role_id, 'share', p.share, 'controlled', p.controlled, 'for_writer_id', p.for_writer_id, 'notes', p.notes) ORDER BY p.id) AS jsonb_agg
-           FROM music.song_publisher p
-          WHERE (p.song_id = s.id)), '[]'::jsonb) AS publishers,
-    music.documents_of('song_document'::text, 'song_id'::text, id) AS documents,
-    COALESCE(( SELECT sum(w.share) AS sum
-           FROM music.song_writer w
-          WHERE (w.song_id = s.id)), (0)::numeric) AS writer_total,
-    COALESCE(( SELECT sum(p.share) AS sum
-           FROM music.song_publisher p
-          WHERE (p.song_id = s.id)), (0)::numeric) AS publisher_total,
-    (music.song_one_stop_reason(id) IS NULL) AS one_stop,
-    music.song_one_stop_reason(id) AS one_stop_reason,
-    created_at,
-    updated_at
-   FROM music.song s;
-
---
 -- Name: song_split_check; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -4238,25 +4526,6 @@ CREATE VIEW api.vocabulary WITH (security_invoker='true') AS
     name,
     base_uri
    FROM music.vocabulary;
-
---
--- Name: vocal_type; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.vocal_type (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT vocal_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
---
--- Name: vocal_type; Type: VIEW; Schema: api; Owner: -
---
-
-CREATE VIEW api.vocal_type WITH (security_invoker='true') AS
- SELECT id,
-    name
-   FROM music.vocal_type;
 
 --
 -- Name: account; Type: TABLE; Schema: music; Owner: -
@@ -4747,13 +5016,6 @@ ALTER TABLE ONLY music.account_storage
     ADD CONSTRAINT account_storage_pkey PRIMARY KEY (account_id);
 
 --
--- Name: user_account app_user_email_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.user_account
-    ADD CONSTRAINT app_user_email_key UNIQUE (email);
-
---
 -- Name: user_account app_user_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -4782,13 +5044,6 @@ ALTER TABLE ONLY music.artist
     ADD CONSTRAINT artist_pkey PRIMARY KEY (id);
 
 --
--- Name: asset_status asset_status_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.asset_status
-    ADD CONSTRAINT asset_status_name_key UNIQUE (name);
-
---
 -- Name: asset_status asset_status_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -4808,13 +5063,6 @@ ALTER TABLE ONLY music.audio_file
 
 ALTER TABLE ONLY music.audio_file
     ADD CONSTRAINT audio_file_pkey PRIMARY KEY (id);
-
---
--- Name: audio_file_type audio_file_type_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.audio_file_type
-    ADD CONSTRAINT audio_file_type_name_key UNIQUE (name);
 
 --
 -- Name: audio_file_type audio_file_type_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -4873,13 +5121,6 @@ ALTER TABLE ONLY music.contact
     ADD CONSTRAINT contact_pkey PRIMARY KEY (id);
 
 --
--- Name: country country_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.country
-    ADD CONSTRAINT country_name_key UNIQUE (name);
-
---
 -- Name: country country_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -4894,13 +5135,6 @@ ALTER TABLE ONLY music.document
     ADD CONSTRAINT document_pkey PRIMARY KEY (id);
 
 --
--- Name: document_type document_type_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.document_type
-    ADD CONSTRAINT document_type_name_key UNIQUE (name);
-
---
 -- Name: document_type document_type_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -4908,25 +5142,11 @@ ALTER TABLE ONLY music.document_type
     ADD CONSTRAINT document_type_pkey PRIMARY KEY (id);
 
 --
--- Name: genre genre_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.genre
-    ADD CONSTRAINT genre_name_key UNIQUE (name);
-
---
 -- Name: genre genre_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
 ALTER TABLE ONLY music.genre
     ADD CONSTRAINT genre_pkey PRIMARY KEY (id);
-
---
--- Name: instrument instrument_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.instrument
-    ADD CONSTRAINT instrument_name_key UNIQUE (name);
 
 --
 -- Name: instrument instrument_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -4950,25 +5170,11 @@ ALTER TABLE ONLY music.key_signature
     ADD CONSTRAINT key_signature_pkey PRIMARY KEY (name);
 
 --
--- Name: language language_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.language
-    ADD CONSTRAINT language_name_key UNIQUE (name);
-
---
 -- Name: language language_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
 ALTER TABLE ONLY music.language
     ADD CONSTRAINT language_pkey PRIMARY KEY (code);
-
---
--- Name: mood mood_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.mood
-    ADD CONSTRAINT mood_name_key UNIQUE (name);
 
 --
 -- Name: mood mood_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5032,13 +5238,6 @@ ALTER TABLE ONLY music.pitch_setting
 
 ALTER TABLE ONLY music.pro
     ADD CONSTRAINT pro_cisac_key UNIQUE (cisac_code);
-
---
--- Name: pro pro_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.pro
-    ADD CONSTRAINT pro_name_key UNIQUE (name);
 
 --
 -- Name: pro pro_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5209,25 +5408,11 @@ ALTER TABLE ONLY music.release
     ADD CONSTRAINT release_upc_unique UNIQUE (account_id, upc);
 
 --
--- Name: role_group role_group_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.role_group
-    ADD CONSTRAINT role_group_name_key UNIQUE (name);
-
---
 -- Name: role_group role_group_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
 ALTER TABLE ONLY music.role_group
     ADD CONSTRAINT role_group_pkey PRIMARY KEY (id);
-
---
--- Name: role role_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.role
-    ADD CONSTRAINT role_name_key UNIQUE (name);
 
 --
 -- Name: role role_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5356,13 +5541,6 @@ ALTER TABLE ONLY music.vocabulary
     ADD CONSTRAINT vocabulary_pkey PRIMARY KEY (prefix);
 
 --
--- Name: vocal_type vocal_type_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.vocal_type
-    ADD CONSTRAINT vocal_type_name_key UNIQUE (name);
-
---
 -- Name: vocal_type vocal_type_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -5376,10 +5554,34 @@ ALTER TABLE ONLY music.vocal_type
 CREATE INDEX app_user_account_id_idx ON music.user_account USING btree (account_id);
 
 --
+-- Name: app_user_email_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX app_user_email_key ON music.user_account USING btree (lower((email)::text));
+
+--
+-- Name: INDEX app_user_email_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.app_user_email_key IS 'One login per email address regardless of case.';
+
+--
 -- Name: artist_member_contact_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
 CREATE INDEX artist_member_contact_id_idx ON music.artist_member USING btree (contact_id);
+
+--
+-- Name: asset_status_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX asset_status_name_key ON music.asset_status USING btree (lower(name));
+
+--
+-- Name: INDEX asset_status_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.asset_status_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
 
 --
 -- Name: audio_file_recording_id_idx; Type: INDEX; Schema: music; Owner: -
@@ -5392,6 +5594,18 @@ CREATE INDEX audio_file_recording_id_idx ON music.audio_file USING btree (record
 --
 
 CREATE INDEX audio_file_type_idx ON music.audio_file USING btree (file_type_id);
+
+--
+-- Name: audio_file_type_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX audio_file_type_name_key ON music.audio_file_type USING btree (lower(name));
+
+--
+-- Name: INDEX audio_file_type_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.audio_file_type_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
 
 --
 -- Name: contact_account_id_idx; Type: INDEX; Schema: music; Owner: -
@@ -5466,6 +5680,18 @@ CREATE UNIQUE INDEX contact_phone_one_primary ON music.contact_phone USING btree
 CREATE INDEX contact_pro_code_idx ON music.contact USING btree (pro_code);
 
 --
+-- Name: country_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX country_name_key ON music.country USING btree (lower(name));
+
+--
+-- Name: INDEX country_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.country_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
 -- Name: document_expires_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -5484,6 +5710,30 @@ CREATE UNIQUE INDEX document_one_per_file ON music.document USING btree (account
 COMMENT ON INDEX music.document_one_per_file IS 'A stored file is one document, attached wherever it applies. Files are named by their contents, so the same file uploaded twice has the same storage_uri.';
 
 --
+-- Name: document_type_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX document_type_name_key ON music.document_type USING btree (lower(name));
+
+--
+-- Name: INDEX document_type_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.document_type_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: genre_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX genre_name_key ON music.genre USING btree (lower(name));
+
+--
+-- Name: INDEX genre_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.genre_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
 -- Name: genre_parent_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -5494,6 +5744,42 @@ CREATE INDEX genre_parent_id_idx ON music.genre USING btree (parent_id);
 --
 
 CREATE INDEX genre_schema_class_id_idx ON music.genre USING btree (schema_class_id);
+
+--
+-- Name: instrument_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX instrument_name_key ON music.instrument USING btree (lower(name));
+
+--
+-- Name: INDEX instrument_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.instrument_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: language_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX language_name_key ON music.language USING btree (lower(name));
+
+--
+-- Name: INDEX language_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.language_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: mood_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX mood_name_key ON music.mood USING btree (lower(name));
+
+--
+-- Name: INDEX mood_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.mood_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
 
 --
 -- Name: organization_account_id_idx; Type: INDEX; Schema: music; Owner: -
@@ -5524,6 +5810,18 @@ CREATE INDEX organization_pro_code_idx ON music.organization USING btree (pro_co
 --
 
 CREATE INDEX pro_home_country_idx ON music.pro USING btree (home_country);
+
+--
+-- Name: pro_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX pro_name_key ON music.pro USING btree (lower(name));
+
+--
+-- Name: INDEX pro_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.pro_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
 
 --
 -- Name: pro_territory_country_code_idx; Type: INDEX; Schema: music; Owner: -
@@ -5670,6 +5968,30 @@ CREATE INDEX release_distribution_release_idx ON music.release_distribution USIN
 CREATE INDEX release_track_recording_idx ON music.release_track USING btree (recording_id);
 
 --
+-- Name: role_group_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX role_group_name_key ON music.role_group USING btree (lower(name));
+
+--
+-- Name: INDEX role_group_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.role_group_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: role_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX role_name_key ON music.role USING btree (lower(name));
+
+--
+-- Name: INDEX role_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.role_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
 -- Name: role_role_group_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -5775,13 +6097,25 @@ CREATE INDEX song_writer_song_id_idx ON music.song_writer USING btree (song_id);
 -- Name: user_invite_one_pending; Type: INDEX; Schema: music; Owner: -
 --
 
-CREATE UNIQUE INDEX user_invite_one_pending ON music.user_invite USING btree (account_id, email) WHERE (accepted_at IS NULL);
+CREATE UNIQUE INDEX user_invite_one_pending ON music.user_invite USING btree (account_id, lower((email)::text)) WHERE (accepted_at IS NULL);
 
 --
 -- Name: INDEX user_invite_one_pending; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON INDEX music.user_invite_one_pending IS 'One open invite per email per account; resend it instead of inviting again.';
+COMMENT ON INDEX music.user_invite_one_pending IS 'One open invite per email per account, regardless of case; resend it instead of inviting again.';
+
+--
+-- Name: vocal_type_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX vocal_type_name_key ON music.vocal_type USING btree (lower(name));
+
+--
+-- Name: INDEX vocal_type_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.vocal_type_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
 
 --
 -- Name: account_invite account_invite_del; Type: TRIGGER; Schema: api; Owner: -
@@ -7894,28 +8228,76 @@ GRANT ALL ON FUNCTION api.recording_write() TO app_user;
 GRANT ALL ON FUNCTION api.release_write() TO app_user;
 
 --
--- Name: FUNCTION set_storage_secret(secret text); Type: ACL; Schema: api; Owner: -
---
-
-GRANT ALL ON FUNCTION api.set_storage_secret(secret text) TO app_user;
-
---
--- Name: FUNCTION song_write(); Type: ACL; Schema: api; Owner: -
---
-
-GRANT ALL ON FUNCTION api.song_write() TO app_user;
-
---
 -- Name: FUNCTION current_account(); Type: ACL; Schema: music; Owner: -
 --
 
 GRANT ALL ON FUNCTION music.current_account() TO app_user;
 
 --
--- Name: FUNCTION default_audio_file_type(p_format text); Type: ACL; Schema: music; Owner: -
+-- Name: TABLE artist; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT ALL ON FUNCTION music.default_audio_file_type(p_format text) TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.artist TO app_user;
+
+--
+-- Name: TABLE artist_member; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.artist_member TO app_user;
+
+--
+-- Name: TABLE contact; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact TO app_user;
+
+--
+-- Name: TABLE artist; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist TO app_user;
+
+--
+-- Name: FUNCTION search(api.artist); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.artist) TO app_user;
+
+--
+-- Name: TABLE asset_status; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.asset_status TO app_user;
+
+--
+-- Name: TABLE asset_status; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.asset_status TO app_user;
+
+--
+-- Name: FUNCTION search(api.asset_status); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.asset_status) TO app_user;
+
+--
+-- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
+
+--
+-- Name: TABLE audio_file_type; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.audio_file_type TO app_user;
+
+--
+-- Name: FUNCTION search(api.audio_file_type); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.audio_file_type) TO app_user;
 
 --
 -- Name: FUNCTION documents_of(p_table text, p_col text, p_parent integer); Type: ACL; Schema: music; Owner: -
@@ -7924,10 +8306,221 @@ GRANT ALL ON FUNCTION music.default_audio_file_type(p_format text) TO app_user;
 GRANT ALL ON FUNCTION music.documents_of(p_table text, p_col text, p_parent integer) TO app_user;
 
 --
--- Name: FUNCTION gtin_valid(p text); Type: ACL; Schema: music; Owner: -
+-- Name: TABLE contact_email; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT ALL ON FUNCTION music.gtin_valid(p text) TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_email TO app_user;
+
+--
+-- Name: TABLE contact_organization; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_organization TO app_user;
+
+--
+-- Name: TABLE contact_phone; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_phone TO app_user;
+
+--
+-- Name: TABLE contact; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact TO app_user;
+
+--
+-- Name: FUNCTION search(api.contact); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.contact) TO app_user;
+
+--
+-- Name: TABLE country; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.country TO app_user;
+
+--
+-- Name: TABLE country; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.country TO app_user;
+
+--
+-- Name: FUNCTION search(api.country); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.country) TO app_user;
+
+--
+-- Name: TABLE contact_document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_document TO app_user;
+
+--
+-- Name: TABLE document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document TO app_user;
+GRANT SELECT ON TABLE music.document TO mamupload;
+
+--
+-- Name: TABLE organization_document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.organization_document TO app_user;
+
+--
+-- Name: TABLE recording_document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_document TO app_user;
+
+--
+-- Name: TABLE song_document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_document TO app_user;
+
+--
+-- Name: TABLE document; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document TO app_user;
+
+--
+-- Name: FUNCTION search(api.document); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.document) TO app_user;
+
+--
+-- Name: TABLE document_type; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document_type TO app_user;
+
+--
+-- Name: TABLE document_type; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document_type TO app_user;
+
+--
+-- Name: FUNCTION search(api.document_type); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.document_type) TO app_user;
+
+--
+-- Name: TABLE genre; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.genre TO app_user;
+
+--
+-- Name: TABLE genre; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.genre TO app_user;
+
+--
+-- Name: FUNCTION search(api.genre); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.genre) TO app_user;
+
+--
+-- Name: TABLE instrument; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.instrument TO app_user;
+
+--
+-- Name: TABLE instrument; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.instrument TO app_user;
+
+--
+-- Name: FUNCTION search(api.instrument); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.instrument) TO app_user;
+
+--
+-- Name: TABLE key_signature; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.key_signature TO app_user;
+
+--
+-- Name: TABLE key_signature; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.key_signature TO app_user;
+
+--
+-- Name: FUNCTION search(api.key_signature); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.key_signature) TO app_user;
+
+--
+-- Name: TABLE language; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.language TO app_user;
+
+--
+-- Name: TABLE language; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.language TO app_user;
+
+--
+-- Name: FUNCTION search(api.language); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.language) TO app_user;
+
+--
+-- Name: TABLE mood; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.mood TO app_user;
+
+--
+-- Name: TABLE mood; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.mood TO app_user;
+
+--
+-- Name: FUNCTION search(api.mood); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.mood) TO app_user;
+
+--
+-- Name: TABLE organization; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.organization TO app_user;
+
+--
+-- Name: TABLE organization; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.organization TO app_user;
+
+--
+-- Name: FUNCTION search(api.organization); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.organization) TO app_user;
 
 --
 -- Name: FUNCTION recording_language(p_recording integer); Type: ACL; Schema: music; Owner: -
@@ -7954,10 +8547,240 @@ GRANT ALL ON FUNCTION music.recording_pitch_comment_auto(p_recording integer, p_
 GRANT ALL ON FUNCTION music.recording_pitch_contact(p_recording integer) TO app_user;
 
 --
+-- Name: TABLE audio_file; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file TO app_user;
+GRANT SELECT ON TABLE music.audio_file TO mamupload;
+
+--
+-- Name: TABLE recording; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording TO app_user;
+GRANT SELECT ON TABLE music.recording TO mamupload;
+
+--
+-- Name: TABLE recording_artist; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_artist TO app_user;
+
+--
+-- Name: TABLE recording_credit; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit TO app_user;
+
+--
+-- Name: TABLE recording_credit_instrument; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_instrument TO app_user;
+
+--
+-- Name: TABLE recording_credit_role; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_role TO app_user;
+
+--
+-- Name: TABLE recording_genre; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_genre TO app_user;
+
+--
+-- Name: TABLE recording_mood; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_mood TO app_user;
+
+--
+-- Name: TABLE recording_owner; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_owner TO app_user;
+
+--
+-- Name: TABLE recording_representation; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_representation TO app_user;
+
+--
+-- Name: TABLE recording_song; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_song TO app_user;
+
+--
+-- Name: TABLE recording; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.recording TO app_user;
+
+--
+-- Name: FUNCTION search(api.recording); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.recording) TO app_user;
+
+--
+-- Name: TABLE role; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.role TO app_user;
+
+--
+-- Name: TABLE recording_role; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.recording_role TO app_user;
+
+--
+-- Name: FUNCTION search(api.recording_role); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.recording_role) TO app_user;
+
+--
+-- Name: FUNCTION gtin_valid(p text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.gtin_valid(p text) TO app_user;
+
+--
 -- Name: FUNCTION release_status(p_release integer); Type: ACL; Schema: music; Owner: -
 --
 
 GRANT ALL ON FUNCTION music.release_status(p_release integer) TO app_user;
+
+--
+-- Name: TABLE release; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release TO app_user;
+
+--
+-- Name: TABLE release_artist; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_artist TO app_user;
+
+--
+-- Name: TABLE release_distribution; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_distribution TO app_user;
+
+--
+-- Name: TABLE release_track; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_track TO app_user;
+
+--
+-- Name: TABLE release; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.release TO app_user;
+
+--
+-- Name: FUNCTION search(api.release); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.release) TO app_user;
+
+--
+-- Name: FUNCTION song_one_stop_reason(p_song integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.song_one_stop_reason(p_song integer) TO app_user;
+
+--
+-- Name: TABLE song; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
+
+--
+-- Name: TABLE song_publisher; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_publisher TO app_user;
+
+--
+-- Name: TABLE song_registration; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_registration TO app_user;
+
+--
+-- Name: TABLE song_title; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_title TO app_user;
+
+--
+-- Name: TABLE song_writer; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_writer TO app_user;
+
+--
+-- Name: TABLE song; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.song TO app_user;
+
+--
+-- Name: FUNCTION search(api.song); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.song) TO app_user;
+
+--
+-- Name: TABLE vocal_type; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocal_type TO app_user;
+
+--
+-- Name: TABLE vocal_type; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocal_type TO app_user;
+
+--
+-- Name: FUNCTION search(api.vocal_type); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.vocal_type) TO app_user;
+
+--
+-- Name: FUNCTION set_storage_secret(secret text); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.set_storage_secret(secret text) TO app_user;
+
+--
+-- Name: FUNCTION song_write(); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.song_write() TO app_user;
+
+--
+-- Name: FUNCTION default_audio_file_type(p_format text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.default_audio_file_type(p_format text) TO app_user;
+
+--
+-- Name: FUNCTION fold(p text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.fold(p text) TO app_user;
 
 --
 -- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: ACL; Schema: music; Owner: -
@@ -7971,12 +8794,6 @@ GRANT ALL ON FUNCTION music.send_invite(p_invite uuid, p_token text) TO app_user
 --
 
 GRANT ALL ON FUNCTION music.song_controlled_share(p_song integer) TO app_user;
-
---
--- Name: FUNCTION song_one_stop_reason(p_song integer); Type: ACL; Schema: music; Owner: -
---
-
-GRANT ALL ON FUNCTION music.song_one_stop_reason(p_song integer) TO app_user;
 
 --
 -- Name: FUNCTION sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb); Type: ACL; Schema: music; Owner: -
@@ -8166,82 +8983,10 @@ GRANT SELECT(role_id),UPDATE(role_id) ON TABLE music.user_account TO app_user;
 GRANT SELECT,DELETE,UPDATE ON TABLE api.account_user TO app_user;
 
 --
--- Name: TABLE artist; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.artist TO app_user;
-
---
--- Name: TABLE artist_member; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.artist_member TO app_user;
-
---
--- Name: TABLE contact; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact TO app_user;
-
---
--- Name: TABLE artist; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist TO app_user;
-
---
 -- Name: TABLE artist_member; Type: ACL; Schema: api; Owner: -
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist_member TO app_user;
-
---
--- Name: TABLE asset_status; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.asset_status TO app_user;
-
---
--- Name: TABLE asset_status; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.asset_status TO app_user;
-
---
--- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
-
---
--- Name: TABLE audio_file_type; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.audio_file_type TO app_user;
-
---
--- Name: TABLE contact_email; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_email TO app_user;
-
---
--- Name: TABLE contact_organization; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_organization TO app_user;
-
---
--- Name: TABLE contact_phone; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_phone TO app_user;
-
---
--- Name: TABLE contact; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact TO app_user;
 
 --
 -- Name: TABLE contact_email; Type: ACL; Schema: api; Owner: -
@@ -8262,61 +9007,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact_organization TO app_user;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact_phone TO app_user;
 
 --
--- Name: TABLE country; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.country TO app_user;
-
---
--- Name: TABLE country; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.country TO app_user;
-
---
--- Name: TABLE contact_document; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.contact_document TO app_user;
-
---
--- Name: TABLE document; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document TO app_user;
-GRANT SELECT ON TABLE music.document TO mamupload;
-
---
--- Name: TABLE organization_document; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.organization_document TO app_user;
-
---
--- Name: TABLE recording_document; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_document TO app_user;
-
---
--- Name: TABLE song_document; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_document TO app_user;
-
---
--- Name: TABLE document; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document TO app_user;
-
---
--- Name: TABLE document_type; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.document_type TO app_user;
-
---
 -- Name: TABLE document_expiring; Type: ACL; Schema: api; Owner: -
 --
 
@@ -8335,12 +9025,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_document TO app_user;
 GRANT SELECT,DELETE ON TABLE api.document_orphan TO app_user;
 
 --
--- Name: TABLE document_type; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.document_type TO app_user;
-
---
 -- Name: TABLE document_usage; Type: ACL; Schema: api; Owner: -
 --
 
@@ -8351,78 +9035,6 @@ GRANT SELECT ON TABLE api.document_usage TO app_user;
 --
 
 GRANT SELECT ON TABLE api.email_duplicate TO app_user;
-
---
--- Name: TABLE genre; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.genre TO app_user;
-
---
--- Name: TABLE genre; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.genre TO app_user;
-
---
--- Name: TABLE instrument; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.instrument TO app_user;
-
---
--- Name: TABLE instrument; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.instrument TO app_user;
-
---
--- Name: TABLE key_signature; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.key_signature TO app_user;
-
---
--- Name: TABLE key_signature; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.key_signature TO app_user;
-
---
--- Name: TABLE language; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.language TO app_user;
-
---
--- Name: TABLE language; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.language TO app_user;
-
---
--- Name: TABLE mood; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.mood TO app_user;
-
---
--- Name: TABLE mood; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.mood TO app_user;
-
---
--- Name: TABLE organization; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.organization TO app_user;
-
---
--- Name: TABLE organization; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.organization TO app_user;
 
 --
 -- Name: TABLE pitch_setting; Type: ACL; Schema: music; Owner: -
@@ -8461,144 +9073,16 @@ GRANT SELECT ON TABLE music.pro_territory TO app_user;
 GRANT SELECT ON TABLE api.pro_territory TO app_user;
 
 --
--- Name: TABLE audio_file; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file TO app_user;
-GRANT SELECT ON TABLE music.audio_file TO mamupload;
-
---
--- Name: TABLE recording; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording TO app_user;
-GRANT SELECT ON TABLE music.recording TO mamupload;
-
---
--- Name: TABLE recording_artist; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_artist TO app_user;
-
---
--- Name: TABLE recording_credit; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit TO app_user;
-
---
--- Name: TABLE recording_credit_instrument; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_instrument TO app_user;
-
---
--- Name: TABLE recording_credit_role; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_role TO app_user;
-
---
--- Name: TABLE recording_genre; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_genre TO app_user;
-
---
--- Name: TABLE recording_mood; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_mood TO app_user;
-
---
--- Name: TABLE recording_owner; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_owner TO app_user;
-
---
--- Name: TABLE recording_representation; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_representation TO app_user;
-
---
--- Name: TABLE recording_song; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_song TO app_user;
-
---
--- Name: TABLE recording; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.recording TO app_user;
-
---
--- Name: TABLE song; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
-
---
--- Name: TABLE song_writer; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_writer TO app_user;
-
---
 -- Name: TABLE recording_cover; Type: ACL; Schema: api; Owner: -
 --
 
 GRANT SELECT ON TABLE api.recording_cover TO app_user;
 
 --
--- Name: TABLE role; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.role TO app_user;
-
---
 -- Name: TABLE recording_credit_display; Type: ACL; Schema: api; Owner: -
 --
 
 GRANT SELECT ON TABLE api.recording_credit_display TO app_user;
-
---
--- Name: TABLE recording_role; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT ON TABLE api.recording_role TO app_user;
-
---
--- Name: TABLE release; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release TO app_user;
-
---
--- Name: TABLE release_artist; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_artist TO app_user;
-
---
--- Name: TABLE release_distribution; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_distribution TO app_user;
-
---
--- Name: TABLE release_track; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_track TO app_user;
-
---
--- Name: TABLE release; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.release TO app_user;
 
 --
 -- Name: TABLE role; Type: ACL; Schema: api; Owner: -
@@ -8637,30 +9121,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocabulary TO app_user;
 GRANT SELECT ON TABLE api.schema_type TO app_user;
 
 --
--- Name: TABLE song_publisher; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_publisher TO app_user;
-
---
--- Name: TABLE song_registration; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_registration TO app_user;
-
---
--- Name: TABLE song_title; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song_title TO app_user;
-
---
--- Name: TABLE song; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.song TO app_user;
-
---
 -- Name: TABLE song_split_check; Type: ACL; Schema: api; Owner: -
 --
 
@@ -8677,18 +9137,6 @@ GRANT SELECT ON TABLE api.song_unregistered TO app_user;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocabulary TO app_user;
-
---
--- Name: TABLE vocal_type; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocal_type TO app_user;
-
---
--- Name: TABLE vocal_type; Type: ACL; Schema: api; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocal_type TO app_user;
 
 --
 -- Name: TABLE account; Type: ACL; Schema: music; Owner: -

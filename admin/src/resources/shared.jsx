@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   List, Datagrid, TextField, Edit, Create, SimpleForm, TextInput, required,
   AutocompleteInput, AutocompleteArrayInput, useChoicesContext,
@@ -40,12 +41,21 @@ export const sharedList = ({ list = NameList, Inputs = NameInputs } = {}) => ({
 // The picker for a shared list that needs only a name, inside its
 // ReferenceInput or ReferenceArrayInput. The site admin can add a missing
 // entry from the picker without leaving the form; nobody else sees Create.
-export const SharedListPicker = ({ multiple = false, ...props }) => {
-  const { resource } = useChoicesContext();
+// Create is not offered when the typed name matches an entry in any case:
+// typing rock picks Rock.
+export const SharedListPicker = ({ multiple = false, onInputChange, ...props }) => {
+  const { resource, allChoices } = useChoicesContext();
   const siteAdmin = useIsSiteAdmin();
+  const [typed, setTyped] = useState('');
+  const key = typed.trim().toLowerCase();
+  const exists = !!key && !!allChoices?.some((c) => c.name?.toLowerCase() === key);
   const Input = multiple ? AutocompleteArrayInput : AutocompleteInput;
   return <Input optionText="name" filterToQuery={byName}
-                create={siteAdmin ? <QuickCreateName resource={resource} /> : undefined}
+                create={siteAdmin && !exists ? <QuickCreateName resource={resource} /> : undefined}
+                onInputChange={(e, value, reason) => {
+                  setTyped(value || '');
+                  onInputChange?.(e, value, reason);
+                }}
                 {...props} />;
 };
 

@@ -5,7 +5,7 @@ import {
 import { CatalogDatagrid } from '../shared';
 
 const filters = [
-  <SearchInput source="title@ilike" alwaysOn />,
+  <SearchInput source="search@ilike" alwaysOn />,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
 ];

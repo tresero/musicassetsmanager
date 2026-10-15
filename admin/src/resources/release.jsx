@@ -14,7 +14,7 @@ import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { bySortName, byTitle } from './vocab';
 import { CatalogDatagrid, SharedListPicker } from './shared';
 
-const filters = [<SearchInput source="title@ilike" alwaysOn />];
+const filters = [<SearchInput source="search@ilike" alwaysOn />];
 
 const releaseTypes = [
   { id: 'Single', name: 'Single' },
