@@ -3,7 +3,6 @@ import {
 } from 'react-admin';
 import { QuickCreateContact } from './quickCreate';
 import { PersonInput } from './partyInputs';
-import { bySortName } from './vocab';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Box, Button, Typography } from '@mui/material';
 import CopyIcon from '@mui/icons-material/ContentCopy';

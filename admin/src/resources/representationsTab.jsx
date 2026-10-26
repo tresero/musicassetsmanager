@@ -5,7 +5,6 @@ import {
 import { Box } from '@mui/material';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonOrCompanyInput } from './partyInputs';
-import { byName, bySortName, byTitle } from './vocab';
 
 const row = {
   display: 'flex',
@@ -56,7 +55,7 @@ export const RepresentationsInput = () => (
         <ReferenceInput source="document_id" reference="document" perPage={500}
                         sort={{ field: 'title', order: 'ASC' }}>
           <AutocompleteInput optionText="title" label="Agreement"
-                             filterToQuery={byTitle} helperText={false}
+                             helperText={false}
                              sx={{ width: { xs: '100%', md: 300 } }} />
         </ReferenceInput>
       </Box>

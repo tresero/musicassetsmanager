@@ -1239,15 +1239,15 @@ CREATE VIEW api.artist WITH (security_invoker='true') AS
 -- Name: search(api.artist); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.artist) RETURNS text
+CREATE FUNCTION api.search(api.artist) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.artist); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.artist) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.artist) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: asset_status; Type: TABLE; Schema: music; Owner: -
@@ -1272,15 +1272,15 @@ CREATE VIEW api.asset_status WITH (security_invoker='true') AS
 -- Name: search(api.asset_status); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.asset_status) RETURNS text
+CREATE FUNCTION api.search(api.asset_status) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.asset_status); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.asset_status) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.asset_status) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: audio_file_type; Type: TABLE; Schema: music; Owner: -
@@ -1305,15 +1305,15 @@ CREATE VIEW api.audio_file_type WITH (security_invoker='true') AS
 -- Name: search(api.audio_file_type); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.audio_file_type) RETURNS text
+CREATE FUNCTION api.search(api.audio_file_type) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.audio_file_type); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.audio_file_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.audio_file_type) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: documents_of(text, text, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -1464,15 +1464,15 @@ CREATE VIEW api.contact WITH (security_invoker='true') AS
 -- Name: search(api.contact); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.contact) RETURNS text
+CREATE FUNCTION api.search(api.contact) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.sort_name) $_$;
+    AS $_$ SELECT music.search_doc($1.sort_name) $_$;
 
 --
 -- Name: FUNCTION search(api.contact); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.contact) IS 'The sort_name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.contact) IS 'The sort name, for search=fts(fold).term:*.';
 
 --
 -- Name: country; Type: TABLE; Schema: music; Owner: -
@@ -1498,15 +1498,15 @@ CREATE VIEW api.country WITH (security_invoker='true') AS
 -- Name: search(api.country); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.country) RETURNS text
+CREATE FUNCTION api.search(api.country) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.country); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.country) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.country) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: contact_document; Type: TABLE; Schema: music; Owner: -
@@ -1622,15 +1622,15 @@ CREATE VIEW api.document WITH (security_invoker='true') AS
 -- Name: search(api.document); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.document) RETURNS text
+CREATE FUNCTION api.search(api.document) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.title) $_$;
+    AS $_$ SELECT music.search_doc($1.title) $_$;
 
 --
 -- Name: FUNCTION search(api.document); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.document) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.document) IS 'The title, for search=fts(fold).term:*.';
 
 --
 -- Name: document_type; Type: TABLE; Schema: music; Owner: -
@@ -1655,15 +1655,15 @@ CREATE VIEW api.document_type WITH (security_invoker='true') AS
 -- Name: search(api.document_type); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.document_type) RETURNS text
+CREATE FUNCTION api.search(api.document_type) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.document_type); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.document_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.document_type) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: genre; Type: TABLE; Schema: music; Owner: -
@@ -1695,15 +1695,15 @@ CREATE VIEW api.genre WITH (security_invoker='true') AS
 -- Name: search(api.genre); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.genre) RETURNS text
+CREATE FUNCTION api.search(api.genre) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.genre); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.genre) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.genre) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: instrument; Type: TABLE; Schema: music; Owner: -
@@ -1736,15 +1736,15 @@ CREATE VIEW api.instrument WITH (security_invoker='true') AS
 -- Name: search(api.instrument); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.instrument) RETURNS text
+CREATE FUNCTION api.search(api.instrument) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.instrument); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.instrument) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.instrument) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: key_signature; Type: TABLE; Schema: music; Owner: -
@@ -1775,15 +1775,15 @@ CREATE VIEW api.key_signature WITH (security_invoker='true') AS
 -- Name: search(api.key_signature); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.key_signature) RETURNS text
+CREATE FUNCTION api.search(api.key_signature) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.key_signature); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.key_signature) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.key_signature) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: language; Type: TABLE; Schema: music; Owner: -
@@ -1810,15 +1810,15 @@ CREATE VIEW api.language WITH (security_invoker='true') AS
 -- Name: search(api.language); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.language) RETURNS text
+CREATE FUNCTION api.search(api.language) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.language); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.language) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.language) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: mood; Type: TABLE; Schema: music; Owner: -
@@ -1843,15 +1843,15 @@ CREATE VIEW api.mood WITH (security_invoker='true') AS
 -- Name: search(api.mood); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.mood) RETURNS text
+CREATE FUNCTION api.search(api.mood) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.mood); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.mood) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.mood) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: organization; Type: TABLE; Schema: music; Owner: -
@@ -1894,15 +1894,15 @@ CREATE VIEW api.organization WITH (security_invoker='true') AS
 -- Name: search(api.organization); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.organization) RETURNS text
+CREATE FUNCTION api.search(api.organization) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.organization); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.organization) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.organization) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: recording_language(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -2539,15 +2539,22 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
 -- Name: search(api.recording); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.recording) RETURNS text
+CREATE FUNCTION api.search(api.recording) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.title) $_$;
+    AS $_$
+  SELECT music.search_doc(
+    $1.title, $1.version_label, $1.isrc, $1.keywords, $1.sounds_like, $1.description,
+    (SELECT string_agg(a.name, ' ') FROM music.recording_artist ra JOIN music.artist a ON a.id = ra.artist_id WHERE ra.recording_id = $1.id),
+    (SELECT string_agg(s.title, ' ') FROM music.recording_song rs JOIN music.song s ON s.id = rs.song_id WHERE rs.recording_id = $1.id),
+    (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ') FROM music.recording_credit c WHERE c.recording_id = $1.id),
+    (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ') FROM music.recording_owner o WHERE o.recording_id = $1.id))
+$_$;
 
 --
 -- Name: FUNCTION search(api.recording); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.recording) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.recording) IS 'Title, version, ISRC, keywords, sounds like, description, artist names, song titles, credit names and credited-as names, and master owner names, for search=fts(fold).term:*.';
 
 --
 -- Name: role; Type: TABLE; Schema: music; Owner: -
@@ -2591,15 +2598,15 @@ CREATE VIEW api.recording_role WITH (security_invoker='true') AS
 -- Name: search(api.recording_role); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.recording_role) RETURNS text
+CREATE FUNCTION api.search(api.recording_role) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.recording_role); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.recording_role) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.recording_role) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: gtin_valid(text); Type: FUNCTION; Schema: music; Owner: -
@@ -2828,15 +2835,21 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
 -- Name: search(api.release); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.release) RETURNS text
+CREATE FUNCTION api.search(api.release) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.title) $_$;
+    AS $_$
+  SELECT music.search_doc(
+    $1.title, $1.upc, $1.catalog_number,
+    music.party_name(NULL, $1.label_id),
+    (SELECT string_agg(a.name, ' ') FROM music.release_artist ra JOIN music.artist a ON a.id = ra.artist_id WHERE ra.release_id = $1.id),
+    (SELECT string_agg(concat_ws(' ', r.title, r.version_label, r.isrc), ' ') FROM music.release_track t JOIN music.recording r ON r.id = t.recording_id WHERE t.release_id = $1.id))
+$_$;
 
 --
 -- Name: FUNCTION search(api.release); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.release) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.release) IS 'Title, UPC, catalog number, label, artist names, and track titles, versions and ISRCs, for search=fts(fold).term:*.';
 
 --
 -- Name: song_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -3027,15 +3040,22 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
 -- Name: search(api.song); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.song) RETURNS text
+CREATE FUNCTION api.search(api.song) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.title) $_$;
+    AS $_$
+  SELECT music.search_doc(
+    $1.title, $1.iswc,
+    (SELECT string_agg(t.title, ' ') FROM music.song_title t WHERE t.song_id = $1.id),
+    (SELECT string_agg(music.party_name(w.contact_id, NULL), ' ') FROM music.song_writer w WHERE w.song_id = $1.id),
+    (SELECT string_agg(music.party_name(NULL, p.organization_id), ' ') FROM music.song_publisher p WHERE p.song_id = $1.id),
+    (SELECT string_agg(r.work_number, ' ') FROM music.song_registration r WHERE r.song_id = $1.id))
+$_$;
 
 --
 -- Name: FUNCTION search(api.song); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.song) IS 'The title lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.song) IS 'Title, alt titles, ISWC, writer and publisher names and registration work numbers, for search=fts(fold).term:*.';
 
 --
 -- Name: vocal_type; Type: TABLE; Schema: music; Owner: -
@@ -3060,15 +3080,15 @@ CREATE VIEW api.vocal_type WITH (security_invoker='true') AS
 -- Name: search(api.vocal_type); Type: FUNCTION; Schema: api; Owner: -
 --
 
-CREATE FUNCTION api.search(api.vocal_type) RETURNS text
+CREATE FUNCTION api.search(api.vocal_type) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.fold($1.name) $_$;
+    AS $_$ SELECT music.search_doc($1.name) $_$;
 
 --
 -- Name: FUNCTION search(api.vocal_type); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.vocal_type) IS 'The name lowercased without accents, for search=ilike.*term* with a folded term.';
+COMMENT ON FUNCTION api.search(api.vocal_type) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: set_storage_secret(text); Type: FUNCTION; Schema: api; Owner: -
@@ -3419,22 +3439,6 @@ END;
 $$;
 
 --
--- Name: fold(text); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.fold(p text) RETURNS text
-    LANGUAGE sql IMMUTABLE PARALLEL SAFE
-    AS $$
-  SELECT lower(public.unaccent('public.unaccent'::regdictionary, p));
-$$;
-
---
--- Name: FUNCTION fold(p text); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.fold(p text) IS 'Text lowercased with accents removed, so Canción, cancion and CANCION compare equal. Used by the api.search computed fields.';
-
---
 -- Name: is_site_admin(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -3745,6 +3749,24 @@ CREATE FUNCTION music.own_song_writer(p_id integer) RETURNS boolean
 COMMENT ON FUNCTION music.own_song_writer(p_id integer) IS 'True when the song_writer row is visible to the caller, which row security limits to the signed-in account. False for null.';
 
 --
+-- Name: party_name(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.party_name(p_contact_id integer, p_organization_id integer) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT concat_ws(' ',
+    (SELECT concat_ws(' ', c.display_name, c.credit_name) FROM music.contact c WHERE c.id = p_contact_id),
+    (SELECT o.name FROM music.organization o WHERE o.id = p_organization_id))
+$$;
+
+--
+-- Name: FUNCTION party_name(p_contact_id integer, p_organization_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.party_name(p_contact_id integer, p_organization_id integer) IS 'The names of a person (display and credit name) or company, for search text.';
+
+--
 -- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -3788,6 +3810,20 @@ $$;
 --
 
 COMMENT ON FUNCTION music.require_site_admin() IS 'Statement trigger on the shared lists: refuses a write unless the signed-in user is the site admin.';
+
+--
+-- Name: search_doc(text[]); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.search_doc(VARIADIC p text[]) RETURNS tsvector
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$ SELECT to_tsvector('api.fold', array_to_string(p, ' ')) $$;
+
+--
+-- Name: FUNCTION search_doc(VARIADIC p text[]); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.search_doc(VARIADIC p text[]) IS 'The searchable words of a record, folded by api.fold. Every api.search function lists its fields through this; empty fields are skipped.';
 
 --
 -- Name: send_invite(uuid, text); Type: FUNCTION; Schema: music; Owner: -
@@ -3968,6 +4004,76 @@ $_$;
 --
 
 COMMENT ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) IS 'Saves the documents listed on a song, recording, person, company, or release and links them to it. A new row whose file is already a document links that document instead of creating a second one; its blank fields are filled from the row. Rows no longer listed are detached; the document itself survives.';
+
+--
+-- Name: fold; Type: TEXT SEARCH CONFIGURATION; Schema: api; Owner: -
+--
+
+CREATE TEXT SEARCH CONFIGURATION api.fold (
+    PARSER = pg_catalog."default" );
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR asciiword WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR word WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR numword WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR email WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR url WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR host WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR sfloat WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR version WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR hword_numpart WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR hword_part WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR hword_asciipart WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR numhword WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR asciihword WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR hword WITH public.unaccent, simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR url_path WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR file WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR "float" WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR "int" WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION api.fold
+    ADD MAPPING FOR uint WITH simple;
+
+--
+-- Name: TEXT SEARCH CONFIGURATION fold; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON TEXT SEARCH CONFIGURATION api.fold IS 'Words lowercased with accents removed, so Canción, cancion and CANCION match. Searches send search=fts(fold).term:* and the database folds the typed words the same way as the stored ones.';
 
 --
 -- Name: user_invite; Type: TABLE; Schema: music; Owner: -
@@ -8777,10 +8883,16 @@ GRANT ALL ON FUNCTION api.song_write() TO app_user;
 GRANT ALL ON FUNCTION music.default_audio_file_type(p_format text) TO app_user;
 
 --
--- Name: FUNCTION fold(p text); Type: ACL; Schema: music; Owner: -
+-- Name: FUNCTION party_name(p_contact_id integer, p_organization_id integer); Type: ACL; Schema: music; Owner: -
 --
 
-GRANT ALL ON FUNCTION music.fold(p text) TO app_user;
+GRANT ALL ON FUNCTION music.party_name(p_contact_id integer, p_organization_id integer) TO app_user;
+
+--
+-- Name: FUNCTION search_doc(VARIADIC p text[]); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.search_doc(VARIADIC p text[]) TO app_user;
 
 --
 -- Name: FUNCTION send_invite(p_invite uuid, p_token text); Type: ACL; Schema: music; Owner: -
@@ -9243,5 +9355,4 @@ GRANT USAGE ON SEQUENCE music.vocal_type_id_seq TO app_user;
 --
 -- PostgreSQL database dump complete
 --
-
 

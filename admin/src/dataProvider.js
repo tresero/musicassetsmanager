@@ -27,27 +27,28 @@ const provider = postgrestRestProvider({
   schema: defaultSchema,
 });
 
-// The api views' search value is lowercased without accents (music.fold), so
-// the typed text is folded the same way: corazón, Corazon and CORAZÓN all
-// find Corazón.
-const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Search boxes and pickers send React Admin's q filter. Each typed word must
+// start a word in the view's search value; the database folds case and
+// accents on both sides (api.fold), so corazon finds Corazón.
+const searchQuery = (q) =>
+  q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => `${w}:*`).join(' & ');
 
-// Searches before #21 were saved in the browser under these keys. No input
-// shows them any more, so a saved one would filter the list invisibly.
-const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike'];
+// Searches saved in the browser under these keys would filter the list
+// invisibly, since no input shows them any more.
+const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike', 'search@ilike'];
 
-const foldSearch = (params) => {
+const toSearch = (params) => {
   if (!params?.filter) return params;
-  const filter = { ...params.filter };
+  const { q, ...filter } = params.filter;
   OLD_SEARCH_KEYS.forEach((key) => delete filter[key]);
-  const value = filter['search@ilike'];
-  if (typeof value === 'string') filter['search@ilike'] = fold(value);
+  const query = typeof q === 'string' ? searchQuery(q) : '';
+  if (query) filter['search@fts(fold)'] = query;
   return { ...params, filter };
 };
 
 export default {
   ...provider,
-  getList: (resource, params) => provider.getList(resource, foldSearch(params)),
+  getList: (resource, params) => provider.getList(resource, toSearch(params)),
   getManyReference: (resource, params) =>
-    provider.getManyReference(resource, foldSearch(params)),
+    provider.getManyReference(resource, toSearch(params)),
 };

@@ -1,11 +1,11 @@
 import {
-  List, TextField, NumberField, BooleanField, ReferenceField, SearchInput,
+  List, TextField, NumberField, BooleanField, ReferenceField,
   NullableBooleanInput,
 } from 'react-admin';
-import { CatalogDatagrid } from '../shared';
+import { CatalogDatagrid, searchFilter } from '../shared';
 
 const filters = [
-  <SearchInput source="search@ilike" alwaysOn />,
+  searchFilter,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
 ];

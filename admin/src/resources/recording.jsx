@@ -1,6 +1,6 @@
 import {
-  List, TextField, NumberField, BooleanField, ReferenceField, SearchInput,
-  Edit, Create, TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
+  List, TextField, NumberField, BooleanField, ReferenceField, Edit, Create,
+  TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
   NullableBooleanInput, useRecordContext, required,
@@ -14,14 +14,11 @@ import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
-import {
-  versionLabels, tempos, freeText,
-  byName, bySortName, byTitle,
-} from './vocab';
-import { CatalogDatagrid, SharedListPicker } from './shared';
+import { versionLabels, tempos, freeText } from './vocab';
+import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
 const filters = [
-  <SearchInput source="search@ilike" alwaysOn />,
+  searchFilter,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
   <NullableBooleanInput source="has_pitch_contact" label="Has pitch contact" />,
@@ -120,7 +117,7 @@ const RecordingForm = () => (
                          sx={{ width: { xs: '100%', md: 200 } }} />
       <ReferenceInput source="key_signature" reference="key_signature" perPage={50}
                       sort={{ field: 'accidentals', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Key" filterToQuery={byName}
+        <AutocompleteInput optionText="name" label="Key"
                            sx={{ width: { xs: '100%', md: 200 } }} />
       </ReferenceInput>
       <ReferenceInput source="vocal_type_id" reference="vocal_type" perPage={50}
@@ -131,7 +128,7 @@ const RecordingForm = () => (
       </ReferenceInput>
       <ReferenceInput source="language_code" reference="language" perPage={300}
                       sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Language" filterToQuery={byName}
+        <AutocompleteInput optionText="name" label="Language"
                            helperText="Language of the vocal. Leave blank to use the song's language."
                            sx={{ width: { xs: '100%', md: 240 } }} />
       </ReferenceInput>
@@ -180,7 +177,7 @@ const RecordingForm = () => (
           <ReferenceInput source="song_id" reference="song" perPage={500}
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText="title" label="Composition"
-                               filterToQuery={byTitle} helperText={false}
+                               helperText={false}
                                validate={required()}
                                sx={{ width: { xs: '100%', md: 380 } }} />
           </ReferenceInput>
@@ -200,7 +197,6 @@ const RecordingForm = () => (
           <ReferenceArrayInput source="role_ids" reference="recording_role" perPage={50}
                                sort={{ field: 'name', order: 'ASC' }}>
             <AutocompleteArrayInput optionText="name" label="Roles"
-                                    filterToQuery={byName}
                                     helperText={false}
                                     sx={{ width: { xs: '100%', md: 260 } }} />
           </ReferenceArrayInput>
@@ -246,14 +242,12 @@ const RecordingForm = () => (
       <ReferenceInput source="recorded_country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Country of recording"
-                           filterToQuery={byName}
                            helperText="Where it was mainly recorded. For a record tracked in more than one country, pick the main one."
                            sx={{ width: { xs: '100%', md: 340 } }} />
       </ReferenceInput>
       <ReferenceInput source="commissioned_country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Country of commissioning"
-                           filterToQuery={byName}
                            helperText="Where the original owner of the master was based when it was made: the label's country, or yours if self-released, wherever the tracks were cut. Societies such as PPL use this and the country of recording to decide eligibility for performance income."
                            sx={{ width: { xs: '100%', md: 340 } }} />
       </ReferenceInput>

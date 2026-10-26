@@ -3,7 +3,6 @@ import {
   Edit, Create, SimpleForm, TextInput, BooleanInput,
   ReferenceInput, AutocompleteInput,
 } from 'react-admin';
-import { bySearch } from './vocab';
 
 const CoList = () => (
   <List perPage={50}>
@@ -20,11 +19,11 @@ const CoForm = () => (
   <SimpleForm>
     <ReferenceInput source="contact_id" reference="contact" perPage={100}
                     sort={{ field: 'sort_name', order: 'ASC' }}>
-      <AutocompleteInput optionText="display_name" label="Person" filterToQuery={bySearch} required />
+      <AutocompleteInput optionText="display_name" label="Person" required />
     </ReferenceInput>
     <ReferenceInput source="organization_id" reference="organization" perPage={100}
                     sort={{ field: 'name', order: 'ASC' }}>
-      <AutocompleteInput optionText="name" label="Company" filterToQuery={bySearch} required />
+      <AutocompleteInput optionText="name" label="Company" required />
     </ReferenceInput>
     <TextInput source="title" />
     <BooleanInput source="is_primary" label="Primary affiliation" />

@@ -3,7 +3,7 @@ import {
   ReferenceInput, AutocompleteInput,
 } from 'react-admin';
 import { Box, Stack } from '@mui/material';
-import { derivationTypes, byTitle } from '../../vocab';
+import { derivationTypes } from '../../vocab';
 
 const CopyrightFields = () => (
   <Stack spacing={2} sx={{ width: '100%', maxWidth: 1100 }}>
@@ -25,7 +25,6 @@ const CopyrightFields = () => (
       <ReferenceInput source="derived_from_id" reference="song" perPage={500}
                       sort={{ field: 'title', order: 'ASC' }}>
         <AutocompleteInput optionText="title" label="Derived from"
-                           filterToQuery={byTitle}
                            helperText="Only when the source is in this catalog"
                            sx={{ width: 340 }} />
       </ReferenceInput>

@@ -3,7 +3,7 @@ import {
   ReferenceInput, AutocompleteInput,
   required,
 } from 'react-admin';
-import { titleTypes, byName } from '../../vocab';
+import { titleTypes } from '../../vocab';
 
 const AltTitlesFields = () => (
   <ArrayInput source="titles" label={false}>
@@ -16,7 +16,7 @@ const AltTitlesFields = () => (
       <ReferenceInput source="language_code" reference="language" perPage={300}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Language"
-                           filterToQuery={byName} helperText={false}
+                           helperText={false}
                            sx={{ width: 190 }} />
       </ReferenceInput>
     </SimpleFormIterator>

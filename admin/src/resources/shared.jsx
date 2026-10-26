@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import {
   List, Datagrid, TextField, Edit, Create, SimpleForm, TextInput, required,
-  AutocompleteInput, AutocompleteArrayInput, useChoicesContext,
+  AutocompleteInput, AutocompleteArrayInput, SearchInput, useChoicesContext,
 } from 'react-admin';
 import { useCan, useIsSiteAdmin } from '../permissions';
 import { QuickCreateName } from './quickCreate';
-import { byName } from './vocab';
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
 // database refuses everyone else.
@@ -50,7 +49,7 @@ export const SharedListPicker = ({ multiple = false, onInputChange, ...props }) 
   const key = typed.trim().toLowerCase();
   const exists = !!key && !!allChoices?.some((c) => c.name?.toLowerCase() === key);
   const Input = multiple ? AutocompleteArrayInput : AutocompleteInput;
-  return <Input optionText="name" filterToQuery={byName}
+  return <Input optionText="name"
                 create={siteAdmin && !exists ? <QuickCreateName resource={resource} /> : undefined}
                 onInputChange={(e, value, reason) => {
                   setTyped(value || '');
@@ -64,3 +63,7 @@ export const CatalogDatagrid = ({ bulkActionButtons, ...props }) => {
   const canDelete = useCan('catalog.delete');
   return <Datagrid bulkActionButtons={canDelete ? bulkActionButtons : false} {...props} />;
 };
+
+// The search box at the top of a list. It sends q, which dataProvider turns
+// into a search of the view's search value.
+export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;

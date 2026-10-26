@@ -1,5 +1,5 @@
 import {
-  List, TextField, NumberField, DateField, SearchInput, Edit, Create,
+  List, TextField, NumberField, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, DateInput, SelectInput, ArrayInput,
   SimpleFormIterator, ReferenceInput, AutocompleteInput, useRecordContext,
   useSimpleFormIteratorItem, minValue, required,
@@ -11,10 +11,9 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
-import { bySortName, byTitle } from './vocab';
-import { CatalogDatagrid, SharedListPicker } from './shared';
+import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
-const filters = [<SearchInput source="search@ilike" alwaysOn />];
+const filters = [searchFilter];
 
 const releaseTypes = [
   { id: 'Single', name: 'Single' },
@@ -155,7 +154,7 @@ const ReleaseForm = () => (
           <ReferenceInput source="recording_id" reference="recording" perPage={500}
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText={recordingLabel} inputText={recordingLabel}
-                               label="Recording" filterToQuery={byTitle}
+                               label="Recording"
                                helperText={false} validate={required()}
                                sx={{ width: { xs: '100%', md: 420 } }} />
           </ReferenceInput>

@@ -1,15 +1,15 @@
 import {
-  List, TextField, ReferenceField, SearchInput, Edit, Create, TabbedForm,
+  List, TextField, ReferenceField, Edit, Create, TabbedForm,
   TextInput, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { DocumentsInput } from './documentsTab';
 import { IsniInput } from './IsniInput';
-import { byName, byCode, proOptionText, proInputText } from './vocab';
-import { CatalogDatagrid } from './shared';
+import { byCode, proOptionText, proInputText } from './vocab';
+import { CatalogDatagrid, searchFilter } from './shared';
 
-const filters = [<SearchInput source="search@ilike" alwaysOn />];
+const filters = [searchFilter];
 
 const OrgList = () => (
   <List filters={filters} sort={{ field: 'name', order: 'ASC' }} perPage={50}>
@@ -45,7 +45,6 @@ const OrgForm = () => (
       <ReferenceInput source="country" reference="country" perPage={500}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Country"
-                           filterToQuery={byName}
                            sx={{ width: { xs: '100%', md: 300 } }} />
       </ReferenceInput>
       <RichTextInput source="notes" />

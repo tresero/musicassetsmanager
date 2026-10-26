@@ -1,15 +1,14 @@
 import {
-  List, TextField, DateField, NumberField, ReferenceField, SearchInput, Edit,
+  List, TextField, DateField, NumberField, ReferenceField, Edit,
   Create, SimpleForm, TextInput, NumberInput, DateInput, SelectInput,
   ReferenceInput, ReferenceArrayInput,
   AutocompleteArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
-import { CatalogDatagrid, SharedListPicker } from './shared';
-import { byName, byTitle, bySortName } from './vocab';
+import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
-const filters = [<SearchInput source="search@ilike" alwaysOn />];
+const filters = [searchFilter];
 
 
 const storageKinds = [
@@ -57,26 +56,22 @@ const DocumentForm = () => (
 
     <ReferenceArrayInput source="song_ids" reference="song" perPage={500}
                          sort={{ field: 'title', order: 'ASC' }}>
-      <AutocompleteArrayInput optionText="title" label="Compositions"
-                              filterToQuery={byTitle} />
+      <AutocompleteArrayInput optionText="title" label="Compositions" />
     </ReferenceArrayInput>
 
     <ReferenceArrayInput source="recording_ids" reference="recording" perPage={500}
                          sort={{ field: 'title', order: 'ASC' }}>
-      <AutocompleteArrayInput optionText="title" label="Recordings"
-                              filterToQuery={byTitle} />
+      <AutocompleteArrayInput optionText="title" label="Recordings" />
     </ReferenceArrayInput>
 
     <ReferenceArrayInput source="contact_ids" reference="contact" perPage={200}
                          sort={{ field: 'sort_name', order: 'ASC' }}>
-      <AutocompleteArrayInput optionText="sort_name" label="People"
-                              filterToQuery={bySortName} />
+      <AutocompleteArrayInput optionText="sort_name" label="People" />
     </ReferenceArrayInput>
 
     <ReferenceArrayInput source="organization_ids" reference="organization"
                          perPage={200} sort={{ field: 'name', order: 'ASC' }}>
-      <AutocompleteArrayInput optionText="name" label="Companies"
-                              filterToQuery={byName} />
+      <AutocompleteArrayInput optionText="name" label="Companies" />
     </ReferenceArrayInput>
 
     <TextInput source="mime_type" label="MIME type" />

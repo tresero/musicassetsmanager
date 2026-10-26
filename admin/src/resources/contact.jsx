@@ -1,5 +1,5 @@
 import {
-  List, TextField, BooleanField, ReferenceField, SearchInput, Edit, Create,
+  List, TextField, BooleanField, ReferenceField, Edit, Create,
   TabbedForm, TextInput, NumberInput, BooleanInput, ArrayInput,
   SimpleFormIterator, ReferenceInput, AutocompleteInput, required,
 } from 'react-admin';
@@ -9,9 +9,9 @@ import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput } from './IsniInput';
-import { CatalogDatagrid } from './shared';
+import { CatalogDatagrid, searchFilter } from './shared';
 
-const filters = [<SearchInput source="search@ilike" alwaysOn />];
+const filters = [searchFilter];
 
 // No divider between rows, and fields centered so a Select does not sit
 // below an Autocomplete.

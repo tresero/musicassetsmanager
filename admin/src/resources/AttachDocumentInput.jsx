@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useGetList, useArrayInput, useNotify } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { Autocomplete, TextField } from '@mui/material';
-import { bySearch } from './vocab';
 
 // The save rewrites an attached document from the row's fields, so the row
 // must carry every one of them; a missing field would blank that value on
@@ -27,7 +26,7 @@ export const AttachDocumentInput = () => {
   const { data = [], isPending } = useGetList('document', {
     pagination: { page: 1, perPage: 500 },
     sort: { field: 'title', order: 'ASC' },
-    filter: query ? bySearch(query) : {},
+    filter: query ? { q: query } : {},
   });
 
   const attached = new Set(current.map((d) => d?.id).filter(Boolean));

@@ -1,5 +1,5 @@
 import {
-  List, TextField, NumberField, SearchInput, Edit, Create, TabbedForm,
+  List, TextField, NumberField, Edit, Create, TabbedForm,
   TextInput, SelectInput, DateInput, ArrayInput, SimpleFormIterator, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
@@ -7,9 +7,9 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
 import { IsniInput } from './IsniInput';
-import { CatalogDatagrid } from './shared';
+import { CatalogDatagrid, searchFilter } from './shared';
 
-const filters = [<SearchInput source="search@ilike" alwaysOn />];
+const filters = [searchFilter];
 
 const artistKinds = [
   { id: 'person', name: 'Person' },

@@ -189,13 +189,18 @@ Owners invite their own staff from Settings, Users. The invite email links to a
 page where the person picks a password and joins with the role the owner chose.
 Email addresses are matched regardless of case, at sign-in and on invites.
 
-Every search box and picker ignores case and accents: corazon finds Corazón,
-and music finds Musician.
 Invites can be resent, which makes the old link stop working, or cancelled.
 Owners change a user's role or remove them; a removed user is signed out on
 their next request. An account always keeps at least one Owner.
 
 ## Interface
+
+Every search box and picker ignores case and accents and matches the start of
+each typed word, in any order: corazon finds Corazón, and smi cora finds
+Corazón by Ann Smith. Songs are found by title, alt titles, ISWC, writers,
+publishers and work numbers; recordings by title, version, ISRC, artists,
+songs, credits, master owners, keywords, sounds like and description; releases
+by title, UPC, catalog number, label, artists and their tracks.
 
 - Save and continue keeps you on the tab you were editing; Save and close
   returns to the list.
@@ -220,3 +225,4 @@ their next request. An account always keeps at least one Owner.
 | 2026-10-14 | Multitracks available flag on recordings, shown in the pitch comment (#1). |
 | 2026-10-14 | The site admin adds name-only list entries from the pickers. |
 | 2026-10-14 | Shared list names and sign-in emails are matched regardless of case; searches ignore case and accents (#21). |
+| 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases. |

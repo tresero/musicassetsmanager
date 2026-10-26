@@ -2,7 +2,6 @@ import { ReferenceInput, AutocompleteInput } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { useFormContext } from 'react-hook-form';
 import { QuickCreateContact, QuickCreateName, QuickCreateArtist } from './quickCreate';
-import { bySortName, byName } from './vocab';
 
 /*
  * Every place a person or company is chosen uses these, so they all search,
@@ -18,7 +17,6 @@ export const PersonInput = ({
   <ReferenceInput source={source} reference="contact" perPage={200}
                   sort={{ field: 'sort_name', order: 'ASC' }}>
     <AutocompleteInput optionText="sort_name" label={label}
-                       filterToQuery={bySortName}
                        create={<QuickCreateContact />}
                        createLabel="Type to search or add a person"
                        helperText={helperText} sx={width(w)} {...rest} />
@@ -31,7 +29,6 @@ export const CompanyInput = ({
   <ReferenceInput source={source} reference="organization" perPage={200}
                   sort={{ field: 'name', order: 'ASC' }}>
     <AutocompleteInput optionText="name" label={label}
-                       filterToQuery={byName}
                        create={<QuickCreateName resource="organization" />}
                        createLabel="Type to search or add a company"
                        helperText={helperText} sx={width(w)} {...rest} />
@@ -44,7 +41,6 @@ export const ArtistInput = ({
   <ReferenceInput source={source} reference="artist" perPage={200}
                   sort={{ field: 'sort_name', order: 'ASC' }}>
     <AutocompleteInput optionText="name" label={label}
-                       filterToQuery={byName}
                        create={<QuickCreateArtist />}
                        createLabel="Type to search or add an artist"
                        helperText={helperText} sx={width(w)} {...rest} />

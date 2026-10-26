@@ -3,7 +3,6 @@ import {
 } from 'react-admin';
 import { useFormState } from 'react-hook-form';
 import { Box, Stack, Typography } from '@mui/material';
-import { byName } from '../../vocab';
 
 // Computed by the database from the controlled writer and publisher
 // shares, so it reflects the last save rather than unsaved edits.
@@ -30,7 +29,7 @@ const DetailsFields = () => (
       <ReferenceInput source="language_code" reference="language" perPage={300}
                       sort={{ field: 'name', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Language"
-                           filterToQuery={byName} helperText={false}
+                           helperText={false}
                            sx={{ width: { xs: '100%', md: 240 } }} />
       </ReferenceInput>
     </Box>

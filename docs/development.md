@@ -112,7 +112,7 @@ Deploy is `npm run build` then a hard reload. There's no server process.
 | RLS returns everything | View missing `security_invoker`, or no `FORCE ROW LEVEL SECURITY` |
 | `cannot change name of view column` | `CREATE OR REPLACE` can't reshape. Drop first, and remember that takes the INSTEAD OF triggers with it. |
 | `null value in column "account_id"` | Running SQL without a JWT. Use `SET LOCAL "request.jwt.claims"` inside the transaction. |
-| Autocomplete filter matches nothing | PostgREST `ilike` needs explicit wildcards: `*term*` |
+| Search box or picker matches nothing | Send React Admin's `q` filter (the default); `dataProvider.js` turns it into `search=fts(fold)`. A custom `filterToQuery` or `search@ilike` bypasses it. |
 | Generated column write error | Strip it in the `transform` prop |
 | Logged out on any 403 | The auth provider should only clear the token on 401 |
 
