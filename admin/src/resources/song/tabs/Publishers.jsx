@@ -3,14 +3,16 @@ import {
   SelectInput, ReferenceInput,
   required,
 } from 'react-admin';
-import { CompanyInput } from '../../partyInputs';
+import { PersonOrCompanyInput } from '../../partyInputs';
 import { ForWriterInput } from '../../ForWriterInput';
 import { PublisherProField } from '../../PublisherProField';
 
 const PublishersFields = () => (
-  <ArrayInput source="publishers" label={false}>
+  <ArrayInput source="publishers" label={false}
+              helperText="A company, or a person who holds their own publishing.">
     <SimpleFormIterator inline>
-      <CompanyInput label="Publisher" validate={required()} />
+      <PersonOrCompanyInput companyFirst companyLabel="Publisher" personLabel="or Person"
+                            required />
       <PublisherProField />
       <ReferenceInput source="role_id" reference="role" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>

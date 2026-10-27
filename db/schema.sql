@@ -3020,16 +3020,24 @@ writer shares when there is no publisher. A public domain work is one stop.';
 CREATE TABLE music.song_publisher (
     id integer NOT NULL,
     song_id integer NOT NULL,
-    organization_id integer NOT NULL,
+    organization_id integer,
     role_id integer NOT NULL,
     share numeric(7,4) DEFAULT 0 NOT NULL,
     controlled boolean DEFAULT false NOT NULL,
     for_writer_id integer,
     notes text,
+    contact_id integer,
+    CONSTRAINT song_publisher_party CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
     CONSTRAINT song_publisher_share CHECK (((share >= (0)::numeric) AND (share <= (100)::numeric)))
 );
 
 ALTER TABLE ONLY music.song_publisher FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN song_publisher.contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song_publisher.contact_id IS 'A person who holds their own publishing, in place of a company. Exactly one of contact_id and organization_id is set.';
 
 --
 -- Name: song_registration; Type: TABLE; Schema: music; Owner: -
@@ -3109,7 +3117,7 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
     COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', w.id, 'contact_id', w.contact_id, 'role_id', w.role_id, 'pro_code', w.pro_code, 'share', w.share, 'controlled', w.controlled, 'notes', w.notes) ORDER BY w.id) AS jsonb_agg
            FROM music.song_writer w
           WHERE (w.song_id = s.id)), '[]'::jsonb) AS writers,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'organization_id', p.organization_id, 'role_id', p.role_id, 'share', p.share, 'controlled', p.controlled, 'for_writer_id', p.for_writer_id, 'notes', p.notes) ORDER BY p.id) AS jsonb_agg
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', p.id, 'contact_id', p.contact_id, 'organization_id', p.organization_id, 'role_id', p.role_id, 'share', p.share, 'controlled', p.controlled, 'for_writer_id', p.for_writer_id, 'notes', p.notes) ORDER BY p.id) AS jsonb_agg
            FROM music.song_publisher p
           WHERE (p.song_id = s.id)), '[]'::jsonb) AS publishers,
     music.documents_of('song_document'::text, 'song_id'::text, id) AS documents,
@@ -3127,9 +3135,10 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
            FROM (music.song_writer w
              JOIN music.contact c ON ((c.id = w.contact_id)))
           WHERE (w.song_id = s.id)) AS writer_names,
-    ( SELECT string_agg(o.name, ', '::text ORDER BY p.share DESC NULLS LAST, p.id) AS string_agg
-           FROM (music.song_publisher p
-             JOIN music.organization o ON ((o.id = p.organization_id)))
+    ( SELECT string_agg(COALESCE(o.name, c.display_name), ', '::text ORDER BY p.share DESC NULLS LAST, p.id) AS string_agg
+           FROM ((music.song_publisher p
+             LEFT JOIN music.organization o ON ((o.id = p.organization_id)))
+             LEFT JOIN music.contact c ON ((c.id = p.contact_id)))
           WHERE (p.song_id = s.id)) AS publisher_names,
     ( SELECT l.name
            FROM music.language l
@@ -3346,7 +3355,8 @@ BEGIN
                         FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
                        WHERE x->>'id' IS NOT NULL);
   UPDATE music.song_publisher p
-     SET organization_id = (x->>'organization_id')::integer,
+     SET contact_id = (x->>'contact_id')::integer,
+         organization_id = (x->>'organization_id')::integer,
          role_id = (x->>'role_id')::integer,
          share = coalesce((x->>'share')::numeric, 0),
          controlled = coalesce((x->>'controlled')::boolean, false),
@@ -3354,15 +3364,17 @@ BEGIN
          notes = nullif(x->>'notes','')
     FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
    WHERE p.id = (x->>'id')::integer AND p.song_id = _id;
-  INSERT INTO music.song_publisher (song_id, organization_id, role_id,
+  INSERT INTO music.song_publisher (song_id, contact_id, organization_id, role_id,
                                     share, controlled, for_writer_id, notes)
-  SELECT _id, (x->>'organization_id')::integer, (x->>'role_id')::integer,
+  SELECT _id, (x->>'contact_id')::integer, (x->>'organization_id')::integer,
+         (x->>'role_id')::integer,
          coalesce((x->>'share')::numeric, 0),
          coalesce((x->>'controlled')::boolean, false),
          nullif(x->>'for_writer_id','')::integer,
          nullif(x->>'notes','')
     FROM jsonb_array_elements(coalesce(NEW.publishers,'[]')) x
-   WHERE x->>'id' IS NULL AND x->>'organization_id' IS NOT NULL
+   WHERE x->>'id' IS NULL
+     AND (x->>'contact_id' IS NOT NULL OR x->>'organization_id' IS NOT NULL)
      AND x->>'role_id' IS NOT NULL;
 
   PERFORM music.sync_documents('song_document', 'song_id', _id, NEW.documents);
@@ -5691,7 +5703,7 @@ ALTER TABLE ONLY music.song_publisher
 --
 
 ALTER TABLE ONLY music.song_publisher
-    ADD CONSTRAINT song_publisher_unique UNIQUE NULLS NOT DISTINCT (song_id, organization_id, role_id, for_writer_id);
+    ADD CONSTRAINT song_publisher_unique UNIQUE NULLS NOT DISTINCT (song_id, contact_id, organization_id, role_id, for_writer_id);
 
 --
 -- Name: song_registration song_reg_unique; Type: CONSTRAINT; Schema: music; Owner: -
@@ -6261,6 +6273,12 @@ CREATE INDEX song_language_code_idx ON music.song USING btree (language_code);
 --
 
 CREATE INDEX song_lower_idx ON music.song USING btree (lower(title));
+
+--
+-- Name: song_publisher_contact_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX song_publisher_contact_id_idx ON music.song_publisher USING btree (contact_id);
 
 --
 -- Name: song_publisher_for_writer_id_idx; Type: INDEX; Schema: music; Owner: -
@@ -7522,6 +7540,13 @@ ALTER TABLE ONLY music.song
     ADD CONSTRAINT song_language_code_fkey FOREIGN KEY (language_code) REFERENCES music.language(code) ON UPDATE CASCADE;
 
 --
+-- Name: song_publisher song_publisher_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.song_publisher
+    ADD CONSTRAINT song_publisher_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES music.contact(id);
+
+--
 -- Name: song_publisher song_publisher_for_writer_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -8255,7 +8280,7 @@ ALTER TABLE music.song_publisher ENABLE ROW LEVEL SECURITY;
 -- Name: song_publisher song_publisher_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY song_publisher_account ON music.song_publisher USING (music.own_song(song_id)) WITH CHECK ((music.own_song(song_id) AND ((organization_id IS NULL) OR music.own_organization(organization_id)) AND ((for_writer_id IS NULL) OR music.own_song_writer(for_writer_id))));
+CREATE POLICY song_publisher_account ON music.song_publisher USING (music.own_song(song_id)) WITH CHECK ((music.own_song(song_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id)) AND ((for_writer_id IS NULL) OR music.own_song_writer(for_writer_id))));
 
 --
 -- Name: POLICY song_publisher_account ON song_publisher; Type: COMMENT; Schema: music; Owner: -

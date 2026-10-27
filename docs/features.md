@@ -17,10 +17,11 @@ says so, or names the first thing in the way.
 writer's society is recorded on the credit and defaults from the person's own
 record, so a back-catalog work registered with a former PRO stays correct.
 
-**Publishers** carry a share, whether you control it, and which writer's share
-they administer. The publisher's society shows alongside it, read from the
-company record. One company can administer several writers' shares of the same
-work, one row per writer.
+**Publishers** are a company, or a person who holds their own publishing. Each
+carries a share, whether you control it, and which writer's share it
+administers. The publisher's society shows alongside it, read from the company
+or person record. One publisher can administer several writers' shares of the
+same work, one row per writer.
 
 **Registrations** record each society a work is registered with, its work
 number there, and the date.
@@ -233,3 +234,4 @@ it shows: names by name and lengths by time.
 | 2026-10-14 | Shared list names and sign-in emails are matched regardless of case; searches ignore case and accents (#21). |
 | 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases; those lists have chosen, sortable columns (#47). |
 | 2026-10-27 | Company names are unique per account, regardless of case (#8). |
+| 2026-10-27 | A song's publisher can be a person who holds their own publishing (#4). |

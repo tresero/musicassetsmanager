@@ -219,9 +219,10 @@ which row to fix.
 
 ## A publisher appears once per writer
 
-The same company can administer several writers' shares of one work, so a
+The same publisher can administer several writers' shares of one work, so a
 publisher row is unique per song, publisher, role, and writer rather than per
-song and publisher.
+song and publisher. A publisher is a company or, for a writer who holds their
+own publishing, a person.
 
 ## The pitch comment is generated
 
@@ -288,3 +289,4 @@ thing this project exists to avoid.
 |---|---|
 | 2026-09-30 | Control as authority by agreement; one stop computed for songs and recordings; publisher per writer; generated pitch comment. |
 | 2026-10-14 | Language on the recording, defaulting from the composition (#3). |
+| 2026-10-27 | A song's publisher can be a person (#4). |
