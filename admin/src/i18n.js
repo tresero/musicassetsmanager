@@ -37,6 +37,7 @@ const messages = {
     schema_type:       { name: 'Schema type |||| Schema types' },
     account_storage:   { name: 'Storage setting |||| Storage settings' },
     pitch_setting:     { name: 'Pitch setting |||| Pitch settings' },
+    user_preference:   { name: 'My settings |||| My settings' },
     account_user:      { name: 'User |||| Users' },
     account_role:      { name: 'Account role |||| Account roles' },
     account_invite:    { name: 'Invite |||| Invites' },

@@ -28,6 +28,7 @@ import keySignature from './resources/keySignature';
 import genre from './resources/genre';
 import language from './resources/language';
 import pitchSetting from './resources/pitchSetting';
+import userPreference from './resources/userPreference';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
 import vocabulary from './resources/vocabulary';
@@ -101,6 +102,7 @@ export default function App() {
       <Resource name="schema_type" {...schemaType} />
       <Resource name="account_storage" {...settings(accountStorage)} />
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
+      <Resource name="user_preference" {...userPreference} />
       <Resource name="document_orphan" {...documentOrphan} />
       <Resource name="account_user" {...accountUser} />
       <Resource name="account_invite" {...accountInvite} />

@@ -75,7 +75,8 @@ export const AppMenu = () => {
         <Menu.ResourceItem name="schema_type" />
       </Folded>}
 
-      {(canSettings || canUsers) && <Heading>Settings</Heading>}
+      <Heading>Settings</Heading>
+      <Menu.ResourceItem name="user_preference" />
       {canSettings && <Menu.ResourceItem name="account_storage" />}
       {canSettings && <Menu.ResourceItem name="pitch_setting" />}
       {canUsers && <Menu.ResourceItem name="account_user" />}

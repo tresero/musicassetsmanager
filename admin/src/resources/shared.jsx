@@ -2,9 +2,9 @@ import { useState } from 'react';
 import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
-  useChoicesContext,
+  ReferenceInput, useChoicesContext, ChoicesContextProvider,
 } from 'react-admin';
-import { useCan, useIsSiteAdmin } from '../permissions';
+import { useCan, useIsSiteAdmin, useDefaultCountry } from '../permissions';
 import { QuickCreateName } from './quickCreate';
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
@@ -57,6 +57,39 @@ export const SharedListPicker = ({ multiple = false, onInputChange, ...props }) 
                   onInputChange?.(e, value, reason);
                 }}
                 {...props} />;
+};
+
+// Lists the choices whose `by` field is in pin first, in pin's order, ahead of
+// the rest in their usual order. Goes between a ReferenceInput and its picker;
+// typed searches still go to the database.
+export const PinFirst = ({ pin, by = 'id', children }) => {
+  const context = useChoicesContext();
+  const rank = (c) => {
+    const i = pin.indexOf(c[by]);
+    return i < 0 ? pin.length : i;
+  };
+  const order = (list) => list && [...list].sort((a, b) => rank(a) - rank(b));
+  const value = {
+    ...context,
+    allChoices: order(context.allChoices),
+    availableChoices: order(context.availableChoices),
+  };
+  return <ChoicesContextProvider value={value}>{children}</ChoicesContextProvider>;
+};
+
+// A country picker with the user's default country (My settings) first. With
+// prefill, a new record starts on it; a saved record left blank stays blank.
+export const CountryInput = ({ source, label = 'Country', helperText, prefill = false, sx }) => {
+  const country = useDefaultCountry();
+  return (
+    <ReferenceInput source={source} reference="country" perPage={500}
+                    sort={{ field: 'name', order: 'ASC' }}>
+      <PinFirst pin={[country]}>
+        <AutocompleteInput optionText="name" label={label} helperText={helperText}
+                           defaultValue={prefill ? country : undefined} sx={sx} />
+      </PinFirst>
+    </ReferenceInput>
+  );
 };
 
 // A list of whole records. Bulk delete shows only for roles that may delete.

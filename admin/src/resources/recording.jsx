@@ -15,7 +15,7 @@ import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText } from './vocab';
-import { CatalogDataTable, SharedListPicker, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, CountryInput, searchFilter } from './shared';
 import { ListActions } from './listActions';
 
 const filters = [
@@ -263,18 +263,12 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Master">
       <OneStopStatus />
-      <ReferenceInput source="recorded_country" reference="country" perPage={500}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Country of recording"
-                           helperText="Where it was mainly recorded. For a record tracked in more than one country, pick the main one."
-                           sx={{ width: { xs: '100%', md: 340 } }} />
-      </ReferenceInput>
-      <ReferenceInput source="commissioned_country" reference="country" perPage={500}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Country of commissioning"
-                           helperText="Where the original owner of the master was based when it was made: the label's country, or yours if self-released, wherever the tracks were cut. Societies such as PPL use this and the country of recording to decide eligibility for performance income."
-                           sx={{ width: { xs: '100%', md: 340 } }} />
-      </ReferenceInput>
+      <CountryInput source="recorded_country" label="Country of recording" prefill
+                    helperText="Where it was mainly recorded. For a record tracked in more than one country, pick the main one."
+                    sx={{ width: { xs: '100%', md: 340 } }} />
+      <CountryInput source="commissioned_country" label="Country of commissioning" prefill
+                    helperText="Where the original owner of the master was based when it was made: the label's country, or yours if self-released, wherever the tracks were cut. Societies such as PPL use this and the country of recording to decide eligibility for performance income."
+                    sx={{ width: { xs: '100%', md: 340 } }} />
       <NumberInput source="p_line_year" label="℗ year"
                    sx={{ width: { xs: '100%', md: 150 } }} />
 

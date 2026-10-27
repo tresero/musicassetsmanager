@@ -21,3 +21,6 @@ export const can = (permissions, code) =>
 export const useCan = (code) => can(usePermissions().permissions, code);
 
 export const useIsSiteAdmin = () => !!usePermissions().permissions?.site_admin;
+
+// The user's default country from My settings, United States when unset.
+export const useDefaultCountry = () => usePermissions().permissions?.country ?? 'US';

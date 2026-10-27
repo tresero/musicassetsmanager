@@ -7,7 +7,7 @@ import { EditToolbar } from './formToolbar';
 import { DocumentsInput } from './documentsTab';
 import { IsniInput } from './IsniInput';
 import { byCode, proOptionText, proInputText } from './vocab';
-import { CatalogDatagrid, searchFilter } from './shared';
+import { CatalogDatagrid, CountryInput, searchFilter } from './shared';
 
 const filters = [searchFilter];
 
@@ -43,11 +43,7 @@ const OrgForm = () => (
                  sx={{ width: { xs: '100%', md: 240 } }} />
       <IsniInput source="isni" label="ISNI"
                  sx={{ width: { xs: '100%', md: 260 } }} />
-      <ReferenceInput source="country" reference="country" perPage={500}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Country"
-                           sx={{ width: { xs: '100%', md: 300 } }} />
-      </ReferenceInput>
+      <CountryInput source="country" sx={{ width: { xs: '100%', md: 300 } }} />
       <RichTextInput source="notes" />
     </TabbedForm.Tab>
 

@@ -642,9 +642,11 @@ CREATE FUNCTION api.me() RETURNS json
       SELECT json_agg(p.code ORDER BY p.code)
         FROM music.account_role_permission rp
         JOIN music.permission p ON p.id = rp.permission_id
-       WHERE rp.role_id = u.role_id), '[]'::json))
+       WHERE rp.role_id = u.role_id), '[]'::json),
+    'country', coalesce(up.country_code::text, 'US'))
     FROM music.user_account u
     JOIN music.account_role r ON r.id = u.role_id
+    LEFT JOIN music.user_preference up ON up.user_id = u.id
    WHERE u.id = music.current_app_user()
      AND u.account_id = music.current_account()
 $$;
@@ -653,7 +655,7 @@ $$;
 -- Name: FUNCTION me(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do.';
+COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do, and their default country (United States unless set in music.user_preference).';
 
 --
 -- Name: organization_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -4753,6 +4755,33 @@ CREATE VIEW api.song_unregistered WITH (security_invoker='true') AS
   WHERE (public_domain_p = false);
 
 --
+-- Name: user_preference; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_preference (
+    user_id uuid DEFAULT music.current_app_user() NOT NULL,
+    country_code music.iso_3166_alpha2
+);
+
+ALTER TABLE ONLY music.user_preference FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE user_preference; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.user_preference IS 'Each user''s own defaults, one row per user. country_code is listed first in every country picker and fills the countries of a new recording; United States when unset. Users edit their own row whatever their role, so it has no permission trigger.';
+
+--
+-- Name: user_preference; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.user_preference WITH (security_invoker='true') AS
+ SELECT user_id AS id,
+    country_code
+   FROM music.user_preference
+  WHERE (user_id = music.current_app_user());
+
+--
 -- Name: vocabulary; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -5760,6 +5789,13 @@ ALTER TABLE ONLY music.user_invite
 
 ALTER TABLE ONLY music.user_invite
     ADD CONSTRAINT user_invite_token_hash_key UNIQUE (token_hash);
+
+--
+-- Name: user_preference user_preference_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_preference
+    ADD CONSTRAINT user_preference_pkey PRIMARY KEY (user_id);
 
 --
 -- Name: vocabulary vocabulary_base_uri_key; Type: CONSTRAINT; Schema: music; Owner: -
@@ -7659,6 +7695,20 @@ ALTER TABLE ONLY music.user_invite
     ADD CONSTRAINT user_invite_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id);
 
 --
+-- Name: user_preference user_preference_country_code_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_preference
+    ADD CONSTRAINT user_preference_country_code_fkey FOREIGN KEY (country_code) REFERENCES music.country(code) ON UPDATE CASCADE;
+
+--
+-- Name: user_preference user_preference_user_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_preference
+    ADD CONSTRAINT user_preference_user_id_fkey FOREIGN KEY (user_id) REFERENCES music.user_account(id) ON DELETE CASCADE;
+
+--
 -- Name: account; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -8389,6 +8439,24 @@ CREATE POLICY user_invite_account ON music.user_invite USING ((account_id = ( SE
 --
 
 COMMENT ON POLICY user_invite_account ON music.user_invite IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: user_preference; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.user_preference ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_preference user_preference_own; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_preference_own ON music.user_preference USING ((user_id = ( SELECT music.current_app_user() AS current_app_user))) WITH CHECK ((user_id = ( SELECT music.current_app_user() AS current_app_user)));
+
+--
+-- Name: POLICY user_preference_own ON user_preference; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY user_preference_own ON music.user_preference IS 'Each user sees and writes only their own row.';
 
 --
 -- Name: SCHEMA api; Type: ACL; Schema: -; Owner: -
@@ -9397,6 +9465,18 @@ GRANT SELECT ON TABLE api.song_split_check TO app_user;
 --
 
 GRANT SELECT ON TABLE api.song_unregistered TO app_user;
+
+--
+-- Name: TABLE user_preference; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE music.user_preference TO app_user;
+
+--
+-- Name: TABLE user_preference; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE api.user_preference TO app_user;
 
 --
 -- Name: TABLE vocabulary; Type: ACL; Schema: api; Owner: -

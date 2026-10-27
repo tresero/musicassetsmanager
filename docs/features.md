@@ -21,7 +21,8 @@ record, so a back-catalog work registered with a former PRO stays correct.
 carries a share, whether you control it, and which writer's share it
 administers. The publisher's society shows alongside it, read from the company
 or person record. One publisher can administer several writers' shares of the
-same work, one row per writer.
+same work, one row per writer. Publisher and Sub-Publisher head the role list,
+and a new row starts on Publisher.
 
 **Registrations** record each society a work is registered with, its work
 number there, and the date.
@@ -168,6 +169,10 @@ on.
 
 ## Settings
 
+**My settings** belong to each user, whatever their role: the default country,
+listed first in every country picker and filled in on a new recording's country
+of recording and of commissioning. It is United States until set.
+
 **Pitch settings** holds the default pitch contact, used by any recording that
 has no contact of its own. A new person can be added from the picker.
 Storage and pitch settings belong to the account. The Recordings list can be filtered to recordings
@@ -235,3 +240,4 @@ it shows: names by name and lengths by time.
 | 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases; those lists have chosen, sortable columns (#47). |
 | 2026-10-27 | Company names are unique per account, regardless of case (#8). |
 | 2026-10-27 | A song's publisher can be a person who holds their own publishing (#4). |
+| 2026-10-27 | My settings with a per-user default country; publisher roles listed first (#2). |
