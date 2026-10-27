@@ -1,3 +1,5 @@
+import { useGetList } from 'react-admin';
+
 const list = (...v) => v.map((x) => ({ id: x, name: x }));
 
 export const versionLabels = list(
@@ -39,3 +41,13 @@ export const byCode = (q) => ({ 'code@ilike': `*${q}*` });
 
 export const proOptionText = (r) => (r ? `${r.code} — ${r.name}` : '');
 export const proInputText  = (r) => (r ? r.code : '');
+
+// The id of the role with this DDEX code, for a new row's default role.
+// Undefined until it loads.
+export const useRoleId = (ddexCode) => {
+  const { data } = useGetList('role', {
+    filter: { ddex_code: ddexCode },
+    pagination: { page: 1, perPage: 1 },
+  });
+  return data?.[0]?.id;
+};

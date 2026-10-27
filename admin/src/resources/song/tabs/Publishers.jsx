@@ -1,22 +1,20 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
-  SelectInput, ReferenceInput, useGetList,
+  SelectInput, ReferenceInput,
   required,
 } from 'react-admin';
 import { PersonOrCompanyInput } from '../../partyInputs';
 import { ForWriterInput } from '../../ForWriterInput';
 import { PublisherProField } from '../../PublisherProField';
 import { PinFirst } from '../../shared';
+import { useRoleId } from '../../vocab';
 
 // Publisher and Sub-Publisher head the role list, found by DDEX code so the
 // site admin can rename them. A new row starts on Publisher.
 const publisherRoles = ['MusicPublisher', 'SubPublisher'];
 
 const PublishersFields = () => {
-  const { data: roles } = useGetList('role', {
-    filter: { ddex_code: publisherRoles[0] },
-    pagination: { page: 1, perPage: 1 },
-  });
+  const publisher = useRoleId(publisherRoles[0]);
   return (
     <ArrayInput source="publishers" label={false}
                 helperText="A company, or a person who holds their own publishing.">
@@ -26,7 +24,7 @@ const PublishersFields = () => {
         <PublisherProField />
         <ReferenceInput source="role_id" reference="role" perPage={50}
                         sort={{ field: 'name', order: 'ASC' }}
-                        defaultValue={roles?.[0]?.id}>
+                        defaultValue={publisher}>
           <PinFirst pin={publisherRoles} by="ddex_code">
             <SelectInput optionText="name" label="Role" helperText={false} validate={required()}
                          sx={{ width: 150 }} />

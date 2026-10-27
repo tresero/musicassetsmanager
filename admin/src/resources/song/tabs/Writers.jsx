@@ -6,7 +6,8 @@ import {
 import { useSourceContext } from 'ra-core';
 import { useFormContext } from 'react-hook-form';
 import { PersonInput } from '../../partyInputs';
-import { byCode, proOptionText, proInputText } from '../../vocab';
+import { byCode, proOptionText, proInputText, useRoleId } from '../../vocab';
+import { PinFirst } from '../../shared';
 
 const iteratorSx = {
   '& .RaSimpleFormIterator-line': {
@@ -39,37 +40,47 @@ const WriterInput = () => {
   return <PersonInput label="Writer" onChange={fillPro} validate={required()} />;
 };
 
-const WritersFields = () => (
-  <ArrayInput source="writers" label={false}>
-    <SimpleFormIterator inline sx={iteratorSx}>
-      <WriterInput />
+// The writing roles, found by DDEX code so the site admin can rename them,
+// listed in this order. A new row starts on Composer Lyricist.
+const writerRoles = ['Composer', 'ComposerAndOrLyricist', 'ComposerLyricist', 'Lyricist', 'Arranger'];
+const writerRoleFilter = { 'ddex_code@in': `(${writerRoles.join(',')})` };
 
-      <ReferenceInput source="role_id" reference="role" perPage={50}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <SelectInput optionText="name" label="Role" helperText={false} validate={required()}
-                     sx={{ width: { xs: '100%', md: 150 } }} />
-      </ReferenceInput>
+const WritersFields = () => {
+  const composerLyricist = useRoleId('ComposerLyricist');
+  return (
+    <ArrayInput source="writers" label={false}>
+      <SimpleFormIterator inline sx={iteratorSx}>
+        <WriterInput />
 
-      <ReferenceInput source="pro_code" reference="pro" perPage={500}
-                      sort={{ field: 'code', order: 'ASC' }}>
-        <AutocompleteInput label="PRO"
-                           optionText={proOptionText}
-                           inputText={proInputText}
-                           filterToQuery={byCode}
-                           helperText={false}
-                           sx={{ width: { xs: '100%', md: 170 } }} />
-      </ReferenceInput>
+        <ReferenceInput source="role_id" reference="role" filter={writerRoleFilter}
+                        defaultValue={composerLyricist}>
+          <PinFirst pin={writerRoles} by="ddex_code">
+            <SelectInput optionText="name" label="Role" helperText={false} validate={required()}
+                         sx={{ width: { xs: '100%', md: 150 } }} />
+          </PinFirst>
+        </ReferenceInput>
 
-      <NumberInput source="share" label="Share %" step={0.0001}
-                   helperText={false}
-                   sx={{ width: { xs: '100%', md: 110 } }} />
+        <ReferenceInput source="pro_code" reference="pro" perPage={500}
+                        sort={{ field: 'code', order: 'ASC' }}>
+          <AutocompleteInput label="PRO"
+                             optionText={proOptionText}
+                             inputText={proInputText}
+                             filterToQuery={byCode}
+                             helperText={false}
+                             sx={{ width: { xs: '100%', md: 170 } }} />
+        </ReferenceInput>
 
-      <BooleanInput source="controlled" label="Controlled" helperText={false} />
+        <NumberInput source="share" label="Share %" step={0.0001}
+                     helperText={false}
+                     sx={{ width: { xs: '100%', md: 110 } }} />
 
-      <TextInput source="notes" label="Note" helperText={false}
-                 sx={{ width: { xs: '100%', md: 220 } }} />
-    </SimpleFormIterator>
-  </ArrayInput>
-);
+        <BooleanInput source="controlled" label="Controlled" helperText={false} />
+
+        <TextInput source="notes" label="Note" helperText={false}
+                   sx={{ width: { xs: '100%', md: 220 } }} />
+      </SimpleFormIterator>
+    </ArrayInput>
+  );
+};
 
 export default WritersFields;

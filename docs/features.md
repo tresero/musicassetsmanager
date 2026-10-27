@@ -15,7 +15,9 @@ says so, or names the first thing in the way.
 
 **Writers** carry a role, a share, and whether you control that share. Each
 writer's society is recorded on the credit and defaults from the person's own
-record, so a back-catalog work registered with a former PRO stays correct.
+record, so a back-catalog work registered with a former PRO stays correct. The role
+list offers only the writing roles: Composer, Composer And/Or Lyricist,
+Composer Lyricist, Lyricist and Arranger. A new row starts on Composer Lyricist.
 
 **Publishers** are a company, or a person who holds their own publishing. Each
 carries a share, whether you control it, and which writer's share it
@@ -241,3 +243,4 @@ it shows: names by name and lengths by time.
 | 2026-10-27 | Company names are unique per account, regardless of case (#8). |
 | 2026-10-27 | A song's publisher can be a person who holds their own publishing (#4). |
 | 2026-10-27 | My settings with a per-user default country; publisher roles listed first (#2). |
+| 2026-10-27 | The writer role list offers only the writing roles and starts on Composer Lyricist (#50). |
