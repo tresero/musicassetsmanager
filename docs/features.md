@@ -202,6 +202,10 @@ publishers and work numbers; recordings by title, version, ISRC, artists,
 songs, credits, master owners, keywords, sounds like and description; releases
 by title, UPC, catalog number, label, artists and their tracks.
 
+The song, recording and release lists have a Columns button to show, hide and
+reorder columns; the choice is kept in the browser. Every column sorts by what
+it shows: names by name and lengths by time.
+
 - Save and continue keeps you on the tab you were editing; Save and close
   returns to the list.
 - Delete names what it deletes.
@@ -225,4 +229,4 @@ by title, UPC, catalog number, label, artists and their tracks.
 | 2026-10-14 | Multitracks available flag on recordings, shown in the pitch comment (#1). |
 | 2026-10-14 | The site admin adds name-only list entries from the pickers. |
 | 2026-10-14 | Shared list names and sign-in emails are matched regardless of case; searches ignore case and accents (#21). |
-| 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases. |
+| 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases; those lists have chosen, sortable columns (#47). |

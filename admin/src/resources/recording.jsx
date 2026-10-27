@@ -1,5 +1,5 @@
 import {
-  List, TextField, NumberField, BooleanField, ReferenceField, Edit, Create,
+  List, DataTable, TextField, BooleanField, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
@@ -15,7 +15,8 @@ import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText } from './vocab';
-import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, searchFilter } from './shared';
+import { ListActions } from './listActions';
 
 const filters = [
   searchFilter,
@@ -76,22 +77,45 @@ const iteratorSx = {
   },
 };
 
+const hiddenColumns = [
+  'song_titles', 'bpm', 'tempo', 'key_signature', 'language_name',
+  'is_instrumental', 'is_cover', 'multitracks_available', 'parental_warning',
+  'easy_clear', 'pitch_contact_used', 'p_line', 'owner_total',
+  'recorded_country', 'copyright_number', 'copyright_date', 'reversion_date',
+  'created_at', 'updated_at',
+];
+
 const RecordingList = () => (
-  <List filters={filters} sort={{ field: 'title', order: 'ASC' }} perPage={50}>
-    <CatalogDatagrid rowClick="edit">
-      <TextField source="title" />
-      <TextField source="version_label" label="Version" emptyText="—" />
-      <TextField source="isrc" label="ISRC" emptyText="—" />
-      <TextField source="duration_display" label="Length" emptyText="—" />
-      <NumberField source="bpm" label="BPM" emptyText="—" />
-      <BooleanField source="is_instrumental" label="Instr." />
-      <BooleanField source="is_cover" label="Cover" />
-      <BooleanField source="one_stop" label="One stop" />
-      <BooleanField source="easy_clear" label="Easy clear" />
-      <BooleanField source="has_pitch_contact" label="Contact" />
-      <ReferenceField source="status_id" reference="asset_status"
-                      label="Status" emptyText="—" />
-    </CatalogDatagrid>
+  <List filters={filters} actions={<ListActions />}
+        sort={{ field: 'title', order: 'ASC' }} perPage={50}>
+    <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
+      <DataTable.Col source="title" />
+      <DataTable.Col source="version_label" label="Version" />
+      <DataTable.Col source="artist_names" label="Artist" />
+      <DataTable.Col source="song_titles" label="Composition" />
+      <DataTable.Col source="isrc" label="ISRC" />
+      <DataTable.Col source="duration_ms" label="Length" render={(r) => r.duration_display} />
+      <DataTable.NumberCol source="bpm" label="BPM" />
+      <DataTable.Col source="tempo" />
+      <DataTable.Col source="key_signature" label="Key" />
+      <DataTable.Col source="language_name" label="Language" />
+      <DataTable.Col source="is_instrumental" label="Instrumental" field={BooleanField} />
+      <DataTable.Col source="is_cover" label="Cover" field={BooleanField} />
+      <DataTable.Col source="multitracks_available" label="Multitracks" field={BooleanField} />
+      <DataTable.Col source="parental_warning" label="Parental warning" />
+      <DataTable.Col source="status_name" label="Status" />
+      <DataTable.Col source="one_stop" label="One stop" field={BooleanField} />
+      <DataTable.Col source="easy_clear" label="Easy clear" field={BooleanField} />
+      <DataTable.Col source="pitch_contact_used" label="Pitch contact" />
+      <DataTable.Col source="p_line" label="P line" />
+      <DataTable.NumberCol source="owner_total" label="Owner %" />
+      <DataTable.Col source="recorded_country" label="Recorded in" />
+      <DataTable.Col source="copyright_number" label="Copyright no." />
+      <DataTable.Col source="copyright_date" label="Copyright date" field={DateField} />
+      <DataTable.Col source="reversion_date" label="Reverts" field={DateField} />
+      <DataTable.Col source="created_at" label="Added" field={DateField} />
+      <DataTable.Col source="updated_at" label="Changed" field={DateField} />
+    </CatalogDataTable>
   </List>
 );
 
@@ -298,6 +322,7 @@ const RecordingForm = () => (
 const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_comment_auto,
                  pitch_contact_used, has_pitch_contact,
                  one_stop, one_stop_reason, language_used,
+                 artist_names, song_titles, status_name, language_name,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

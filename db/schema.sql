@@ -1905,6 +1905,28 @@ CREATE FUNCTION api.search(api.organization) RETURNS tsvector
 COMMENT ON FUNCTION api.search(api.organization) IS 'The name, for search=fts(fold).term:*.';
 
 --
+-- Name: artist_billing(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.artist_billing(p_recording_id integer, p_release_id integer) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT nullif(concat_ws(' feat. ',
+    string_agg(a.name, ', ' ORDER BY x.sequence, a.name) FILTER (WHERE x.role = 'main'),
+    string_agg(a.name, ', ' ORDER BY x.sequence, a.name) FILTER (WHERE x.role = 'featured')), '')
+  FROM (SELECT artist_id, role, sequence FROM music.recording_artist WHERE recording_id = p_recording_id
+        UNION ALL
+        SELECT artist_id, role, sequence FROM music.release_artist WHERE release_id = p_release_id) x
+  JOIN music.artist a ON a.id = x.artist_id
+$$;
+
+--
+-- Name: FUNCTION artist_billing(p_recording_id integer, p_release_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.artist_billing(p_recording_id integer, p_release_id integer) IS 'The artists of a recording or a release as billed: main artists, then feat. and the featured ones, each in sequence order.';
+
+--
 -- Name: recording_language(integer); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -2446,6 +2468,53 @@ CREATE TABLE music.recording_song (
 ALTER TABLE ONLY music.recording_song FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: song; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.song (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    title text NOT NULL,
+    iswc music.iswc,
+    lyrics text,
+    notes text,
+    public_domain_p boolean DEFAULT false NOT NULL,
+    derived_from_id integer,
+    derivation_type text,
+    copyright_date date,
+    copyright_number text,
+    reversion_date date,
+    reversion_lead smallint,
+    language_code music.iso_639_code,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    based_on text,
+    easy_clear boolean DEFAULT false NOT NULL,
+    CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
+    CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
+    CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
+    CONSTRAINT song_reversion_lead CHECK (((reversion_lead IS NULL) OR ((reversion_lead >= 0) AND (reversion_lead <= 20)))),
+    CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
+);
+
+ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.based_on IS 'Source work not in this catalog: a public domain tune, or something whose
+composition row does not exist here. Free text. Use derived_from_id instead
+when the source is a real row.';
+
+--
+-- Name: COLUMN song.easy_clear; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
+stop, which is computed from the controlled shares.';
+
+--
 -- Name: recording; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -2532,8 +2601,43 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     updated_at,
     language_code,
     music.recording_language(id) AS language_used,
-    multitracks_available
+    multitracks_available,
+    music.artist_billing(id, NULL::integer) AS artist_names,
+    ( SELECT string_agg(s.title, ', '::text ORDER BY s.title) AS string_agg
+           FROM (music.recording_song rs
+             JOIN music.song s ON ((s.id = rs.song_id)))
+          WHERE (rs.recording_id = r.id)) AS song_titles,
+    ( SELECT st.name
+           FROM music.asset_status st
+          WHERE (st.id = r.status_id)) AS status_name,
+    ( SELECT l.name
+           FROM music.language l
+          WHERE ((l.code)::text = (music.recording_language(r.id))::text)) AS language_name
    FROM music.recording r;
+
+--
+-- Name: COLUMN recording.artist_names; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.artist_names IS 'Artists as billed (music.artist_billing), for the list and its sort.';
+
+--
+-- Name: COLUMN recording.song_titles; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.song_titles IS 'Titles of the compositions recorded, for the list and its sort.';
+
+--
+-- Name: COLUMN recording.status_name; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.status_name IS 'The status by name, so the list sorts by name.';
+
+--
+-- Name: COLUMN recording.language_name; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.language_name IS 'The language used (language_used) by name, so the list sorts by name.';
 
 --
 -- Name: search(api.recording); Type: FUNCTION; Schema: api; Owner: -
@@ -2544,8 +2648,7 @@ CREATE FUNCTION api.search(api.recording) RETURNS tsvector
     AS $_$
   SELECT music.search_doc(
     $1.title, $1.version_label, $1.isrc, $1.keywords, $1.sounds_like, $1.description,
-    (SELECT string_agg(a.name, ' ') FROM music.recording_artist ra JOIN music.artist a ON a.id = ra.artist_id WHERE ra.recording_id = $1.id),
-    (SELECT string_agg(s.title, ' ') FROM music.recording_song rs JOIN music.song s ON s.id = rs.song_id WHERE rs.recording_id = $1.id),
+    $1.artist_names, $1.song_titles,
     (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ') FROM music.recording_credit c WHERE c.recording_id = $1.id),
     (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ') FROM music.recording_owner o WHERE o.recording_id = $1.id))
 $_$;
@@ -2828,8 +2931,43 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
              LEFT JOIN music.organization o ON ((o.id = r.c_line_organization_id)))
              LEFT JOIN music.contact c ON ((c.id = r.c_line_contact_id)))) AS c_line,
     created_at,
-    updated_at
+    updated_at,
+    music.artist_billing(NULL::integer, id) AS artist_names,
+    ( SELECT o.name
+           FROM music.organization o
+          WHERE (o.id = r.label_id)) AS label_name,
+    ( SELECT sum(rec.duration_ms) AS sum
+           FROM (music.release_track t
+             JOIN music.recording rec ON ((rec.id = t.recording_id)))
+          WHERE (t.release_id = r.id)) AS duration_ms,
+    ( SELECT g.name
+           FROM music.genre g
+          WHERE (g.id = r.primary_genre_id)) AS primary_genre_name
    FROM music.release r;
+
+--
+-- Name: COLUMN release.artist_names; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.release.artist_names IS 'Artists as billed (music.artist_billing), for the list and its sort.';
+
+--
+-- Name: COLUMN release.label_name; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.release.label_name IS 'The label by name, for the list and its sort.';
+
+--
+-- Name: COLUMN release.duration_ms; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.release.duration_ms IS 'Total length of the tracks in milliseconds, so Length sorts by time.';
+
+--
+-- Name: COLUMN release.primary_genre_name; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.release.primary_genre_name IS 'The primary genre by name, for the list and its sort.';
 
 --
 -- Name: search(api.release); Type: FUNCTION; Schema: api; Owner: -
@@ -2839,9 +2977,7 @@ CREATE FUNCTION api.search(api.release) RETURNS tsvector
     LANGUAGE sql STABLE
     AS $_$
   SELECT music.search_doc(
-    $1.title, $1.upc, $1.catalog_number,
-    music.party_name(NULL, $1.label_id),
-    (SELECT string_agg(a.name, ' ') FROM music.release_artist ra JOIN music.artist a ON a.id = ra.artist_id WHERE ra.release_id = $1.id),
+    $1.title, $1.upc, $1.catalog_number, $1.label_name, $1.artist_names,
     (SELECT string_agg(concat_ws(' ', r.title, r.version_label, r.isrc), ' ') FROM music.release_track t JOIN music.recording r ON r.id = t.recording_id WHERE t.release_id = $1.id))
 $_$;
 
@@ -2876,53 +3012,6 @@ $$;
 COMMENT ON FUNCTION music.song_one_stop_reason(p_song integer) IS 'Why a composition is not one stop, or NULL when it is: the publishing you
 control totals 100, counting controlled publisher shares, or controlled
 writer shares when there is no publisher. A public domain work is one stop.';
-
---
--- Name: song; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.song (
-    id integer NOT NULL,
-    account_id uuid DEFAULT music.current_account() NOT NULL,
-    title text NOT NULL,
-    iswc music.iswc,
-    lyrics text,
-    notes text,
-    public_domain_p boolean DEFAULT false NOT NULL,
-    derived_from_id integer,
-    derivation_type text,
-    copyright_date date,
-    copyright_number text,
-    reversion_date date,
-    reversion_lead smallint,
-    language_code music.iso_639_code,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    based_on text,
-    easy_clear boolean DEFAULT false NOT NULL,
-    CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
-    CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
-    CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
-    CONSTRAINT song_reversion_lead CHECK (((reversion_lead IS NULL) OR ((reversion_lead >= 0) AND (reversion_lead <= 20)))),
-    CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
-);
-
-ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.song.based_on IS 'Source work not in this catalog: a public domain tune, or something whose
-composition row does not exist here. Free text. Use derived_from_id instead
-when the source is a real row.';
-
---
--- Name: COLUMN song.easy_clear; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
-stop, which is computed from the controlled shares.';
 
 --
 -- Name: song_publisher; Type: TABLE; Schema: music; Owner: -
@@ -3033,8 +3122,37 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
     (music.song_one_stop_reason(id) IS NULL) AS one_stop,
     music.song_one_stop_reason(id) AS one_stop_reason,
     created_at,
-    updated_at
+    updated_at,
+    ( SELECT string_agg(c.display_name, ', '::text ORDER BY w.share DESC NULLS LAST, w.id) AS string_agg
+           FROM (music.song_writer w
+             JOIN music.contact c ON ((c.id = w.contact_id)))
+          WHERE (w.song_id = s.id)) AS writer_names,
+    ( SELECT string_agg(o.name, ', '::text ORDER BY p.share DESC NULLS LAST, p.id) AS string_agg
+           FROM (music.song_publisher p
+             JOIN music.organization o ON ((o.id = p.organization_id)))
+          WHERE (p.song_id = s.id)) AS publisher_names,
+    ( SELECT l.name
+           FROM music.language l
+          WHERE ((l.code)::text = (s.language_code)::text)) AS language_name
    FROM music.song s;
+
+--
+-- Name: COLUMN song.writer_names; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.song.writer_names IS 'Writers by share, for the list and its sort.';
+
+--
+-- Name: COLUMN song.publisher_names; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.song.publisher_names IS 'Publishers by share, for the list and its sort.';
+
+--
+-- Name: COLUMN song.language_name; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.song.language_name IS 'The language by name, so the list sorts by name.';
 
 --
 -- Name: search(api.song); Type: FUNCTION; Schema: api; Owner: -
@@ -3044,10 +3162,9 @@ CREATE FUNCTION api.search(api.song) RETURNS tsvector
     LANGUAGE sql STABLE
     AS $_$
   SELECT music.search_doc(
-    $1.title, $1.iswc,
+    $1.title, $1.iswc, $1.writer_names, $1.publisher_names,
     (SELECT string_agg(t.title, ' ') FROM music.song_title t WHERE t.song_id = $1.id),
-    (SELECT string_agg(music.party_name(w.contact_id, NULL), ' ') FROM music.song_writer w WHERE w.song_id = $1.id),
-    (SELECT string_agg(music.party_name(NULL, p.organization_id), ' ') FROM music.song_publisher p WHERE p.song_id = $1.id),
+    (SELECT string_agg(c.credit_name, ' ') FROM music.song_writer w JOIN music.contact c ON c.id = w.contact_id WHERE w.song_id = $1.id),
     (SELECT string_agg(r.work_number, ' ') FROM music.song_registration r WHERE r.song_id = $1.id))
 $_$;
 
@@ -8629,6 +8746,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.organization TO app_user;
 GRANT ALL ON FUNCTION api.search(api.organization) TO app_user;
 
 --
+-- Name: FUNCTION artist_billing(p_recording_id integer, p_release_id integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.artist_billing(p_recording_id integer, p_release_id integer) TO app_user;
+
+--
 -- Name: FUNCTION recording_language(p_recording integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -8721,6 +8844,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_representation TO app
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_song TO app_user;
 
 --
+-- Name: TABLE song; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
+
+--
 -- Name: TABLE recording; Type: ACL; Schema: api; Owner: -
 --
 
@@ -8803,12 +8932,6 @@ GRANT ALL ON FUNCTION api.search(api.release) TO app_user;
 --
 
 GRANT ALL ON FUNCTION music.song_one_stop_reason(p_song integer) TO app_user;
-
---
--- Name: TABLE song; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
 
 --
 -- Name: TABLE song_publisher; Type: ACL; Schema: music; Owner: -

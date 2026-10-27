@@ -1,5 +1,5 @@
 import {
-  List, TextField, NumberField, DateField, Edit, Create,
+  List, DataTable, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, DateInput, SelectInput, ArrayInput,
   SimpleFormIterator, ReferenceInput, AutocompleteInput, useRecordContext,
   useSimpleFormIteratorItem, minValue, required,
@@ -11,7 +11,8 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
-import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, searchFilter } from './shared';
+import { ListActions } from './listActions';
 
 const filters = [searchFilter];
 
@@ -73,17 +74,30 @@ const TrackNumber = () => {
   );
 };
 
+const hiddenColumns = [
+  'catalog_number', 'label_name', 'primary_genre_name', 'c_line',
+  'created_at', 'updated_at',
+];
+
 const ReleaseList = () => (
-  <List filters={filters} sort={{ field: 'release_date', order: 'DESC' }} perPage={50}>
-    <CatalogDatagrid rowClick="edit">
-      <TextField source="title" />
-      <TextField source="release_type" label="Type" />
-      <TextField source="upc" label="UPC" emptyText="—" />
-      <DateField source="release_date" label="Released" emptyText="—" />
-      <TextField source="status" />
-      <NumberField source="track_count" label="Tracks" />
-      <TextField source="duration_display" label="Length" emptyText="—" />
-    </CatalogDatagrid>
+  <List filters={filters} actions={<ListActions />}
+        sort={{ field: 'release_date', order: 'DESC' }} perPage={50}>
+    <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
+      <DataTable.Col source="title" />
+      <DataTable.Col source="artist_names" label="Artist" />
+      <DataTable.Col source="release_type" label="Type" />
+      <DataTable.Col source="upc" label="UPC" />
+      <DataTable.Col source="catalog_number" label="Catalog no." />
+      <DataTable.Col source="label_name" label="Label" />
+      <DataTable.Col source="release_date" label="Released" field={DateField} />
+      <DataTable.Col source="status" />
+      <DataTable.NumberCol source="track_count" label="Tracks" />
+      <DataTable.Col source="duration_ms" label="Length" render={(r) => r.duration_display} />
+      <DataTable.Col source="primary_genre_name" label="Genre" />
+      <DataTable.Col source="c_line" label="C line" />
+      <DataTable.Col source="created_at" label="Added" field={DateField} />
+      <DataTable.Col source="updated_at" label="Changed" field={DateField} />
+    </CatalogDataTable>
   </List>
 );
 
@@ -206,7 +220,8 @@ const ReleaseForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ status, track_count, duration_display, c_line,
+const strip = ({ status, track_count, duration_display, c_line, artist_names,
+                 label_name, duration_ms, primary_genre_name,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

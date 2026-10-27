@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-  List, Datagrid, TextField, Edit, Create, SimpleForm, TextInput, required,
-  AutocompleteInput, AutocompleteArrayInput, SearchInput, useChoicesContext,
+  List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
+  required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
+  useChoicesContext,
 } from 'react-admin';
 import { useCan, useIsSiteAdmin } from '../permissions';
 import { QuickCreateName } from './quickCreate';
@@ -62,6 +63,15 @@ export const SharedListPicker = ({ multiple = false, onInputChange, ...props }) 
 export const CatalogDatagrid = ({ bulkActionButtons, ...props }) => {
   const canDelete = useCan('catalog.delete');
   return <Datagrid bulkActionButtons={canDelete ? bulkActionButtons : false} {...props} />;
+};
+
+// The same for lists whose columns the user chooses (with ListActions):
+// list every useful column and name the ones that start hidden in
+// hiddenColumns. A column sorts by its source, so show a name or time with
+// render and sort by the value behind it.
+export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
+  const canDelete = useCan('catalog.delete');
+  return <DataTable bulkActionButtons={canDelete ? bulkActionButtons : false} {...props} />;
 };
 
 // The search box at the top of a list. It sends q, which dataProvider turns

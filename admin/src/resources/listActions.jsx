@@ -1,5 +1,6 @@
 import {
-  TopToolbar, FilterButton, CreateButton, ExportButton, Button, useListContext,
+  TopToolbar, FilterButton, CreateButton, ExportButton, ColumnsButton, Button,
+  useListContext, useResourceDefinition,
 } from 'react-admin';
 import FilterOffIcon from '@mui/icons-material/FilterAltOff';
 
@@ -15,11 +16,17 @@ const ClearFiltersButton = () => {
   );
 };
 
-export const ListActions = () => (
-  <TopToolbar>
-    <ClearFiltersButton />
-    <FilterButton />
-    <CreateButton />
-    <ExportButton />
-  </TopToolbar>
-);
+// The toolbar of a CatalogDataTable list. Columns shows, hides and reorders
+// the columns; the choice is kept in the browser.
+export const ListActions = () => {
+  const { hasCreate } = useResourceDefinition();
+  return (
+    <TopToolbar>
+      <ColumnsButton />
+      <ClearFiltersButton />
+      <FilterButton />
+      {hasCreate && <CreateButton />}
+      <ExportButton />
+    </TopToolbar>
+  );
+};
