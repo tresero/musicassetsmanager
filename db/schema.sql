@@ -6017,10 +6017,16 @@ CREATE INDEX organization_account_id_idx ON music.organization USING btree (acco
 CREATE INDEX organization_document_doc_idx ON music.organization_document USING btree (document_id);
 
 --
--- Name: organization_lower_idx; Type: INDEX; Schema: music; Owner: -
+-- Name: organization_name_key; Type: INDEX; Schema: music; Owner: -
 --
 
-CREATE INDEX organization_lower_idx ON music.organization USING btree (lower(name));
+CREATE UNIQUE INDEX organization_name_key ON music.organization USING btree (account_id, lower(name));
+
+--
+-- Name: INDEX organization_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.organization_name_key IS 'A company name is used once per account, regardless of case. Two companies that really share a name are told apart in the name itself, for example by country or entity type.';
 
 --
 -- Name: organization_pro_code_idx; Type: INDEX; Schema: music; Owner: -

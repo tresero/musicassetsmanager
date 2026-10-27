@@ -29,6 +29,7 @@ const OrgForm = () => (
   <TabbedForm toolbar={<EditToolbar />}>
     <TabbedForm.Tab label="Details">
       <TextInput source="name" required
+                 helperText="Used once per account. If two companies share a name, add the country or entity type."
                  sx={{ width: { xs: '100%', md: 360 } }} />
       <ReferenceInput source="pro_code" reference="pro" perPage={500}
                       sort={{ field: 'code', order: 'ASC' }}>

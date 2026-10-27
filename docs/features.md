@@ -116,7 +116,9 @@ each, and attached documents.
 
 ## Companies
 
-Name, society, IPI, ISNI, country, and attached documents.
+Name, society, IPI, ISNI, country, and attached documents. A company name is
+used once per account, regardless of case; two companies that share a name are
+told apart in the name, by country or entity type.
 
 ## Artists
 
@@ -230,3 +232,4 @@ it shows: names by name and lengths by time.
 | 2026-10-14 | The site admin adds name-only list entries from the pickers. |
 | 2026-10-14 | Shared list names and sign-in emails are matched regardless of case; searches ignore case and accents (#21). |
 | 2026-10-26 | Searches match the start of each word and cover writers, artists, codes and more on songs, recordings and releases; those lists have chosen, sortable columns (#47). |
+| 2026-10-27 | Company names are unique per account, regardless of case (#8). |
