@@ -1,4 +1,4 @@
-import { usePermissions } from 'react-admin';
+import { usePermissions, useGetOne } from 'react-admin';
 
 /*
  * The signed-in user's role, permission codes and site admin flag come from
@@ -24,3 +24,10 @@ export const useIsSiteAdmin = () => !!usePermissions().permissions?.site_admin;
 
 // The user's default country from My settings, United States when unset.
 export const useDefaultCountry = () => usePermissions().permissions?.country ?? 'US';
+
+// The calling code of the user's default country, which a new phone number
+// starts on; 1 when the country has none.
+export const useDefaultCallingCode = () => {
+  const { data } = useGetOne('country', { id: useDefaultCountry() });
+  return data?.calling_code ?? 1;
+};

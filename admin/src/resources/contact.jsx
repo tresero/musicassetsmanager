@@ -10,6 +10,7 @@ import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput } from './IsniInput';
 import { CatalogDatagrid, searchFilter } from './shared';
+import { useDefaultCallingCode } from '../permissions';
 
 const filters = [searchFilter];
 
@@ -44,78 +45,81 @@ const ContactList = () => (
   </List>
 );
 
-const ContactForm = () => (
-  <TabbedForm toolbar={<EditToolbar />}>
-    <TabbedForm.Tab label="Details">
-      <TextInput source="first_name" label="First name"
-                 sx={{ width: { xs: '100%', md: 260 } }} />
-      <TextInput source="last_name" label="Last name"
-                 sx={{ width: { xs: '100%', md: 260 } }} />
-      <TextInput source="credit_name" label="Credited as"
-                 helperText="Performing name, if different. Used on every recording unless a credit overrides it."
-                 sx={{ width: { xs: '100%', md: 360 } }} />
-      <ReferenceInput source="pro_code" reference="pro" perPage={500}
-                      sort={{ field: 'code', order: 'ASC' }}>
-        <AutocompleteInput label="PRO"
-                           optionText={proOptionText}
-                           inputText={proInputText}
-                           filterToQuery={byCode}
-                           sx={{ width: { xs: '100%', md: 260 } }} />
-      </ReferenceInput>
-      <TextInput source="member_ipi" label="IPI name number"
-                 sx={{ width: { xs: '100%', md: 220 } }} />
-      <IsniInput source="isni" label="ISNI"
-                 sx={{ width: { xs: '100%', md: 260 } }} />
-      <RichTextInput source="notes" />
-    </TabbedForm.Tab>
+const ContactForm = () => {
+  const callingCode = useDefaultCallingCode();
+  return (
+    <TabbedForm toolbar={<EditToolbar />}>
+      <TabbedForm.Tab label="Details">
+        <TextInput source="first_name" label="First name"
+                   sx={{ width: { xs: '100%', md: 260 } }} />
+        <TextInput source="last_name" label="Last name"
+                   sx={{ width: { xs: '100%', md: 260 } }} />
+        <TextInput source="credit_name" label="Credited as"
+                   helperText="Performing name, if different. Used on every recording unless a credit overrides it."
+                   sx={{ width: { xs: '100%', md: 360 } }} />
+        <ReferenceInput source="pro_code" reference="pro" perPage={500}
+                        sort={{ field: 'code', order: 'ASC' }}>
+          <AutocompleteInput label="PRO"
+                             optionText={proOptionText}
+                             inputText={proInputText}
+                             filterToQuery={byCode}
+                             sx={{ width: { xs: '100%', md: 260 } }} />
+        </ReferenceInput>
+        <TextInput source="member_ipi" label="IPI name number"
+                   sx={{ width: { xs: '100%', md: 220 } }} />
+        <IsniInput source="isni" label="ISNI"
+                   sx={{ width: { xs: '100%', md: 260 } }} />
+        <RichTextInput source="notes" />
+      </TabbedForm.Tab>
 
-    <TabbedForm.Tab label="Email">
-      <ArrayInput source="emails" label={false}>
-        <SimpleFormIterator inline sx={iteratorSx}>
-          <TextInput source="email" type="email" label="Address" helperText={false}
-                     validate={required()}
-                     sx={{ width: { xs: '100%', md: 320 } }} />
-          <BooleanInput source="is_primary" label="Primary" helperText={false} />
-          <TextInput source="note" label="Note" helperText={false}
-                     sx={{ width: { xs: '100%', md: 240 } }} />
-        </SimpleFormIterator>
-      </ArrayInput>
-    </TabbedForm.Tab>
+      <TabbedForm.Tab label="Email">
+        <ArrayInput source="emails" label={false}>
+          <SimpleFormIterator inline sx={iteratorSx}>
+            <TextInput source="email" type="email" label="Address" helperText={false}
+                       validate={required()}
+                       sx={{ width: { xs: '100%', md: 320 } }} />
+            <BooleanInput source="is_primary" label="Primary" helperText={false} />
+            <TextInput source="note" label="Note" helperText={false}
+                       sx={{ width: { xs: '100%', md: 240 } }} />
+          </SimpleFormIterator>
+        </ArrayInput>
+      </TabbedForm.Tab>
 
-    <TabbedForm.Tab label="Phone">
-      <ArrayInput source="phones" label={false}>
-        <SimpleFormIterator inline sx={iteratorSx}>
-          <NumberInput source="country_code" label="CC" defaultValue={1}
-                       helperText={false}
-                       sx={{ width: { xs: '100%', md: 90 } }} />
-          <TextInput source="number" label="Number" helperText={false}
-                     validate={required()}
-                     sx={{ width: { xs: '100%', md: 200 } }} />
-          <TextInput source="extension" label="Ext" helperText={false}
-                     sx={{ width: { xs: '100%', md: 100 } }} />
-          <BooleanInput source="is_primary" label="Primary" helperText={false} />
-          <TextInput source="note" label="Note" helperText={false}
-                     sx={{ width: { xs: '100%', md: 240 } }} />
-        </SimpleFormIterator>
-      </ArrayInput>
-    </TabbedForm.Tab>
+      <TabbedForm.Tab label="Phone">
+        <ArrayInput source="phones" label={false}>
+          <SimpleFormIterator inline sx={iteratorSx}>
+            <NumberInput source="country_code" label="CC" defaultValue={callingCode}
+                         helperText={false}
+                         sx={{ width: { xs: '100%', md: 90 } }} />
+            <TextInput source="number" label="Number" helperText={false}
+                       validate={required()}
+                       sx={{ width: { xs: '100%', md: 200 } }} />
+            <TextInput source="extension" label="Ext" helperText={false}
+                       sx={{ width: { xs: '100%', md: 100 } }} />
+            <BooleanInput source="is_primary" label="Primary" helperText={false} />
+            <TextInput source="note" label="Note" helperText={false}
+                       sx={{ width: { xs: '100%', md: 240 } }} />
+          </SimpleFormIterator>
+        </ArrayInput>
+      </TabbedForm.Tab>
 
-    <TabbedForm.Tab label="Companies">
-      <ArrayInput source="organizations" label={false}>
-        <SimpleFormIterator inline sx={iteratorSx}>
-          <CompanyInput w={280} validate={required()} />
-          <TextInput source="title" label="Title" helperText={false}
-                     sx={{ width: { xs: '100%', md: 220 } }} />
-          <BooleanInput source="is_primary" label="Primary" helperText={false} />
-        </SimpleFormIterator>
-      </ArrayInput>
-    </TabbedForm.Tab>
+      <TabbedForm.Tab label="Companies">
+        <ArrayInput source="organizations" label={false}>
+          <SimpleFormIterator inline sx={iteratorSx}>
+            <CompanyInput w={280} validate={required()} />
+            <TextInput source="title" label="Title" helperText={false}
+                       sx={{ width: { xs: '100%', md: 220 } }} />
+            <BooleanInput source="is_primary" label="Primary" helperText={false} />
+          </SimpleFormIterator>
+        </ArrayInput>
+      </TabbedForm.Tab>
 
-    <TabbedForm.Tab label="Documents">
-      <DocumentsInput />
-    </TabbedForm.Tab>
-  </TabbedForm>
-);
+      <TabbedForm.Tab label="Documents">
+        <DocumentsInput />
+      </TabbedForm.Tab>
+    </TabbedForm>
+  );
+};
 
 const strip = ({ display_name, sort_name, primary_email,
                  created_at, updated_at, ...rest }) => rest;

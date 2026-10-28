@@ -173,7 +173,8 @@ on.
 
 **My settings** belong to each user, whatever their role: the default country,
 listed first in every country picker and filled in on a new recording's country
-of recording and of commissioning. It is United States until set.
+of recording and of commissioning. A new phone number starts on its calling
+code. It is United States until set.
 
 **Pitch settings** holds the default pitch contact, used by any recording that
 has no contact of its own. A new person can be added from the picker.
@@ -244,3 +245,4 @@ it shows: names by name and lengths by time.
 | 2026-10-27 | A song's publisher can be a person who holds their own publishing (#4). |
 | 2026-10-27 | My settings with a per-user default country; publisher roles listed first (#2). |
 | 2026-10-27 | The writer role list offers only the writing roles and starts on Composer Lyricist (#50). |
+| 2026-10-28 | A new phone number starts on the calling code of the user's default country (#51). |

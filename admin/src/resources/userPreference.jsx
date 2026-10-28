@@ -17,7 +17,7 @@ const UserPreferenceList = () => (
 const UserPreferenceForm = () => (
   <SimpleForm toolbar={<Toolbar><SaveButton /></Toolbar>}>
     <CountryInput source="country_code" label="Default country"
-                  helperText="Listed first in every country picker and filled in on new recordings. United States when not set."
+                  helperText="Listed first in every country picker, filled in on new recordings, and the calling code a new phone number starts on. United States when not set."
                   sx={{ width: { xs: '100%', md: 400 } }} />
   </SimpleForm>
 );

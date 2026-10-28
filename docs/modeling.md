@@ -270,6 +270,11 @@ switchboard appears several times. Normalizing it would mean a search step and
 a second screen to enter a phone number, which is how you end up with no phone
 numbers.
 
+A phone's country code is the ITU calling code, a number rather than a country,
+since one code covers several countries (1 for North America and much of the
+Caribbean). `music.country.calling_code` gives the code a new number starts
+on, from the user's default country.
+
 The tradeoff is recorded in a `COMMENT ON TABLE` so the reasoning travels with
 the schema rather than living in someone's memory.
 
@@ -290,3 +295,4 @@ thing this project exists to avoid.
 | 2026-09-30 | Control as authority by agreement; one stop computed for songs and recordings; publisher per writer; generated pitch comment. |
 | 2026-10-14 | Language on the recording, defaulting from the composition (#3). |
 | 2026-10-27 | A song's publisher can be a person (#4). |
+| 2026-10-28 | Phone country codes are ITU calling codes; countries carry theirs (#51). |

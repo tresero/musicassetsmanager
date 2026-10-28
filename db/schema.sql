@@ -1483,9 +1483,17 @@ COMMENT ON FUNCTION api.search(api.contact) IS 'The sort name, for search=fts(fo
 CREATE TABLE music.country (
     code music.iso_3166_alpha2 NOT NULL,
     name text NOT NULL,
+    calling_code smallint,
+    CONSTRAINT country_calling_code_check CHECK (((calling_code >= 1) AND (calling_code <= 999))),
     CONSTRAINT country_name_len CHECK ((length(name) <= 128)),
     CONSTRAINT country_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
+
+--
+-- Name: COLUMN country.calling_code; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.country.calling_code IS 'ITU calling code, without the plus. Several countries share one (1 across North America and much of the Caribbean, 7 for Russia and Kazakhstan); empty for territories without one. A new phone number starts on the calling code of the user''s default country, or 1 when it has none.';
 
 --
 -- Name: country; Type: VIEW; Schema: api; Owner: -
@@ -1493,7 +1501,8 @@ CREATE TABLE music.country (
 
 CREATE VIEW api.country WITH (security_invoker='true') AS
  SELECT code,
-    name
+    name,
+    calling_code
    FROM music.country;
 
 --

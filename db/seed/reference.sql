@@ -1,256 +1,256 @@
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 
-COPY music.country (code, name) FROM stdin;
-AD	Andorra
-AE	United Arab Emirates
-AF	Afghanistan
-AG	Antigua and Barbuda
-AI	Anguilla
-AL	Albania
-AM	Armenia
-AO	Angola
-AQ	Antarctica
-AR	Argentina
-AS	American Samoa
-AT	Austria
-AU	Australia
-AW	Aruba
-AX	Aland Islands
-AZ	Azerbaijan
-BA	Bosnia and Herzegovina
-BB	Barbados
-BD	Bangladesh
-BE	Belgium
-BF	Burkina Faso
-BG	Bulgaria
-BH	Bahrain
-BI	Burundi
-BJ	Benin
-BL	Saint Barthelemy
-BM	Bermuda
-BN	Brunei Darussalam
-BO	Bolivia
-BQ	Caribbean Netherlands
-BR	Brazil
-BS	Bahamas
-BT	Bhutan
-BV	Bouvet Island
-BW	Botswana
-BY	Belarus
-BZ	Belize
-CA	Canada
-CC	Cocos (Keeling) Islands
-CD	Congo\\, Democratic Republic of
-CF	Central African Republic
-CG	Congo
-CH	Switzerland
-CI	Cote d'Ivoire
-CK	Cook Islands
-CL	Chile
-CM	Cameroon
-CN	China
-CO	Colombia
-CR	Costa Rica
-CU	Cuba
-CV	Cape Verde
-CW	Curacao
-CX	Christmas Island
-CY	Cyprus
-CZ	Czech Republic
-DE	Germany
-DJ	Djibouti
-DK	Denmark
-DM	Dominica
-DO	Dominican Republic
-DZ	Algeria
-EC	Ecuador
-EE	Estonia
-EG	Egypt
-EH	Western Sahara
-ER	Eritrea
-ES	Spain
-ET	Ethiopia
-FI	Finland
-FJ	Fiji
-FK	Falkland Islands
-FM	Micronesia\\, Federated States of
-FO	Faroe Islands
-FR	France
-GA	Gabon
-GB	United Kingdom
-GD	Grenada
-GE	Georgia
-GF	French Guiana
-GG	Guernsey
-GH	Ghana
-GI	Gibraltar
-GL	Greenland
-GM	Gambia
-GN	Guinea
-GP	Guadeloupe
-GQ	Equatorial Guinea
-GR	Greece
-GS	South Georgia and the South Sandwich Islands
-GT	Guatemala
-GU	Guam
-GW	Guinea-Bissau
-GY	Guyana
-HK	Hong Kong
-HM	Heard and McDonald Islands
-HN	Honduras
-HR	Croatia
-HT	Haiti
-HU	Hungary
-ID	Indonesia
-IE	Ireland
-IL	Israel
-IM	Isle of Man
-IN	India
-IO	British Indian Ocean Territory
-IQ	Iraq
-IR	Iran
-IS	Iceland
-IT	Italy
-JE	Jersey
-JM	Jamaica
-JO	Jordan
-JP	Japan
-KE	Kenya
-KG	Kyrgyzstan
-KH	Cambodia
-KI	Kiribati
-KM	Comoros
-KN	Saint Kitts and Nevis
-KP	North Korea
-KR	South Korea
-KW	Kuwait
-KY	Cayman Islands
-KZ	Kazakhstan
-LA	Lao People's Democratic Republic
-LB	Lebanon
-LC	Saint Lucia
-LI	Liechtenstein
-LK	Sri Lanka
-LR	Liberia
-LS	Lesotho
-LT	Lithuania
-LU	Luxembourg
-LV	Latvia
-LY	Libya
-MA	Morocco
-MC	Monaco
-MD	Moldova
-ME	Montenegro
-MF	Saint-Martin (France)
-MG	Madagascar
-MH	Marshall Islands
-MK	Macedonia
-ML	Mali
-MM	Myanmar
-MN	Mongolia
-MO	Macau
-MP	Northern Mariana Islands
-MQ	Martinique
-MR	Mauritania
-MS	Montserrat
-MT	Malta
-MU	Mauritius
-MV	Maldives
-MW	Malawi
-MX	Mexico
-MY	Malaysia
-MZ	Mozambique
-NA	Namibia
-NC	New Caledonia
-NE	Niger
-NF	Norfolk Island
-NG	Nigeria
-NI	Nicaragua
-NL	The Netherlands
-NO	Norway
-NP	Nepal
-NR	Nauru
-NU	Niue
-NZ	New Zealand
-OM	Oman
-PA	Panama
-PE	Peru
-PF	French Polynesia
-PG	Papua New Guinea
-PH	Philippines
-PK	Pakistan
-PL	Poland
-PM	St. Pierre and Miquelon
-PN	Pitcairn
-PR	Puerto Rico
-PS	Palestine\\, State of
-PT	Portugal
-PW	Palau
-PY	Paraguay
-QA	Qatar
-RE	Reunion
-RO	Romania
-RS	Serbia
-RU	Russian Federation
-RW	Rwanda
-SA	Saudi Arabia
-SB	Solomon Islands
-SC	Seychelles
-SD	Sudan
-SE	Sweden
-SG	Singapore
-SH	Saint Helena
-SI	Slovenia
-SJ	Svalbard and Jan Mayen Islands
-SK	Slovakia
-SL	Sierra Leone
-SM	San Marino
-SN	Senegal
-SO	Somalia
-SR	Suriname
-SS	South Sudan
-ST	Sao Tome and Principe
-SV	El Salvador
-SX	Sint Maarten (Dutch part)
-SY	Syria
-SZ	Swaziland
-TC	Turks and Caicos Islands
-TD	Chad
-TF	French Southern Territories
-TG	Togo
-TH	Thailand
-TJ	Tajikistan
-TK	Tokelau
-TL	Timor-Leste
-TM	Turkmenistan
-TN	Tunisia
-TO	Tonga
-TR	Turkey
-TT	Trinidad and Tobago
-TV	Tuvalu
-TW	Taiwan
-TZ	Tanzania
-UA	Ukraine
-UG	Uganda
-UM	United States Minor Outlying Islands
-US	United States
-UY	Uruguay
-UZ	Uzbekistan
-VA	Vatican
-VC	Saint Vincent and the Grenadines
-VE	Venezuela
-VG	Virgin Islands (British)
-VI	Virgin Islands (U.S.)
-VN	Vietnam
-VU	Vanuatu
-WF	Wallis and Futuna Islands
-WS	Samoa
-YE	Yemen
-YT	Mayotte
-ZA	South Africa
-ZM	Zambia
-ZW	Zimbabwe
+COPY music.country (code, name, calling_code) FROM stdin;
+AD	Andorra	376
+AE	United Arab Emirates	971
+AF	Afghanistan	93
+AG	Antigua and Barbuda	1
+AI	Anguilla	1
+AL	Albania	355
+AM	Armenia	374
+AO	Angola	244
+AQ	Antarctica	\N
+AR	Argentina	54
+AS	American Samoa	1
+AT	Austria	43
+AU	Australia	61
+AW	Aruba	297
+AX	Aland Islands	358
+AZ	Azerbaijan	994
+BA	Bosnia and Herzegovina	387
+BB	Barbados	1
+BD	Bangladesh	880
+BE	Belgium	32
+BF	Burkina Faso	226
+BG	Bulgaria	359
+BH	Bahrain	973
+BI	Burundi	257
+BJ	Benin	229
+BL	Saint Barthelemy	590
+BM	Bermuda	1
+BN	Brunei Darussalam	673
+BO	Bolivia	591
+BQ	Caribbean Netherlands	599
+BR	Brazil	55
+BS	Bahamas	1
+BT	Bhutan	975
+BV	Bouvet Island	\N
+BW	Botswana	267
+BY	Belarus	375
+BZ	Belize	501
+CA	Canada	1
+CC	Cocos (Keeling) Islands	61
+CD	Congo\\, Democratic Republic of	243
+CF	Central African Republic	236
+CG	Congo	242
+CH	Switzerland	41
+CI	Cote d'Ivoire	225
+CK	Cook Islands	682
+CL	Chile	56
+CM	Cameroon	237
+CN	China	86
+CO	Colombia	57
+CR	Costa Rica	506
+CU	Cuba	53
+CV	Cape Verde	238
+CW	Curacao	599
+CX	Christmas Island	61
+CY	Cyprus	357
+CZ	Czech Republic	420
+DE	Germany	49
+DJ	Djibouti	253
+DK	Denmark	45
+DM	Dominica	1
+DO	Dominican Republic	1
+DZ	Algeria	213
+EC	Ecuador	593
+EE	Estonia	372
+EG	Egypt	20
+EH	Western Sahara	212
+ER	Eritrea	291
+ES	Spain	34
+ET	Ethiopia	251
+FI	Finland	358
+FJ	Fiji	679
+FK	Falkland Islands	500
+FM	Micronesia\\, Federated States of	691
+FO	Faroe Islands	298
+FR	France	33
+GA	Gabon	241
+GB	United Kingdom	44
+GD	Grenada	1
+GE	Georgia	995
+GF	French Guiana	594
+GG	Guernsey	44
+GH	Ghana	233
+GI	Gibraltar	350
+GL	Greenland	299
+GM	Gambia	220
+GN	Guinea	224
+GP	Guadeloupe	590
+GQ	Equatorial Guinea	240
+GR	Greece	30
+GS	South Georgia and the South Sandwich Islands	\N
+GT	Guatemala	502
+GU	Guam	1
+GW	Guinea-Bissau	245
+GY	Guyana	592
+HK	Hong Kong	852
+HM	Heard and McDonald Islands	\N
+HN	Honduras	504
+HR	Croatia	385
+HT	Haiti	509
+HU	Hungary	36
+ID	Indonesia	62
+IE	Ireland	353
+IL	Israel	972
+IM	Isle of Man	44
+IN	India	91
+IO	British Indian Ocean Territory	246
+IQ	Iraq	964
+IR	Iran	98
+IS	Iceland	354
+IT	Italy	39
+JE	Jersey	44
+JM	Jamaica	1
+JO	Jordan	962
+JP	Japan	81
+KE	Kenya	254
+KG	Kyrgyzstan	996
+KH	Cambodia	855
+KI	Kiribati	686
+KM	Comoros	269
+KN	Saint Kitts and Nevis	1
+KP	North Korea	850
+KR	South Korea	82
+KW	Kuwait	965
+KY	Cayman Islands	1
+KZ	Kazakhstan	7
+LA	Lao People's Democratic Republic	856
+LB	Lebanon	961
+LC	Saint Lucia	1
+LI	Liechtenstein	423
+LK	Sri Lanka	94
+LR	Liberia	231
+LS	Lesotho	266
+LT	Lithuania	370
+LU	Luxembourg	352
+LV	Latvia	371
+LY	Libya	218
+MA	Morocco	212
+MC	Monaco	377
+MD	Moldova	373
+ME	Montenegro	382
+MF	Saint-Martin (France)	590
+MG	Madagascar	261
+MH	Marshall Islands	692
+MK	Macedonia	389
+ML	Mali	223
+MM	Myanmar	95
+MN	Mongolia	976
+MO	Macau	853
+MP	Northern Mariana Islands	1
+MQ	Martinique	596
+MR	Mauritania	222
+MS	Montserrat	1
+MT	Malta	356
+MU	Mauritius	230
+MV	Maldives	960
+MW	Malawi	265
+MX	Mexico	52
+MY	Malaysia	60
+MZ	Mozambique	258
+NA	Namibia	264
+NC	New Caledonia	687
+NE	Niger	227
+NF	Norfolk Island	672
+NG	Nigeria	234
+NI	Nicaragua	505
+NL	The Netherlands	31
+NO	Norway	47
+NP	Nepal	977
+NR	Nauru	674
+NU	Niue	683
+NZ	New Zealand	64
+OM	Oman	968
+PA	Panama	507
+PE	Peru	51
+PF	French Polynesia	689
+PG	Papua New Guinea	675
+PH	Philippines	63
+PK	Pakistan	92
+PL	Poland	48
+PM	St. Pierre and Miquelon	508
+PN	Pitcairn	\N
+PR	Puerto Rico	1
+PS	Palestine\\, State of	970
+PT	Portugal	351
+PW	Palau	680
+PY	Paraguay	595
+QA	Qatar	974
+RE	Reunion	262
+RO	Romania	40
+RS	Serbia	381
+RU	Russian Federation	7
+RW	Rwanda	250
+SA	Saudi Arabia	966
+SB	Solomon Islands	677
+SC	Seychelles	248
+SD	Sudan	249
+SE	Sweden	46
+SG	Singapore	65
+SH	Saint Helena	290
+SI	Slovenia	386
+SJ	Svalbard and Jan Mayen Islands	47
+SK	Slovakia	421
+SL	Sierra Leone	232
+SM	San Marino	378
+SN	Senegal	221
+SO	Somalia	252
+SR	Suriname	597
+SS	South Sudan	211
+ST	Sao Tome and Principe	239
+SV	El Salvador	503
+SX	Sint Maarten (Dutch part)	1
+SY	Syria	963
+SZ	Swaziland	268
+TC	Turks and Caicos Islands	1
+TD	Chad	235
+TF	French Southern Territories	\N
+TG	Togo	228
+TH	Thailand	66
+TJ	Tajikistan	992
+TK	Tokelau	690
+TL	Timor-Leste	670
+TM	Turkmenistan	993
+TN	Tunisia	216
+TO	Tonga	676
+TR	Turkey	90
+TT	Trinidad and Tobago	1
+TV	Tuvalu	688
+TW	Taiwan	886
+TZ	Tanzania	255
+UA	Ukraine	380
+UG	Uganda	256
+UM	United States Minor Outlying Islands	\N
+US	United States	1
+UY	Uruguay	598
+UZ	Uzbekistan	998
+VA	Vatican	39
+VC	Saint Vincent and the Grenadines	1
+VE	Venezuela	58
+VG	Virgin Islands (British)	1
+VI	Virgin Islands (U.S.)	1
+VN	Vietnam	84
+VU	Vanuatu	678
+WF	Wallis and Futuna Islands	681
+WS	Samoa	685
+YE	Yemen	967
+YT	Mayotte	262
+ZA	South Africa	27
+ZM	Zambia	260
+ZW	Zimbabwe	263
 \.
 
 COPY music.language (code, name, iso_name) FROM stdin;
