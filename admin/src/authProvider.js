@@ -9,7 +9,10 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: username, pass: password }),
     });
-    if (!res.ok) throw new Error('Invalid credentials');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(res.status === 429 && body.message ? body.message : 'Invalid credentials');
+    }
     const { token } = await res.json();
     if (!token) throw new Error('Invalid credentials');
     localStorage.setItem('token', token);

@@ -610,22 +610,53 @@ COMMENT ON FUNCTION api.document_write() IS 'Runs as the signed-in user, so row 
 
 CREATE FUNCTION api.login(email text, pass text) RETURNS json
     LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
+    SET search_path TO 'pg_catalog', 'public'
+    AS $_$
 DECLARE
-  _user uuid;
+  _email text := lower(btrim(login.email));
+  _ip    inet;
+  _user  uuid;
+  _hash  text;
 BEGIN
-  SELECT u.id INTO _user
-  FROM music.user_account u
-  WHERE lower(u.email) = lower(btrim(login.email))
-    AND u.password_hash = crypt(login.pass, u.password_hash);
+  BEGIN
+    _ip := nullif(current_setting('request.headers', true)::json ->> 'cf-connecting-ip', '')::inet;
+  EXCEPTION WHEN others THEN
+    _ip := NULL;
+  END;
 
-  IF _user IS NULL THEN
-    RAISE EXCEPTION 'invalid credentials' USING errcode = 'invalid_password';
+  DELETE FROM auth.login_failure WHERE failed_at < now() - interval '1 day';
+
+  IF (SELECT count(*) FROM auth.login_failure f
+       WHERE f.email = _email AND f.failed_at > now() - interval '15 minutes') >= 10
+     OR (_ip IS NOT NULL AND
+         (SELECT count(*) FROM auth.login_failure f
+           WHERE f.ip = _ip AND f.failed_at > now() - interval '15 minutes') >= 50) THEN
+    PERFORM set_config('response.status', '429', true);
+    RETURN json_build_object('message', 'Too many failed sign-ins. Try again in 15 minutes.');
   END IF;
 
+  SELECT u.id, u.password_hash INTO _user, _hash
+    FROM music.user_account u
+   WHERE lower(u.email) = _email;
+
+  _hash := coalesce(_hash, '$2a$10$ekNYGQnjdY2p2jT9zsPrde');
+
+  IF _user IS NULL OR public.crypt(login.pass, _hash) IS DISTINCT FROM _hash THEN
+    INSERT INTO auth.login_failure (email, ip) VALUES (_email, _ip);
+    PERFORM set_config('response.status', '403', true);
+    RETURN json_build_object('message', 'invalid credentials');
+  END IF;
+
+  DELETE FROM auth.login_failure WHERE login_failure.email = _email;
   RETURN auth.session(_user);
 END;
-$$;
+$_$;
+
+--
+-- Name: FUNCTION login(email text, pass text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.login(email text, pass text) IS 'Signs a user in. After 10 failed sign-ins for an email, or 50 from one client address, in 15 minutes it answers 429 without checking the password. An unknown email costs the same bcrypt work as a wrong password, so timing does not reveal which emails have users. Failures are answered with a status rather than an error so the failure record commits.';
 
 --
 -- Name: me(); Type: FUNCTION; Schema: api; Owner: -
@@ -4801,6 +4832,34 @@ CREATE VIEW api.vocabulary WITH (security_invoker='true') AS
    FROM music.vocabulary;
 
 --
+-- Name: login_failure; Type: TABLE; Schema: auth; Owner: -
+--
+
+CREATE TABLE auth.login_failure (
+    email text NOT NULL,
+    ip inet,
+    failed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
+-- Name: TABLE login_failure; Type: COMMENT; Schema: auth; Owner: -
+--
+
+COMMENT ON TABLE auth.login_failure IS 'Failed sign-ins, kept one day. Written and read only by api.login.';
+
+--
+-- Name: COLUMN login_failure.email; Type: COMMENT; Schema: auth; Owner: -
+--
+
+COMMENT ON COLUMN auth.login_failure.email IS 'The email as typed, trimmed and lower cased, whether or not a user has it.';
+
+--
+-- Name: COLUMN login_failure.ip; Type: COMMENT; Schema: auth; Owner: -
+--
+
+COMMENT ON COLUMN auth.login_failure.ip IS 'The client address Cloudflare reports in CF-Connecting-IP. Empty when the header is missing or not an address.';
+
+--
 -- Name: account; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -5826,6 +5885,18 @@ ALTER TABLE ONLY music.vocabulary
 
 ALTER TABLE ONLY music.vocal_type
     ADD CONSTRAINT vocal_type_pkey PRIMARY KEY (id);
+
+--
+-- Name: login_failure_email_idx; Type: INDEX; Schema: auth; Owner: -
+--
+
+CREATE INDEX login_failure_email_idx ON auth.login_failure USING btree (email, failed_at);
+
+--
+-- Name: login_failure_ip_idx; Type: INDEX; Schema: auth; Owner: -
+--
+
+CREATE INDEX login_failure_ip_idx ON auth.login_failure USING btree (ip, failed_at);
 
 --
 -- Name: app_user_account_id_idx; Type: INDEX; Schema: music; Owner: -
