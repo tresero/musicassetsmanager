@@ -18,7 +18,7 @@ const extOf = (key) => {
  * The window is opened before the link is fetched; opening it afterwards
  * gets blocked as a popup in Safari.
  */
-export const FileLink = ({ scoped = false }) => {
+export const FileLink = ({ scoped = false, sx = { alignSelf: 'flex-start', mt: 1, mb: 0.5 } }) => {
   const notify = useNotify();
   const sourceCtx = useSourceContext();
   const path = (f) => (scoped && sourceCtx ? sourceCtx.getSource(f) : f);
@@ -32,9 +32,8 @@ export const FileLink = ({ scoped = false }) => {
 
   if (kind === 'url' || /^https?:\/\//i.test(uri)) {
     return (
-      <Button size="small" startIcon={<OpenIcon />}
-              href={uri} target="_blank" rel="noreferrer"
-              sx={{ alignSelf: 'center' }}>
+      <Button variant="outlined" size="small" startIcon={<OpenIcon />}
+              href={uri} target="_blank" rel="noreferrer" sx={sx}>
         Open
       </Button>
     );
@@ -64,8 +63,8 @@ export const FileLink = ({ scoped = false }) => {
   };
 
   return (
-    <Button size="small" startIcon={<OpenIcon />} onClick={open}
-            sx={{ alignSelf: 'center' }}>
+    <Button variant="outlined" size="small" startIcon={<OpenIcon />}
+            onClick={open} sx={sx}>
       Open
     </Button>
   );

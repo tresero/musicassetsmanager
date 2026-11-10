@@ -41,7 +41,7 @@ export const AudioFilesInput = () => (
 
       <Box sx={row}>
         <AudioUploadInput scoped />
-        <FileLink scoped />
+        <FileLink scoped sx={{ alignSelf: 'center' }} />
         <ReferenceInput source="file_type_id" reference="audio_file_type"
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>
           <SharedListPicker label="Type"

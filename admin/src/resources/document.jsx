@@ -5,7 +5,9 @@ import {
   AutocompleteArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
+import { Box } from '@mui/material';
 import { EditToolbar } from './formToolbar';
+import { FileLink } from './FileLink';
 import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
 const filters = [searchFilter];
@@ -45,8 +47,12 @@ const DocumentForm = () => (
 
     <SelectInput source="storage_kind" choices={storageKinds}
                  label="Storage" defaultValue="url" />
-    <TextInput source="storage_uri" label="Location" fullWidth required
-               helperText="URL, path, or object key depending on storage type" />
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 2, width: '100%' }}>
+      <TextInput source="storage_uri" label="Location" required
+                 helperText="URL, path, or object key depending on storage type"
+                 sx={{ width: { xs: '100%', md: 600 } }} />
+      <FileLink sx={{}} />
+    </Box>
     <TextInput source="external_ref" label="External reference"
                helperText="Document id in Paperless or similar" />
 
