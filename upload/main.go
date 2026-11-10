@@ -263,6 +263,31 @@ func contentKey(base, kind, sum, filename string) string {
 	return strings.Join(append(parts, kind, name), "/")
 }
 
+// contentHash returns the hash in a key presign would hand out for this
+// base path, and false for any other key.
+func contentHash(base, key string) (string, bool) {
+	rest := key
+	if base != "" {
+		if !strings.HasPrefix(key, base+"/") {
+			return "", false
+		}
+		rest = strings.TrimPrefix(key, base+"/")
+	}
+	kind, name, ok := strings.Cut(rest, "/")
+	if !ok {
+		return "", false
+	}
+	known := false
+	for _, k := range kinds {
+		known = known || k == kind
+	}
+	sum, ext, hasExt := strings.Cut(name, ".")
+	if !known || !sha256Hex.MatchString(sum) || (hasExt && !extRe.MatchString(ext)) {
+		return "", false
+	}
+	return sum, true
+}
+
 func validKey(key string) bool {
 	return key != "" && !strings.Contains(key, "..") && !strings.HasPrefix(key, "/")
 }
@@ -416,6 +441,11 @@ func (s *server) direct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "direct upload is only for the local backend", http.StatusBadRequest)
 		return
 	}
+	sum, ok := contentHash(st.BasePath, key)
+	if !ok {
+		http.Error(w, "bad key", http.StatusBadRequest)
+		return
+	}
 	dest, ok := s.localPath(account, key)
 	if !ok {
 		http.Error(w, "bad key", http.StatusBadRequest)
@@ -436,8 +466,14 @@ func (s *server) direct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not store the file", http.StatusInternalServerError)
 		return
 	}
-	n, err := io.Copy(f, io.LimitReader(r.Body, s.cfg.MaxBytes))
+	h := sha256.New()
+	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(r.Body, s.cfg.MaxBytes))
 	f.Close()
+	if err == nil && hex.EncodeToString(h.Sum(nil)) != sum {
+		os.Remove(tmp)
+		http.Error(w, "the file does not match its hash", http.StatusBadRequest)
+		return
+	}
 	if err == nil {
 		err = os.Rename(tmp, dest)
 	}
@@ -460,10 +496,12 @@ func randHex(n int) string {
 
 // A filename header that survives accents: an ASCII fallback plus the
 // RFC 5987 UTF-8 form, which every current browser prefers.
-func disposition(name string) string {
+func disposition(name string) string { return dispositionAs("inline", name) }
+
+func dispositionAs(how, name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "inline"
+		return how
 	}
 	ascii := strings.Map(func(r rune) rune {
 		if r < 32 || r > 126 || r == '"' || r == '\\' {
@@ -471,8 +509,39 @@ func disposition(name string) string {
 		}
 		return r
 	}, name)
-	return fmt.Sprintf(`inline; filename="%s"; filename*=UTF-8''%s`,
-		ascii, url.PathEscape(name))
+	return fmt.Sprintf(`%s; filename="%s"; filename*=UTF-8''%s`,
+		how, ascii, url.PathEscape(name))
+}
+
+// Local files are served from the app's own origin, so only types a browser
+// shows without running script open in the tab. Anything else, HTML and SVG
+// included, is a sandboxed download and cannot reach the app's sign-in.
+var inlineTypes = map[string]string{
+	".pdf":  "application/pdf",
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".mp3":  "audio/mpeg",
+	".wav":  "audio/wav",
+	".flac": "audio/flac",
+	".m4a":  "audio/mp4",
+	".aac":  "audio/aac",
+	".ogg":  "audio/ogg",
+	".txt":  "text/plain; charset=utf-8",
+}
+
+func fileHeaders(h http.Header, key, name string) {
+	h.Set("X-Content-Type-Options", "nosniff")
+	if ct, ok := inlineTypes[strings.ToLower(filepath.Ext(key))]; ok {
+		h.Set("Content-Type", ct)
+		h.Set("Content-Disposition", disposition(name))
+		return
+	}
+	h.Set("Content-Type", "application/octet-stream")
+	h.Set("Content-Security-Policy", "sandbox")
+	h.Set("Content-Disposition", dispositionAs("attachment", name))
 }
 
 // download answers with a short-lived link rather than redirecting, so
@@ -557,7 +626,7 @@ func (s *server) serveSigned(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad key", http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Disposition", disposition(name))
+	fileHeaders(w.Header(), key, name)
 	http.ServeFile(w, r, p)
 }
 
