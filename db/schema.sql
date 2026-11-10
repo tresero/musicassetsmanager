@@ -3475,6 +3475,7 @@ COMMENT ON FUNCTION auth.session(p_user uuid) IS 'The sign-in token for a user. 
 
 CREATE FUNCTION auth.set_password(p_email text, p_password text) RETURNS void
     LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
     AS $$
   UPDATE music.user_account
   SET password_hash = crypt(p_password, gen_salt('bf', 10))
@@ -9177,6 +9178,12 @@ GRANT ALL ON FUNCTION api.set_storage_secret(secret text) TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.song_write() TO app_user;
+
+--
+-- Name: FUNCTION set_password(p_email text, p_password text); Type: ACL; Schema: auth; Owner: -
+--
+
+REVOKE ALL ON FUNCTION auth.set_password(p_email text, p_password text) FROM PUBLIC;
 
 --
 -- Name: FUNCTION default_audio_file_type(p_format text); Type: ACL; Schema: music; Owner: -
