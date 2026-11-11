@@ -213,7 +213,9 @@ their next request. An account always keeps at least one Owner.
 The site admin creates accounts from Settings, Accounts: a name and the email
 of the first Owner, who gets an invite and sets up the rest. The page lists
 every account with its Owner, user count and invite status. Until someone signs
-in, the site admin can resend the invite or delete the account.
+in, the site admin can resend the invite or delete the account. Editing an
+account renames it and, until someone signs in, corrects the Owner's email,
+which moves the invite there and sends a new link.
 
 ## Interface
 
@@ -260,3 +262,4 @@ it shows: names by name and lengths by time.
 | 2026-11-11 | IPI and ISNI are unique per account, so accounts keep their own records of the same person, company or artist (#49). |
 | 2026-11-11 | The site admin creates an account by inviting its first Owner (#34). |
 | 2026-11-11 | The invite page checks the link first and offers a new link when it has expired or been replaced (#34). |
+| 2026-11-11 | The site admin renames accounts and corrects the first Owner's email (#34). |

@@ -3366,11 +3366,11 @@ BEGIN
 
   IF TG_OP = 'INSERT' THEN
     _id := music.create_account(NEW.name, NEW.owner_email);
-  ELSE
-    IF NOT coalesce(NEW.resend, false) THEN
-      RAISE EXCEPTION 'An account''s invite can only be resent here.';
-    END IF;
+  ELSIF coalesce(NEW.resend, false) THEN
     PERFORM music.resend_account_invite(OLD.id);
+    _id := OLD.id;
+  ELSE
+    PERFORM music.update_account(OLD.id, NEW.name, NEW.owner_email);
     _id := OLD.id;
   END IF;
 
@@ -4449,6 +4449,97 @@ $_$;
 COMMENT ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) IS 'Saves the documents listed on a song, recording, person, company, or release and links them to it. A new row whose file is already a document links that document instead of creating a second one; its blank fields are filled from the row. Rows no longer listed are detached; the document itself survives.';
 
 --
+-- Name: update_account(uuid, text, text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.update_account(p_account uuid, p_name text, p_owner_email text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+DECLARE
+  _name text := btrim(coalesce(p_name, ''));
+  _email text := lower(btrim(coalesce(p_owner_email, '')));
+  _old text;
+  _current text;
+  _invite uuid;
+  _token text := encode(gen_random_bytes(32), 'hex');
+BEGIN
+  IF NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can change accounts.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT a.name INTO _old FROM music.account a WHERE a.id = p_account FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'This account no longer exists.'
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  IF _name = '' THEN
+    RAISE EXCEPTION 'Enter a name for the account.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF _name <> _old THEN
+    IF EXISTS (SELECT 1 FROM music.account a
+                WHERE lower(a.name) = lower(_name) AND a.id <> p_account) THEN
+      RAISE EXCEPTION 'An account named % already exists.', _name
+        USING ERRCODE = 'unique_violation';
+    END IF;
+    UPDATE music.account SET name = _name WHERE id = p_account;
+  END IF;
+
+  SELECT lower(s.owner_email) INTO _current FROM music.site_account() s WHERE s.id = p_account;
+  IF _email = coalesce(_current, '') THEN
+    RETURN;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.account_id = p_account) THEN
+    RAISE EXCEPTION 'Someone has signed in to this account, so its Owners change its users on the Users page.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF _email = '' THEN
+    RAISE EXCEPTION 'Enter the Owner''s email.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE lower(u.email) = _email) THEN
+    RAISE EXCEPTION '% already has a login, and a login belongs to one account. Invite a different address.', _email
+      USING ERRCODE = 'unique_violation';
+  END IF;
+
+  SELECT i.id INTO _invite
+    FROM music.user_invite i
+    JOIN music.account_role r ON r.id = i.role_id
+   WHERE i.account_id = p_account AND r.name = 'Owner' AND i.accepted_at IS NULL
+   ORDER BY i.sent_at DESC
+   LIMIT 1
+     FOR UPDATE OF i;
+
+  IF _invite IS NULL THEN
+    INSERT INTO music.user_invite (account_id, email, role_id, token_hash)
+    VALUES (p_account, _email,
+            (SELECT r.id FROM music.account_role r WHERE r.name = 'Owner'),
+            sha256(convert_to(_token, 'UTF8')))
+    RETURNING id INTO _invite;
+  ELSE
+    UPDATE music.user_invite
+       SET email = _email,
+           token_hash = sha256(convert_to(_token, 'UTF8')),
+           sent_at = now(),
+           expires_at = now() + interval '7 days'
+     WHERE id = _invite;
+  END IF;
+
+  PERFORM music.send_invite(_invite, _token);
+END;
+$$;
+
+--
+-- Name: FUNCTION update_account(p_account uuid, p_name text, p_owner_email text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.update_account(p_account uuid, p_name text, p_owner_email text) IS 'Site admin only: renames an account, and while nobody has signed in to it, moves its Owner invite to a corrected email and sends a new link there. Owner rights because the account is not the signed-in user''s.';
+
+--
 -- Name: fold; Type: TEXT SEARCH CONFIGURATION; Schema: api; Owner: -
 --
 
@@ -5052,7 +5143,7 @@ CREATE VIEW api.site_account WITH (security_invoker='true') AS
 -- Name: VIEW site_account; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update with resend true to send a new link; delete to remove an account nobody has signed in to.';
+COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update name and owner_email to rename it or correct the invite, or set resend true to send a new link; delete to remove an account nobody has signed in to.';
 
 --
 -- Name: song_split_check; Type: VIEW; Schema: api; Owner: -
@@ -9609,6 +9700,13 @@ GRANT ALL ON FUNCTION music.song_controlled_share(p_song integer) TO app_user;
 --
 
 GRANT ALL ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) TO app_user;
+
+--
+-- Name: FUNCTION update_account(p_account uuid, p_name text, p_owner_email text); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.update_account(p_account uuid, p_name text, p_owner_email text) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.update_account(p_account uuid, p_name text, p_owner_email text) TO app_user;
 
 --
 -- Name: TABLE user_invite; Type: ACL; Schema: music; Owner: -

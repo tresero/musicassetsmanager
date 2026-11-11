@@ -1,15 +1,16 @@
 import {
   List, Datagrid, TextField, DateField, NumberField, FunctionField,
-  Create, SimpleForm, TextInput, DeleteButton,
+  Create, Edit, SimpleForm, TextInput, DeleteButton, Toolbar, SaveButton,
   TopToolbar, CreateButton, Button, required, email,
-  useRecordContext, useUpdate, useNotify,
+  useRecordContext, useUpdate, useNotify, useRedirect,
 } from 'react-admin';
 import SendIcon from '@mui/icons-material/Send';
 
 // Every account, for the site admin. Creating one emails its first Owner an
 // invite; the Owner then sets up storage, pitch settings and staff. The
 // database refuses anyone but the site admin, and refuses to resend or delete
-// once someone has signed in to the account.
+// once someone has signed in to the account. Editing renames the account and,
+// until someone signs in, moves the Owner invite to a corrected email.
 
 const ResendButton = () => {
   const record = useRecordContext();
@@ -46,7 +47,7 @@ const SiteAccountListActions = () => (
 const SiteAccountList = () => (
   <List sort={{ field: 'name', order: 'ASC' }} perPage={100} exporter={false}
         title="Accounts" actions={<SiteAccountListActions />}>
-    <Datagrid rowClick={false} bulkActionButtons={false}>
+    <Datagrid rowClick="edit" bulkActionButtons={false}>
       <TextField source="name" />
       <TextField source="status" />
       <TextField source="owner_email" label="Owner" />
@@ -61,17 +62,58 @@ const SiteAccountList = () => (
   </List>
 );
 
+const nameHelp = 'The label or publisher as its users will see it. Must differ from every other account.';
+
+// Only these two are written; everything else in the row is computed.
+const strip = ({ name, owner_email }) => ({ name, owner_email });
+
+const OwnerEmailInput = () => {
+  const record = useRecordContext();
+  const signedIn = record?.user_count > 0;
+  return (
+    <TextInput source="owner_email" label="Owner's email" type="email"
+               disabled={signedIn} validate={signedIn ? undefined : [required(), email()]}
+               helperText={signedIn
+                 ? "Someone has signed in, so the account's Owners manage its users on their Users page."
+                 : 'Correcting it moves the invite to this address and sends a new link; the old link stops working.'}
+               sx={{ width: { xs: '100%', md: 640 } }} />
+  );
+};
+
+// An onSuccess replaces the form's own redirect, so these redirect themselves.
+const SiteAccountEdit = () => {
+  const notify = useNotify();
+  const redirect = useRedirect();
+  return (
+    <Edit title="Edit account" mutationMode="pessimistic" transform={strip}
+          mutationOptions={{
+            onSuccess: (data) => {
+              notify(`Saved ${data.name}`, { type: 'info' });
+              redirect('list', 'site_account');
+            },
+          }}>
+      <SimpleForm toolbar={<Toolbar><SaveButton /></Toolbar>}>
+        <TextInput source="name" validate={required()} helperText={nameHelp}
+                   sx={{ width: { xs: '100%', md: 640 } }} />
+        <OwnerEmailInput />
+      </SimpleForm>
+    </Edit>
+  );
+};
+
 const SiteAccountCreate = () => {
   const notify = useNotify();
+  const redirect = useRedirect();
   return (
-    <Create title="New account" redirect="list"
+    <Create title="New account" transform={strip}
             mutationOptions={{
-              onSuccess: (data) => notify(`Account created; invite sent to ${data.owner_email}`,
-                                          { type: 'info' }),
+              onSuccess: (data) => {
+                notify(`Account created; invite sent to ${data.owner_email}`, { type: 'info' });
+                redirect('list', 'site_account');
+              },
             }}>
       <SimpleForm>
-        <TextInput source="name" validate={required()}
-                   helperText="The label or publisher as its users will see it. Must differ from every other account."
+        <TextInput source="name" validate={required()} helperText={nameHelp}
                    sx={{ width: { xs: '100%', md: 640 } }} />
         <TextInput source="owner_email" label="Owner's email" type="email"
                    validate={[required(), email()]}
@@ -85,5 +127,6 @@ const SiteAccountCreate = () => {
 export default {
   list: SiteAccountList,
   create: SiteAccountCreate,
+  edit: SiteAccountEdit,
   recordRepresentation: 'name',
 };
