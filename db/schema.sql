@@ -356,6 +356,34 @@ $$;
 COMMENT ON FUNCTION api.artist_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
 
 --
+-- Name: check_invite(text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.check_invite(token text) RETURNS json
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT CASE
+           WHEN i.id IS NULL THEN json_build_object('status', 'invalid')
+           WHEN i.accepted_at IS NOT NULL THEN json_build_object('status', 'accepted')
+           WHEN i.expires_at <= now() THEN json_build_object('status', 'expired')
+           ELSE json_build_object('status', 'open', 'email', i.email,
+                                  'account', a.name, 'role', r.name)
+         END
+    FROM (SELECT 1) one
+    LEFT JOIN music.user_invite i
+           ON i.token_hash = sha256(convert_to(coalesce(check_invite.token, ''), 'UTF8'))
+    LEFT JOIN music.account a ON a.id = i.account_id
+    LEFT JOIN music.account_role r ON r.id = i.role_id
+$$;
+
+--
+-- Name: FUNCTION check_invite(token text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.check_invite(token text) IS 'What an invite link is worth before anyone types a password: open (with the email, account and role), accepted, expired, or invalid for an unknown or replaced link. Owner rights because the person is not signed in yet.';
+
+--
 -- Name: check_session(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -1153,6 +1181,45 @@ $$;
 --
 
 COMMENT ON FUNCTION api.release_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: request_invite_link(text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.request_invite_link(email text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+DECLARE
+  _id uuid;
+  _token text;
+BEGIN
+  FOR _id IN
+    SELECT i.id
+      FROM music.user_invite i
+     WHERE lower(i.email) = lower(btrim(coalesce(request_invite_link.email, '')))
+       AND i.accepted_at IS NULL
+       AND i.sent_at < now() - interval '2 minutes'
+       AND NOT EXISTS (SELECT 1 FROM music.user_account u
+                        WHERE lower(u.email) = lower(i.email))
+       FOR UPDATE
+  LOOP
+    _token := encode(gen_random_bytes(32), 'hex');
+    UPDATE music.user_invite
+       SET token_hash = sha256(convert_to(_token, 'UTF8')),
+           sent_at = now(),
+           expires_at = now() + interval '7 days'
+     WHERE id = _id;
+    PERFORM music.send_invite(_id, _token);
+  END LOOP;
+END;
+$$;
+
+--
+-- Name: FUNCTION request_invite_link(email text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.request_invite_link(email text) IS 'Emails a new link for every open invite to this address, for someone whose link expired or was replaced. Says nothing about whether an invite exists, and sends at most one link per invite every 2 minutes. Owner rights because the person is not signed in yet.';
 
 --
 -- Name: current_account(); Type: FUNCTION; Schema: music; Owner: -
@@ -8846,6 +8913,13 @@ GRANT ALL ON FUNCTION api.account_storage_write() TO app_user;
 GRANT ALL ON FUNCTION api.artist_write() TO app_user;
 
 --
+-- Name: FUNCTION check_invite(token text); Type: ACL; Schema: api; Owner: -
+--
+
+REVOKE ALL ON FUNCTION api.check_invite(token text) FROM PUBLIC;
+GRANT ALL ON FUNCTION api.check_invite(token text) TO web_anon;
+
+--
 -- Name: FUNCTION check_session(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -8902,6 +8976,13 @@ GRANT ALL ON FUNCTION api.recording_write() TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.release_write() TO app_user;
+
+--
+-- Name: FUNCTION request_invite_link(email text); Type: ACL; Schema: api; Owner: -
+--
+
+REVOKE ALL ON FUNCTION api.request_invite_link(email text) FROM PUBLIC;
+GRANT ALL ON FUNCTION api.request_invite_link(email text) TO web_anon;
 
 --
 -- Name: FUNCTION current_account(); Type: ACL; Schema: music; Owner: -

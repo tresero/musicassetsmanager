@@ -203,6 +203,10 @@ page where the person picks a password and joins with the role the owner chose.
 Email addresses are matched regardless of case, at sign-in and on invites.
 
 Invites can be resent, which makes the old link stop working, or cancelled.
+The invite page checks the link before asking for a password: it names the
+account, role and email for an open invite, sends an accepted one to sign in,
+and for an expired or replaced link offers to email a new one to the invited
+address, without saying whether an invite exists.
 Owners change a user's role or remove them; a removed user is signed out on
 their next request. An account always keeps at least one Owner.
 
@@ -255,3 +259,4 @@ it shows: names by name and lengths by time.
 | 2026-10-28 | A new phone number starts on the calling code of the user's default country (#51). |
 | 2026-11-11 | IPI and ISNI are unique per account, so accounts keep their own records of the same person, company or artist (#49). |
 | 2026-11-11 | The site admin creates an account by inviting its first Owner (#34). |
+| 2026-11-11 | The invite page checks the link first and offers a new link when it has expired or been replaced (#34). |
