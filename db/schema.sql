@@ -3283,6 +3283,44 @@ $$;
 COMMENT ON FUNCTION api.set_storage_secret(secret text) IS 'Runs as the signed-in user, so row security limits every write to that account.';
 
 --
+-- Name: site_account_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.site_account_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _id uuid;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM music.delete_account(OLD.id);
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    _id := music.create_account(NEW.name, NEW.owner_email);
+  ELSE
+    IF NOT coalesce(NEW.resend, false) THEN
+      RAISE EXCEPTION 'An account''s invite can only be resent here.';
+    END IF;
+    PERFORM music.resend_account_invite(OLD.id);
+    _id := OLD.id;
+  END IF;
+
+  SELECT v.id, v.name, v.created_at, v.user_count, v.owner_email, v.status, v.invite_expires_at, false
+    INTO NEW.id, NEW.name, NEW.created_at, NEW.user_count, NEW.owner_email, NEW.status, NEW.invite_expires_at, NEW.resend
+    FROM api.site_account v WHERE v.id = _id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION site_account_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.site_account_write() IS 'Runs as the signed-in user and hands each write to the site admin functions, which refuse anyone else.';
+
+--
 -- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -3559,6 +3597,57 @@ END;
 $$;
 
 --
+-- Name: create_account(text, text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.create_account(p_name text, p_owner_email text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+DECLARE
+  _name text := btrim(coalesce(p_name, ''));
+  _email text := lower(btrim(coalesce(p_owner_email, '')));
+  _token text := encode(gen_random_bytes(32), 'hex');
+  _account uuid;
+  _invite uuid;
+BEGIN
+  IF NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can create accounts.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF _name = '' THEN
+    RAISE EXCEPTION 'Enter a name for the account.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF EXISTS (SELECT 1 FROM music.account a WHERE lower(a.name) = lower(_name)) THEN
+    RAISE EXCEPTION 'An account named % already exists.', _name
+      USING ERRCODE = 'unique_violation';
+  END IF;
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE lower(u.email) = _email) THEN
+    RAISE EXCEPTION '% already has a login, and a login belongs to one account. Invite a different address.', _email
+      USING ERRCODE = 'unique_violation';
+  END IF;
+
+  INSERT INTO music.account (name) VALUES (_name) RETURNING id INTO _account;
+
+  INSERT INTO music.user_invite (account_id, email, role_id, token_hash)
+  VALUES (_account, _email,
+          (SELECT r.id FROM music.account_role r WHERE r.name = 'Owner'),
+          sha256(convert_to(_token, 'UTF8')))
+  RETURNING id INTO _invite;
+
+  PERFORM music.send_invite(_invite, _token);
+  RETURN _account;
+END;
+$$;
+
+--
+-- Name: FUNCTION create_account(p_name text, p_owner_email text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.create_account(p_name text, p_owner_email text) IS 'Site admin only: creates an account and emails its first Owner an invite. Owner rights because the new account is not the signed-in user''s.';
+
+--
 -- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -3583,6 +3672,33 @@ CREATE FUNCTION music.default_audio_file_type(p_format text) RETURNS integer
    WHERE name = CASE WHEN upper(coalesce(p_format, '')) = 'ZIP'
                      THEN 'Stem' ELSE 'Full Mix' END
 $$;
+
+--
+-- Name: delete_account(uuid); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.delete_account(p_account uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+BEGIN
+  IF NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can delete accounts.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.account_id = p_account) THEN
+    RAISE EXCEPTION 'Someone has signed in to this account, so it can no longer be deleted here.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  DELETE FROM music.account a WHERE a.id = p_account;
+END;
+$$;
+
+--
+-- Name: FUNCTION delete_account(p_account uuid); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.delete_account(p_account uuid) IS 'Site admin only: deletes an account nobody has signed in to yet, with its invite, for an account created by mistake. Owner rights because the account is not the signed-in user''s.';
 
 --
 -- Name: document_storage_kind(); Type: FUNCTION; Schema: music; Owner: -
@@ -3984,6 +4100,55 @@ $$;
 COMMENT ON FUNCTION music.require_site_admin() IS 'Statement trigger on the shared lists: refuses a write unless the signed-in user is the site admin.';
 
 --
+-- Name: resend_account_invite(uuid); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.resend_account_invite(p_account uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+DECLARE
+  _token text := encode(gen_random_bytes(32), 'hex');
+  _invite uuid;
+BEGIN
+  IF NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can resend an account''s first invite.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.account_id = p_account) THEN
+    RAISE EXCEPTION 'This account already has users. Its Owners invite people from the Users page.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  UPDATE music.user_invite v
+     SET token_hash = sha256(convert_to(_token, 'UTF8')),
+         sent_at = now(),
+         expires_at = now() + interval '7 days'
+   WHERE v.id = (SELECT i.id
+                   FROM music.user_invite i
+                   JOIN music.account_role r ON r.id = i.role_id
+                  WHERE i.account_id = p_account AND r.name = 'Owner'
+                    AND i.accepted_at IS NULL
+                  ORDER BY i.sent_at DESC
+                  LIMIT 1)
+  RETURNING v.id INTO _invite;
+
+  IF _invite IS NULL THEN
+    RAISE EXCEPTION 'This account has no open invite to resend.'
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  PERFORM music.send_invite(_invite, _token);
+END;
+$$;
+
+--
+-- Name: FUNCTION resend_account_invite(p_account uuid); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.resend_account_invite(p_account uuid) IS 'Site admin only: sends a new link for an account''s Owner invite while the account has no users. The older link stops working. Owner rights because the account is not the signed-in user''s.';
+
+--
 -- Name: search_doc(text[]); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -4036,6 +4201,45 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+--
+-- Name: site_account(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.site_account() RETURNS TABLE(id uuid, name text, created_at timestamp with time zone, user_count integer, owner_email text, status text, invite_expires_at timestamp with time zone)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT a.id, a.name, a.created_at, u.n::integer,
+         coalesce(u.owner, i.email),
+         CASE WHEN u.n > 0 THEN 'Active'
+              WHEN i.id IS NULL THEN 'No invite'
+              WHEN i.expires_at <= now() THEN 'Invite expired'
+              ELSE 'Invited' END,
+         CASE WHEN u.n = 0 THEN i.expires_at END
+    FROM music.account a
+    CROSS JOIN LATERAL (
+      SELECT count(*) AS n,
+             (array_agg(x.email::text ORDER BY x.created_at)
+                FILTER (WHERE r.name = 'Owner'))[1] AS owner
+        FROM music.user_account x
+        JOIN music.account_role r ON r.id = x.role_id
+       WHERE x.account_id = a.id) u
+    LEFT JOIN LATERAL (
+      SELECT v.id, v.email::text AS email, v.expires_at
+        FROM music.user_invite v
+        JOIN music.account_role r ON r.id = v.role_id
+       WHERE v.account_id = a.id AND r.name = 'Owner' AND v.accepted_at IS NULL
+       ORDER BY v.sent_at DESC
+       LIMIT 1) i ON true
+   WHERE music.is_site_admin()
+$$;
+
+--
+-- Name: FUNCTION site_account(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.site_account() IS 'Every account with its user count, first Owner and the state of its Owner invite. Returns rows only to the site admin. Owner rights because app_user cannot read other accounts.';
 
 --
 -- Name: song_controlled_share(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -4761,6 +4965,27 @@ CREATE VIEW api.schema_type WITH (security_invoker='true') AS
     ((s.vocabulary || ':'::text) || s.class_name) AS curie
    FROM (music.schema_type s
      JOIN music.vocabulary v ON ((v.prefix = s.vocabulary)));
+
+--
+-- Name: site_account; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.site_account WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    created_at,
+    user_count,
+    owner_email,
+    status,
+    invite_expires_at,
+    false AS resend
+   FROM music.site_account() site_account(id, name, created_at, user_count, owner_email, status, invite_expires_at);
+
+--
+-- Name: VIEW site_account; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update with resend true to send a new link; delete to remove an account nobody has signed in to.';
 
 --
 -- Name: song_split_check; Type: VIEW; Schema: api; Owner: -
@@ -6672,6 +6897,24 @@ CREATE TRIGGER release_ins INSTEAD OF INSERT ON api.release FOR EACH ROW EXECUTE
 --
 
 CREATE TRIGGER release_upd INSTEAD OF UPDATE ON api.release FOR EACH ROW EXECUTE FUNCTION api.release_write();
+
+--
+-- Name: site_account site_account_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER site_account_del INSTEAD OF DELETE ON api.site_account FOR EACH ROW EXECUTE FUNCTION api.site_account_write();
+
+--
+-- Name: site_account site_account_ins; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER site_account_ins INSTEAD OF INSERT ON api.site_account FOR EACH ROW EXECUTE FUNCTION api.site_account_write();
+
+--
+-- Name: site_account site_account_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER site_account_upd INSTEAD OF UPDATE ON api.site_account FOR EACH ROW EXECUTE FUNCTION api.site_account_write();
 
 --
 -- Name: song song_del; Type: TRIGGER; Schema: api; Owner: -
@@ -9204,6 +9447,12 @@ GRANT ALL ON FUNCTION api.search(api.vocal_type) TO app_user;
 GRANT ALL ON FUNCTION api.set_storage_secret(secret text) TO app_user;
 
 --
+-- Name: FUNCTION site_account_write(); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.site_account_write() TO app_user;
+
+--
 -- Name: FUNCTION song_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -9216,16 +9465,37 @@ GRANT ALL ON FUNCTION api.song_write() TO app_user;
 REVOKE ALL ON FUNCTION auth.set_password(p_email text, p_password text) FROM PUBLIC;
 
 --
+-- Name: FUNCTION create_account(p_name text, p_owner_email text); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.create_account(p_name text, p_owner_email text) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.create_account(p_name text, p_owner_email text) TO app_user;
+
+--
 -- Name: FUNCTION default_audio_file_type(p_format text); Type: ACL; Schema: music; Owner: -
 --
 
 GRANT ALL ON FUNCTION music.default_audio_file_type(p_format text) TO app_user;
 
 --
+-- Name: FUNCTION delete_account(p_account uuid); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.delete_account(p_account uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.delete_account(p_account uuid) TO app_user;
+
+--
 -- Name: FUNCTION party_name(p_contact_id integer, p_organization_id integer); Type: ACL; Schema: music; Owner: -
 --
 
 GRANT ALL ON FUNCTION music.party_name(p_contact_id integer, p_organization_id integer) TO app_user;
+
+--
+-- Name: FUNCTION resend_account_invite(p_account uuid); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.resend_account_invite(p_account uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.resend_account_invite(p_account uuid) TO app_user;
 
 --
 -- Name: FUNCTION search_doc(VARIADIC p text[]); Type: ACL; Schema: music; Owner: -
@@ -9239,6 +9509,13 @@ GRANT ALL ON FUNCTION music.search_doc(VARIADIC p text[]) TO app_user;
 
 REVOKE ALL ON FUNCTION music.send_invite(p_invite uuid, p_token text) FROM PUBLIC;
 GRANT ALL ON FUNCTION music.send_invite(p_invite uuid, p_token text) TO app_user;
+
+--
+-- Name: FUNCTION site_account(); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.site_account() FROM PUBLIC;
+GRANT ALL ON FUNCTION music.site_account() TO app_user;
 
 --
 -- Name: FUNCTION song_controlled_share(p_song integer); Type: ACL; Schema: music; Owner: -
@@ -9570,6 +9847,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.vocabulary TO app_user;
 --
 
 GRANT SELECT ON TABLE api.schema_type TO app_user;
+
+--
+-- Name: TABLE site_account; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.site_account TO app_user;
 
 --
 -- Name: TABLE song_split_check; Type: ACL; Schema: api; Owner: -

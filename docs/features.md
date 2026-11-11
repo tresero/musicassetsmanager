@@ -206,6 +206,11 @@ Invites can be resent, which makes the old link stop working, or cancelled.
 Owners change a user's role or remove them; a removed user is signed out on
 their next request. An account always keeps at least one Owner.
 
+The site admin creates accounts from Settings, Accounts: a name and the email
+of the first Owner, who gets an invite and sets up the rest. The page lists
+every account with its Owner, user count and invite status. Until someone signs
+in, the site admin can resend the invite or delete the account.
+
 ## Interface
 
 Every search box and picker ignores case and accents and matches the start of
@@ -249,3 +254,4 @@ it shows: names by name and lengths by time.
 | 2026-10-27 | The writer role list offers only the writing roles and starts on Composer Lyricist (#50). |
 | 2026-10-28 | A new phone number starts on the calling code of the user's default country (#51). |
 | 2026-11-11 | IPI and ISNI are unique per account, so accounts keep their own records of the same person, company or artist (#49). |
+| 2026-11-11 | The site admin creates an account by inviting its first Owner (#34). |
