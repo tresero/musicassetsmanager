@@ -116,19 +116,21 @@ and the file's description.
 
 Names, the name they perform under, society, IPI, and ISNI. Several email
 addresses and phone numbers, the companies they work for with their title at
-each, and attached documents.
+each, and attached documents. An IPI or ISNI is used once per account.
 
 ## Companies
 
 Name, society, IPI, ISNI, country, and attached documents. A company name is
 used once per account, regardless of case; two companies that share a name are
-told apart in the name, by country or entity type.
+told apart in the name, by country or entity type. An IPI or ISNI is used once
+per account.
 
 ## Artists
 
 The identity a record is released under: name, how it sorts, whether it is a
 person or a group, and its ISNI. A solo act under its own name inherits the
-member's ISNI. Members are listed with the dates they joined and left.
+member's ISNI. An ISNI is used once per account. Members are listed with the
+dates they joined and left.
 
 ## Documents
 
@@ -246,3 +248,4 @@ it shows: names by name and lengths by time.
 | 2026-10-27 | My settings with a per-user default country; publisher roles listed first (#2). |
 | 2026-10-27 | The writer role list offers only the writing roles and starts on Composer Lyricist (#50). |
 | 2026-10-28 | A new phone number starts on the calling code of the user's default country (#51). |
+| 2026-11-11 | IPI and ISNI are unique per account, so accounts keep their own records of the same person, company or artist (#49). |

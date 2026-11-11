@@ -5360,7 +5360,13 @@ ALTER TABLE ONLY music.user_account
 --
 
 ALTER TABLE ONLY music.artist
-    ADD CONSTRAINT artist_isni_key UNIQUE (isni);
+    ADD CONSTRAINT artist_isni_key UNIQUE (account_id, isni);
+
+--
+-- Name: CONSTRAINT artist_isni_key ON artist; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON CONSTRAINT artist_isni_key ON music.artist IS 'An ISNI is used once per account; other accounts keep their own record of the same artist.';
 
 --
 -- Name: artist_member artist_member_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5423,14 +5429,26 @@ ALTER TABLE ONLY music.contact_email
 --
 
 ALTER TABLE ONLY music.contact
-    ADD CONSTRAINT contact_ipi_key UNIQUE (member_ipi);
+    ADD CONSTRAINT contact_ipi_key UNIQUE (account_id, member_ipi);
+
+--
+-- Name: CONSTRAINT contact_ipi_key ON contact; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON CONSTRAINT contact_ipi_key ON music.contact IS 'An IPI is used once per account; other accounts keep their own record of the same person.';
 
 --
 -- Name: contact contact_isni_key; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
 ALTER TABLE ONLY music.contact
-    ADD CONSTRAINT contact_isni_key UNIQUE (isni);
+    ADD CONSTRAINT contact_isni_key UNIQUE (account_id, isni);
+
+--
+-- Name: CONSTRAINT contact_isni_key ON contact; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON CONSTRAINT contact_isni_key ON music.contact IS 'An ISNI is used once per account; other accounts keep their own record of the same person.';
 
 --
 -- Name: contact_organization contact_organization_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -5528,14 +5546,26 @@ ALTER TABLE ONLY music.organization_document
 --
 
 ALTER TABLE ONLY music.organization
-    ADD CONSTRAINT organization_ipi_key UNIQUE (member_ipi);
+    ADD CONSTRAINT organization_ipi_key UNIQUE (account_id, member_ipi);
+
+--
+-- Name: CONSTRAINT organization_ipi_key ON organization; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON CONSTRAINT organization_ipi_key ON music.organization IS 'An IPI is used once per account; other accounts keep their own record of the same company.';
 
 --
 -- Name: organization organization_isni_key; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
 ALTER TABLE ONLY music.organization
-    ADD CONSTRAINT organization_isni_key UNIQUE (isni);
+    ADD CONSTRAINT organization_isni_key UNIQUE (account_id, isni);
+
+--
+-- Name: CONSTRAINT organization_isni_key ON organization; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON CONSTRAINT organization_isni_key ON music.organization IS 'An ISNI is used once per account; other accounts keep their own record of the same company.';
 
 --
 -- Name: organization organization_pkey; Type: CONSTRAINT; Schema: music; Owner: -
