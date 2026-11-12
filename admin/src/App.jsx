@@ -38,6 +38,7 @@ import documentOrphan from './resources/documentOrphan';
 import accountUser from './resources/accountUser';
 import accountInvite from './resources/accountInvite';
 import siteAccount from './resources/siteAccount';
+import accountRole from './resources/accountRole';
 import siteSetting from './resources/siteSetting';
 import { sharedList } from './resources/shared';
 
@@ -108,7 +109,8 @@ export default function App() {
       <Resource name="document_orphan" {...documentOrphan} />
       <Resource name="account_user" {...accountUser} />
       <Resource name="account_invite" {...accountInvite} />
-      <Resource name="account_role" recordRepresentation="name" />
+      <Resource name="account_role" {...(permissions?.site_admin ? accountRole : { recordRepresentation: 'name' })} />
+      <Resource name="permission" recordRepresentation="description" />
       {permissions?.site_admin && <Resource name="site_account" {...siteAccount} />}
       <Resource name="site_setting" {...(permissions?.site_admin ? siteSetting : {})} />
       <CustomRoutes noLayout>

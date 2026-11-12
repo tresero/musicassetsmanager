@@ -209,6 +209,53 @@ $$;
 COMMENT ON FUNCTION api.account_invite_write() IS 'Runs as the signed-in user, so row security and the users.manage permission apply. Each send makes a new link code; an older link stops working.';
 
 --
+-- Name: account_role_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.account_role_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _id integer;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM music.delete_account_role(OLD.id);
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO music.account_role (name, description)
+    VALUES (btrim(NEW.name), btrim(NEW.description))
+    RETURNING id INTO _id;
+  ELSE
+    UPDATE music.account_role
+       SET name = btrim(NEW.name), description = btrim(NEW.description)
+     WHERE id = OLD.id;
+    _id := OLD.id;
+  END IF;
+
+  IF NEW.permission_ids IS NOT NULL THEN
+    DELETE FROM music.account_role_permission rp
+     WHERE rp.role_id = _id AND rp.permission_id <> ALL (NEW.permission_ids);
+    INSERT INTO music.account_role_permission (role_id, permission_id)
+    SELECT _id, p FROM unnest(NEW.permission_ids) p
+    ON CONFLICT DO NOTHING;
+  END IF;
+
+  SELECT v.id, v.name, v.description, v.permission_ids
+    INTO NEW.id, NEW.name, NEW.description, NEW.permission_ids
+    FROM api.account_role v WHERE v.id = _id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION account_role_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.account_role_write() IS 'Runs as the signed-in user; the site admin triggers on the role tables refuse anyone else. permission_ids replaces the role''s permissions when given.';
+
+--
 -- Name: account_storage_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -3817,6 +3864,49 @@ $$;
 COMMENT ON FUNCTION music.delete_account(p_account uuid) IS 'Site admin only: deletes an account and everything in it, its users included, except the account the site admin is signed in to. Owner rights because the account is not the signed-in user''s.';
 
 --
+-- Name: delete_account_role(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.delete_account_role(p_role integer) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+DECLARE
+  _name text;
+  _users integer;
+  _invites integer;
+BEGIN
+  IF NOT music.is_site_admin() THEN
+    RAISE EXCEPTION 'Only the site admin can delete roles.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT r.name INTO _name FROM music.account_role r WHERE r.id = p_role;
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  SELECT count(*) INTO _users FROM music.user_account u WHERE u.role_id = p_role;
+  SELECT count(*) INTO _invites FROM music.user_invite i
+   WHERE i.role_id = p_role AND i.accepted_at IS NULL;
+  IF _users + _invites > 0 THEN
+    RAISE EXCEPTION 'The % role is held by % user(s) and % open invite(s) across all accounts. Give them another role first.',
+      _name, _users, _invites
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  DELETE FROM music.user_invite i WHERE i.role_id = p_role AND i.accepted_at IS NOT NULL;
+  DELETE FROM music.account_role r WHERE r.id = p_role;
+END;
+$$;
+
+--
+-- Name: FUNCTION delete_account_role(p_role integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.delete_account_role(p_role integer) IS 'Site admin only: deletes a role nobody holds, in any account, along with the record of invites accepted with it. Owner rights because app_user cannot see other accounts'' users.';
+
+--
 -- Name: document_storage_kind(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -4187,6 +4277,36 @@ $$;
 --
 
 COMMENT ON FUNCTION music.party_name(p_contact_id integer, p_organization_id integer) IS 'The names of a person (display and credit name) or company, for search text.';
+
+--
+-- Name: protect_owner_role(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.protect_owner_role() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'account_role' THEN
+    IF OLD.name = 'Owner' AND (TG_OP = 'DELETE' OR NEW.name IS DISTINCT FROM 'Owner') THEN
+      RAISE EXCEPTION 'The Owner role cannot be renamed or deleted. New accounts get their first user with it, and every account keeps one.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  ELSIF EXISTS (SELECT 1
+                  FROM music.account_role r, music.permission p
+                 WHERE r.id = OLD.role_id AND r.name = 'Owner'
+                   AND p.id = OLD.permission_id AND p.code = 'users.manage') THEN
+    RAISE EXCEPTION 'The Owner role always keeps managing users, so every account has someone who can.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
+--
+-- Name: FUNCTION protect_owner_role(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.protect_owner_role() IS 'Keeps the Owner role, which the database finds by name, from being renamed or deleted, and keeps its users.manage permission.';
 
 --
 -- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
@@ -4740,7 +4860,9 @@ COMMENT ON VIEW api.account_invite IS 'The signed-in account''s invites. Insert 
 CREATE TABLE music.account_role (
     id integer NOT NULL,
     name text NOT NULL,
-    description text NOT NULL
+    description text NOT NULL,
+    CONSTRAINT account_role_description_trimmed CHECK (((description = btrim(description)) AND (description <> ''::text))),
+    CONSTRAINT account_role_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
 
 --
@@ -4750,20 +4872,38 @@ CREATE TABLE music.account_role (
 COMMENT ON TABLE music.account_role IS 'What a user may do in their account. A role is a named set of permissions; adding one is adding rows here and in account_role_permission.';
 
 --
+-- Name: account_role_permission; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account_role_permission (
+    role_id integer NOT NULL,
+    permission_id integer NOT NULL
+);
+
+--
+-- Name: TABLE account_role_permission; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.account_role_permission IS 'Which permissions each account role has.';
+
+--
 -- Name: account_role; Type: VIEW; Schema: api; Owner: -
 --
 
 CREATE VIEW api.account_role WITH (security_invoker='true') AS
  SELECT id,
     name,
-    description
-   FROM music.account_role;
+    description,
+    COALESCE(( SELECT array_agg(rp.permission_id ORDER BY rp.permission_id) AS array_agg
+           FROM music.account_role_permission rp
+          WHERE (rp.role_id = r.id)), '{}'::integer[]) AS permission_ids
+   FROM music.account_role r;
 
 --
 -- Name: VIEW account_role; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user.';
+COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user, the same for every account, with the permissions each grants. Only the site admin inserts, updates or deletes them.';
 
 --
 -- Name: account_storage; Type: TABLE; Schema: music; Owner: -
@@ -5001,6 +5141,44 @@ CREATE VIEW api.email_duplicate WITH (security_invoker='true') AS
   WHERE (retired_at IS NULL)
   GROUP BY (lower((email)::text))
  HAVING (count(*) > 1);
+
+--
+-- Name: permission; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.permission (
+    id integer NOT NULL,
+    code text NOT NULL,
+    description text NOT NULL
+);
+
+--
+-- Name: TABLE permission; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.permission IS 'Actions the database checks by code. The set is fixed by the code that checks it.';
+
+--
+-- Name: COLUMN permission.description; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.permission.description IS 'Completes the sentence "Your role does not allow ..." in the error a refused user sees.';
+
+--
+-- Name: permission; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.permission WITH (security_invoker='true') AS
+ SELECT id,
+    code,
+    description
+   FROM music.permission;
+
+--
+-- Name: VIEW permission; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.permission IS 'The actions the database checks, which a role may grant. Fixed by the code that checks them, so read only.';
 
 --
 -- Name: pitch_setting; Type: TABLE; Schema: music; Owner: -
@@ -5376,21 +5554,6 @@ ALTER TABLE music.account_role ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 );
 
 --
--- Name: account_role_permission; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.account_role_permission (
-    role_id integer NOT NULL,
-    permission_id integer NOT NULL
-);
-
---
--- Name: TABLE account_role_permission; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.account_role_permission IS 'Which permissions each account role has.';
-
---
 -- Name: artist_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -5558,28 +5721,6 @@ ALTER TABLE music.organization ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
     NO MAXVALUE
     CACHE 1
 );
-
---
--- Name: permission; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.permission (
-    id integer NOT NULL,
-    code text NOT NULL,
-    description text NOT NULL
-);
-
---
--- Name: TABLE permission; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON TABLE music.permission IS 'Actions the database checks by code. The set is fixed by the code that checks it.';
-
---
--- Name: COLUMN permission.description; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.permission.description IS 'Completes the sentence "Your role does not allow ..." in the error a refused user sees.';
 
 --
 -- Name: permission_id_seq; Type: SEQUENCE; Schema: music; Owner: -
@@ -5808,13 +5949,6 @@ ALTER TABLE music.vocal_type ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 ALTER TABLE ONLY music.account
     ADD CONSTRAINT account_pkey PRIMARY KEY (id);
-
---
--- Name: account_role account_role_name_key; Type: CONSTRAINT; Schema: music; Owner: -
---
-
-ALTER TABLE ONLY music.account_role
-    ADD CONSTRAINT account_role_name_key UNIQUE (name);
 
 --
 -- Name: account_role_permission account_role_permission_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -6426,6 +6560,18 @@ CREATE INDEX login_failure_email_idx ON auth.login_failure USING btree (email, f
 CREATE INDEX login_failure_ip_idx ON auth.login_failure USING btree (ip, failed_at);
 
 --
+-- Name: account_role_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX account_role_name_key ON music.account_role USING btree (lower(name));
+
+--
+-- Name: INDEX account_role_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.account_role_name_key IS 'A role name is used once, regardless of case.';
+
+--
 -- Name: app_user_account_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -7026,6 +7172,24 @@ CREATE TRIGGER account_invite_ins INSTEAD OF INSERT ON api.account_invite FOR EA
 CREATE TRIGGER account_invite_upd INSTEAD OF UPDATE ON api.account_invite FOR EACH ROW EXECUTE FUNCTION api.account_invite_write();
 
 --
+-- Name: account_role account_role_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_role_del INSTEAD OF DELETE ON api.account_role FOR EACH ROW EXECUTE FUNCTION api.account_role_write();
+
+--
+-- Name: account_role account_role_ins; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_role_ins INSTEAD OF INSERT ON api.account_role FOR EACH ROW EXECUTE FUNCTION api.account_role_write();
+
+--
+-- Name: account_role account_role_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER account_role_upd INSTEAD OF UPDATE ON api.account_role FOR EACH ROW EXECUTE FUNCTION api.account_role_write();
+
+--
 -- Name: account_storage account_storage_del; Type: TRIGGER; Schema: api; Owner: -
 --
 
@@ -7210,6 +7374,30 @@ CREATE TRIGGER song_ins INSTEAD OF INSERT ON api.song FOR EACH ROW EXECUTE FUNCT
 --
 
 CREATE TRIGGER song_upd INSTEAD OF UPDATE ON api.song FOR EACH ROW EXECUTE FUNCTION api.song_write();
+
+--
+-- Name: account_role_permission account_role_permission_protect_owner; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_role_permission_protect_owner BEFORE DELETE OR UPDATE ON music.account_role_permission FOR EACH ROW EXECUTE FUNCTION music.protect_owner_role();
+
+--
+-- Name: account_role_permission account_role_permission_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_role_permission_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.account_role_permission FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin('the roles');
+
+--
+-- Name: account_role account_role_protect_owner; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_role_protect_owner BEFORE DELETE OR UPDATE ON music.account_role FOR EACH ROW EXECUTE FUNCTION music.protect_owner_role();
+
+--
+-- Name: account_role account_role_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_role_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.account_role FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin('the roles');
 
 --
 -- Name: account_storage account_storage_local_allowed; Type: TRIGGER; Schema: music; Owner: -
@@ -9123,6 +9311,12 @@ REVOKE ALL ON FUNCTION api.accept_invite(token text, pass text) FROM PUBLIC;
 GRANT ALL ON FUNCTION api.accept_invite(token text, pass text) TO web_anon;
 
 --
+-- Name: FUNCTION account_role_write(); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.account_role_write() TO app_user;
+
+--
 -- Name: FUNCTION account_storage_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -9794,6 +9988,13 @@ REVOKE ALL ON FUNCTION music.delete_account(p_account uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION music.delete_account(p_account uuid) TO app_user;
 
 --
+-- Name: FUNCTION delete_account_role(p_role integer); Type: ACL; Schema: music; Owner: -
+--
+
+REVOKE ALL ON FUNCTION music.delete_account_role(p_role integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION music.delete_account_role(p_role integer) TO app_user;
+
+--
 -- Name: FUNCTION party_name(p_contact_id integer, p_organization_id integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -9921,13 +10122,19 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.account_invite TO app_user;
 -- Name: TABLE account_role; Type: ACL; Schema: music; Owner: -
 --
 
-GRANT SELECT ON TABLE music.account_role TO app_user;
+GRANT SELECT,INSERT,UPDATE ON TABLE music.account_role TO app_user;
+
+--
+-- Name: TABLE account_role_permission; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE ON TABLE music.account_role_permission TO app_user;
 
 --
 -- Name: TABLE account_role; Type: ACL; Schema: api; Owner: -
 --
 
-GRANT SELECT ON TABLE api.account_role TO app_user;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.account_role TO app_user;
 
 --
 -- Name: TABLE account_storage; Type: ACL; Schema: music; Owner: -
@@ -10081,6 +10288,18 @@ GRANT SELECT ON TABLE api.document_usage TO app_user;
 GRANT SELECT ON TABLE api.email_duplicate TO app_user;
 
 --
+-- Name: TABLE permission; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.permission TO app_user;
+
+--
+-- Name: TABLE permission; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.permission TO app_user;
+
+--
 -- Name: TABLE pitch_setting; Type: ACL; Schema: music; Owner: -
 --
 
@@ -10217,12 +10436,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.vocabulary TO app_user;
 --
 
 --
--- Name: TABLE account_role_permission; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT ON TABLE music.account_role_permission TO app_user;
-
---
 -- Name: SEQUENCE artist_id_seq; Type: ACL; Schema: music; Owner: -
 --
 
@@ -10293,12 +10506,6 @@ GRANT USAGE ON SEQUENCE music.mood_id_seq TO app_user;
 --
 
 GRANT USAGE ON SEQUENCE music.organization_id_seq TO app_user;
-
---
--- Name: TABLE permission; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT ON TABLE music.permission TO app_user;
 
 --
 -- Name: SEQUENCE vocal_type_id_seq; Type: ACL; Schema: music; Owner: -

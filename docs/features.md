@@ -220,6 +220,14 @@ and sends a new link. The site admin can delete any account but their own,
 with its users and catalog; for an account in use, its name must be typed to
 confirm. Files in the account's storage are left alone.
 
+The roles Owners give their users are the same for every account. The site
+admin creates, renames, describes and deletes them from Settings, Account
+roles, and picks what each may do: add and edit catalog data, delete whole
+records, change settings, manage users. Everyone in an account can read all of
+it. The Owner role keeps its name and always manages users. A role cannot be
+deleted while a user or an open invite in any account has it; the error gives
+the counts. Role names are unique regardless of case.
+
 ## Interface
 
 Every search box and picker ignores case and accents and matches the start of
@@ -268,3 +276,4 @@ it shows: names by name and lengths by time.
 | 2026-11-11 | The site admin renames accounts and corrects the first Owner's email (#34). |
 | 2026-11-11 | The site admin deletes any account but their own, typing its name when it is in use (#34). |
 | 2026-11-11 | Site settings; Local disk only for the site admin's account unless allowed there (#39). |
+| 2026-11-11 | The site admin creates, edits and deletes account roles and their permissions. |
