@@ -42,6 +42,7 @@ const messages = {
     account_role:      { name: 'Account role |||| Account roles' },
     account_invite:    { name: 'Invite |||| Invites' },
     site_account:      { name: 'Account |||| Accounts' },
+    site_setting:      { name: 'Site settings |||| Site settings' },
   },
 };
 

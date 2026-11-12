@@ -188,8 +188,9 @@ that resolve to nobody, which would go out with nobody to call.
 Files are stored in S3-compatible object storage or on local disk, chosen per
 account. Uploads go straight from the browser to the bucket. Each file is named
 by the hash of its contents, so the same file uploaded again is not stored
-twice, and a nightly sweep deletes stored files nothing refers to. See
-[file-storage.md](file-storage.md).
+twice, and a nightly sweep deletes stored files nothing refers to. Local disk
+is offered only to the site admin's account unless the site admin allows it for
+every account in Site settings. See [file-storage.md](file-storage.md).
 
 ## Accounts
 
@@ -266,3 +267,4 @@ it shows: names by name and lengths by time.
 | 2026-11-11 | The invite page checks the link first and offers a new link when it has expired or been replaced (#34). |
 | 2026-11-11 | The site admin renames accounts and corrects the first Owner's email (#34). |
 | 2026-11-11 | The site admin deletes any account but their own, typing its name when it is in use (#34). |
+| 2026-11-11 | Site settings; Local disk only for the site admin's account unless allowed there (#39). |

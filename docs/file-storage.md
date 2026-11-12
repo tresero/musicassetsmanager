@@ -53,6 +53,12 @@ A hosted deployment does not have to hold anyone's files. A client points the
 install at their own bucket, keeps their own credentials, and pays their own
 storage bill.
 
+Local disk is the server's own disk, so by default only the site admin's
+account may choose it. The site admin turns on "Let accounts store files on
+this server's disk" in Settings, Site settings to offer it to every account.
+While it is off, the database refuses any other account's switch to Local, and
+the Storage page does not offer it. An account already on Local keeps it.
+
 ## Files are named by their contents
 
 A stored file's key is the SHA-256 of its contents:
@@ -139,3 +145,4 @@ earn its place when one database holds credentials for many clients.
 | Date | Revision |
 |---|---|
 | 2026-11-11 | A deleted account's files are left in its storage; added this history |
+| 2026-11-11 | Only the site admin's account uses Local disk unless the site setting allows it (#39) |

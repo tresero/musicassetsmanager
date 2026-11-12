@@ -38,6 +38,7 @@ import documentOrphan from './resources/documentOrphan';
 import accountUser from './resources/accountUser';
 import accountInvite from './resources/accountInvite';
 import siteAccount from './resources/siteAccount';
+import siteSetting from './resources/siteSetting';
 import { sharedList } from './resources/shared';
 
 const nameList = sharedList();
@@ -109,6 +110,7 @@ export default function App() {
       <Resource name="account_invite" {...accountInvite} />
       <Resource name="account_role" recordRepresentation="name" />
       {permissions?.site_admin && <Resource name="site_account" {...siteAccount} />}
+      <Resource name="site_setting" {...(permissions?.site_admin ? siteSetting : {})} />
       <CustomRoutes noLayout>
         <Route path="/accept-invite" element={<AcceptInvite />} />
       </CustomRoutes>

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import {
   List, Datagrid, TextField, BooleanField,
   Edit, Create, SimpleForm, TextInput, SelectInput,
-  useRecordContext, useNotify, useRefresh,
+  useRecordContext, useNotify, useRefresh, useGetOne,
 } from 'react-admin';
 import { Button, TextField as MuiTextField, Stack, Alert } from '@mui/material';
 import { EditToolbar } from './formToolbar';
+import { useIsSiteAdmin } from '../permissions';
 
 const kinds = [
   { id: 'local',  name: 'Local disk' },
@@ -87,33 +88,50 @@ const StorageList = () => (
   </List>
 );
 
-const StorageFields = () => (
-  <>
-    <Alert severity="info" sx={{ width: '100%', mb: 2 }}>
-      <strong>S3 is recommended.</strong> Large uploads go straight from the
-      browser to the bucket, so they never pass through this server. Works with
-      AWS, Hetzner Object Storage, Backblaze B2, Cloudflare R2, Wasabi, and
-      MinIO. Leave the endpoint blank for AWS; set it to the provider's URL for
-      anything else.
-      <br /><br />
-      <strong>Local disk</strong> needs no account and nothing to configure
-      beyond a path, but every upload and download passes through this server.
-      Fine for documents, slow for audio masters.
-    </Alert>
-    <SelectInput source="kind" choices={kinds} label="Backend" required />
-    <TextInput source="endpoint" fullWidth
-               helperText="S3 only. Hetzner: https://fsn1.your-objectstorage.com. Blank for AWS." />
-    <TextInput source="region" helperText="S3 only" />
-    <TextInput source="bucket" helperText="S3 only" />
-    <TextInput source="access_key_id" label="Access key ID" fullWidth
-               helperText="Not a secret on its own" />
-    <TextInput source="base_path" label="Path prefix" fullWidth
-               helperText="Directory for local, key prefix for S3" />
-    <TextInput source="public_base_url" label="Public URL base" fullWidth
-               helperText="If public objects are served from a different hostname" />
-    <TextInput source="notes" multiline fullWidth />
-  </>
-);
+// Local disk is offered to the site admin, to every account when the
+// allow_local_storage site setting is on, and to storage already on it. The
+// database refuses any other switch to Local.
+const useLocalAllowed = () => {
+  const siteAdmin = useIsSiteAdmin();
+  const record = useRecordContext();
+  const { data } = useGetOne('site_setting', { id: 1 });
+  return siteAdmin || !!data?.allow_local_storage || record?.kind === 'local';
+};
+
+const StorageFields = () => {
+  const localAllowed = useLocalAllowed();
+  return (
+    <>
+      <Alert severity="info" sx={{ width: '100%', mb: 2 }}>
+        <strong>S3 is recommended.</strong> Large uploads go straight from the
+        browser to the bucket, so they never pass through this server. Works with
+        AWS, Hetzner Object Storage, Backblaze B2, Cloudflare R2, Wasabi, and
+        MinIO. Leave the endpoint blank for AWS; set it to the provider's URL for
+        anything else.
+        {localAllowed && <>
+          <br /><br />
+          <strong>Local disk</strong> needs no account and nothing to configure
+          beyond a path, but every upload and download passes through this server.
+          Fine for documents, slow for audio masters.
+        </>}
+      </Alert>
+      <SelectInput source="kind" label="Backend" required defaultValue="s3"
+                   choices={localAllowed ? kinds : kinds.filter((k) => k.id !== 'local')}
+                   helperText="Where this account's documents, audio and artwork are kept" />
+      <TextInput source="endpoint" fullWidth
+                 helperText="S3 only. Hetzner: https://fsn1.your-objectstorage.com. Blank for AWS." />
+      <TextInput source="region" helperText="S3 only" />
+      <TextInput source="bucket" helperText="S3 only" />
+      <TextInput source="access_key_id" label="Access key ID" fullWidth
+                 helperText="Not a secret on its own" />
+      <TextInput source="base_path" label="Path prefix" fullWidth
+                 helperText="Directory for local, key prefix for S3" />
+      <TextInput source="public_base_url" label="Public URL base" fullWidth
+                 helperText="If public objects are served from a different hostname" />
+      <TextInput source="notes" multiline fullWidth />
+    </>
+  );
+};
 
 const StorageEditForm = () => (
   <SimpleForm toolbar={<EditToolbar />}>

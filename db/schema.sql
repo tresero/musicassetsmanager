@@ -3388,6 +3388,29 @@ $$;
 COMMENT ON FUNCTION api.site_account_write() IS 'Runs as the signed-in user and hands each write to the site admin functions, which refuse anyone else.';
 
 --
+-- Name: site_setting_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.site_setting_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  INSERT INTO music.site_setting (id, allow_local_storage)
+  VALUES (1, coalesce(NEW.allow_local_storage, false))
+  ON CONFLICT (id) DO UPDATE SET allow_local_storage = EXCLUDED.allow_local_storage;
+  NEW.id := 1;
+  NEW.allow_local_storage := coalesce(NEW.allow_local_storage, false);
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION site_setting_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.site_setting_write() IS 'Runs as the signed-in user; the site_setting_site_admin trigger refuses anyone but the site admin.';
+
+--
 -- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -3628,6 +3651,32 @@ $$;
 COMMENT ON FUNCTION music.can(p_code text) IS 'True when the signed-in user''s role has the permission. Owner rights only to read the user''s own role; it changes nothing.';
 
 --
+-- Name: check_local_storage(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.check_local_storage() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.kind = 'local'
+     AND (TG_OP = 'INSERT' OR OLD.kind IS DISTINCT FROM 'local')
+     AND music.current_app_user() IS NOT NULL
+     AND NOT music.is_site_admin()
+     AND NOT music.local_storage_allowed() THEN
+    RAISE EXCEPTION 'This installation does not let accounts keep files on its own disk. Choose another backend, such as S3 compatible.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION check_local_storage(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.check_local_storage() IS 'Refuses a switch to Local disk unless the site admin makes it or the allow_local_storage site setting is on. Storage already on Local stays editable, and writes outside an API request are not checked.';
+
+--
 -- Name: check_representation_exclusive(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -3840,6 +3889,22 @@ $$;
 --
 
 COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave the signed-in user''s account without an Owner. Users leaving with a whole account, deleted by the site admin or outside an API request, are not checked.';
+
+--
+-- Name: local_storage_allowed(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.local_storage_allowed() RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT coalesce((SELECT s.allow_local_storage FROM music.site_setting s WHERE s.id = 1), false)
+$$;
+
+--
+-- Name: FUNCTION local_storage_allowed(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.local_storage_allowed() IS 'The allow_local_storage site setting, false when unset.';
 
 --
 -- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -4155,7 +4220,7 @@ CREATE FUNCTION music.require_site_admin() RETURNS trigger
     AS $$
 BEGIN
   IF music.current_app_user() IS NOT NULL AND NOT music.is_site_admin() THEN
-    RAISE EXCEPTION 'Only the site admin can change the shared lists'
+    RAISE EXCEPTION 'Only the site admin can change %', coalesce(TG_ARGV[0], 'the shared lists')
       USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NULL;
@@ -5147,6 +5212,44 @@ CREATE VIEW api.site_account WITH (security_invoker='true') AS
 --
 
 COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update name and owner_email to rename it or correct the invite, or set resend true to send a new link; delete to remove an account and everything in it, other than the site admin''s own.';
+
+--
+-- Name: site_setting; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.site_setting (
+    id integer DEFAULT 1 NOT NULL,
+    allow_local_storage boolean DEFAULT false NOT NULL,
+    CONSTRAINT site_setting_one_row CHECK ((id = 1))
+);
+
+--
+-- Name: TABLE site_setting; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.site_setting IS 'Settings for the whole installation: one row, changed only by the site admin. With no row, every setting takes its default.';
+
+--
+-- Name: COLUMN site_setting.allow_local_storage; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.site_setting.allow_local_storage IS 'Whether accounts other than the site admin''s may keep their files on this server''s disk. Off by default, so a hosted installation does not share its disk with its customers.';
+
+--
+-- Name: site_setting; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.site_setting WITH (security_invoker='true') AS
+ SELECT 1 AS id,
+    COALESCE(s.allow_local_storage, false) AS allow_local_storage
+   FROM (( SELECT 1 AS "?column?") one
+     LEFT JOIN music.site_setting s ON ((s.id = 1)));
+
+--
+-- Name: VIEW site_setting; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.site_setting IS 'The installation''s settings, always one row with id 1. Every user reads it; only the site admin updates it.';
 
 --
 -- Name: song_split_check; Type: VIEW; Schema: api; Owner: -
@@ -6185,6 +6288,13 @@ ALTER TABLE ONLY music.schema_type
     ADD CONSTRAINT schema_type_unique UNIQUE (vocabulary, class_name);
 
 --
+-- Name: site_setting site_setting_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.site_setting
+    ADD CONSTRAINT site_setting_pkey PRIMARY KEY (id);
+
+--
 -- Name: song_document song_document_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -7078,6 +7188,12 @@ CREATE TRIGGER site_account_ins INSTEAD OF INSERT ON api.site_account FOR EACH R
 CREATE TRIGGER site_account_upd INSTEAD OF UPDATE ON api.site_account FOR EACH ROW EXECUTE FUNCTION api.site_account_write();
 
 --
+-- Name: site_setting site_setting_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER site_setting_upd INSTEAD OF UPDATE ON api.site_setting FOR EACH ROW EXECUTE FUNCTION api.site_setting_write();
+
+--
 -- Name: song song_del; Type: TRIGGER; Schema: api; Owner: -
 --
 
@@ -7094,6 +7210,12 @@ CREATE TRIGGER song_ins INSTEAD OF INSERT ON api.song FOR EACH ROW EXECUTE FUNCT
 --
 
 CREATE TRIGGER song_upd INSTEAD OF UPDATE ON api.song FOR EACH ROW EXECUTE FUNCTION api.song_write();
+
+--
+-- Name: account_storage account_storage_local_allowed; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER account_storage_local_allowed BEFORE INSERT OR UPDATE OF kind ON music.account_storage FOR EACH ROW EXECUTE FUNCTION music.check_local_storage();
 
 --
 -- Name: account_storage account_storage_settings_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -7424,6 +7546,12 @@ CREATE TRIGGER role_group_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.
 --
 
 CREATE TRIGGER role_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.role FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
+
+--
+-- Name: site_setting site_setting_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER site_setting_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.site_setting FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin('the site settings');
 
 --
 -- Name: song song_delete_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -9628,6 +9756,12 @@ GRANT ALL ON FUNCTION api.set_storage_secret(secret text) TO app_user;
 GRANT ALL ON FUNCTION api.site_account_write() TO app_user;
 
 --
+-- Name: FUNCTION site_setting_write(); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.site_setting_write() TO app_user;
+
+--
 -- Name: FUNCTION song_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -10035,6 +10169,18 @@ GRANT SELECT ON TABLE api.schema_type TO app_user;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.site_account TO app_user;
+
+--
+-- Name: TABLE site_setting; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE music.site_setting TO app_user;
+
+--
+-- Name: TABLE site_setting; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,UPDATE ON TABLE api.site_setting TO app_user;
 
 --
 -- Name: TABLE song_split_check; Type: ACL; Schema: api; Owner: -

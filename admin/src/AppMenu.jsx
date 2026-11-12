@@ -82,6 +82,7 @@ export const AppMenu = () => {
       {canUsers && <Menu.ResourceItem name="account_user" />}
       {canUsers && <Menu.ResourceItem name="account_invite" />}
       {siteAdmin && <Menu.ResourceItem name="site_account" />}
+      {siteAdmin && <Menu.ResourceItem name="site_setting" />}
     </Menu>
   );
 };
