@@ -8,3 +8,4 @@ AGENTS.md
 .claude/
 skills/
 skills-lock.json
+db.sqlite3

@@ -288,6 +288,17 @@ The alternative was a foreign key that points at either a person or a company
 depending on a type column, which PostgreSQL can't enforce. That pattern is the
 thing this project exists to avoid.
 
+## Publishing and master royalties are accounted apart
+
+Publishing income is earned by a composition and paid by its writer and
+publisher shares. Master income is earned by a recording and paid by its owner
+shares and points. Each side keeps its own balances, and nothing moves between
+them.
+
+A deal can cross-collateralize the two, recouping a master advance from
+publishing royalties or the reverse. That is deliberately not modeled. Where a
+contract does it, it is settled outside the catalog.
+
 ## Revision history
 
 | Date | Revision |
@@ -296,3 +307,4 @@ thing this project exists to avoid.
 | 2026-10-14 | Language on the recording, defaulting from the composition (#3). |
 | 2026-10-27 | A song's publisher can be a person (#4). |
 | 2026-10-28 | Phone country codes are ITU calling codes; countries carry theirs (#51). |
+| 2026-11-12 | Publishing and master royalties are accounted apart; cross-collateralization is not modeled. |
