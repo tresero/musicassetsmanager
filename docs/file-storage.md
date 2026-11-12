@@ -109,6 +109,12 @@ nothing refers to. Three rules keep it safe:
 It runs nightly from a systemd timer and has a dry run for checking what it
 would remove.
 
+The sweep finds each account's files through its storage settings, so when the
+site admin deletes an account, its files are left where they are. On S3 that is
+the account's own bucket, which is theirs to keep or empty. On an installation
+that lets accounts use Local disk, they stay on the server's disk until removed
+by hand.
+
 ## Credentials
 
 The access key id is stored in the clear. On its own it is an identifier, not a
@@ -127,3 +133,9 @@ Column-level encryption with pgcrypto protects a stolen dump but not a
 compromised host, since the passphrase has to reach the running process. For a
 single-tenant install it is machinery without a matching threat. It starts to
 earn its place when one database holds credentials for many clients.
+
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-11-11 | A deleted account's files are left in its storage; added this history |

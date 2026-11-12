@@ -1,16 +1,23 @@
+import { useState } from 'react';
 import {
   List, Datagrid, TextField, DateField, NumberField, FunctionField,
-  Create, Edit, SimpleForm, TextInput, DeleteButton, Toolbar, SaveButton,
+  Create, Edit, SimpleForm, TextInput, Toolbar, SaveButton,
   TopToolbar, CreateButton, Button, required, email,
-  useRecordContext, useUpdate, useNotify, useRedirect,
+  useRecordContext, useUpdate, useDelete, useNotify, useRedirect,
 } from 'react-admin';
+import {
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  TextField as MuiTextField,
+} from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 // Every account, for the site admin. Creating one emails its first Owner an
 // invite; the Owner then sets up storage, pitch settings and staff. The
-// database refuses anyone but the site admin, and refuses to resend or delete
-// once someone has signed in to the account. Editing renames the account and,
-// until someone signs in, moves the Owner invite to a corrected email.
+// database refuses anyone but the site admin, refuses to resend once someone
+// has signed in, and never deletes the site admin's own account. Editing
+// renames the account and, until someone signs in, moves the Owner invite to a
+// corrected email.
 
 const ResendButton = () => {
   const record = useRecordContext();
@@ -30,13 +37,51 @@ const ResendButton = () => {
   return <Button label="Resend" onClick={resend} disabled={isPending}><SendIcon /></Button>;
 };
 
+// Deleting an account in use takes its users and catalog with it, so the
+// name must be typed first. Clicks inside the dialog stop at the dialog, or
+// they would reach the row and open the edit page.
 const RemoveButton = () => {
   const record = useRecordContext();
-  if (!record || record.user_count > 0) return null;
+  const notify = useNotify();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [remove, { isPending }] = useDelete();
+  if (!record || record.is_mine) return null;
+  const inUse = record.user_count > 0;
+  const ready = !inUse || typed.trim() === record.name;
+  const close = () => { setOpen(false); setTyped(''); };
+  const confirm = () => remove('site_account', { id: record.id, previousData: record }, {
+    mutationMode: 'pessimistic',
+    onSuccess: () => { close(); notify(`Deleted ${record.name}`, { type: 'info' }); },
+    onError: (err) => notify(err.message, { type: 'error' }),
+  });
   return (
-    <DeleteButton mutationMode="pessimistic" redirect={false}
-                  confirmTitle={`Delete the account ${record.name}?`}
-                  confirmContent="Nobody has signed in to it yet. The emailed link will stop working." />
+    <>
+      <Button label="Delete" color="error"
+              onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        <DeleteIcon />
+      </Button>
+      <Dialog open={open} onClose={close} onClick={(e) => e.stopPropagation()}>
+        <DialogTitle>Delete the account {record.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: inUse ? 2 : 0 }}>
+            {inUse
+              ? `This permanently deletes its ${record.user_count} user${record.user_count === 1 ? '' : 's'} and all of its songs, recordings, releases, people, companies, artists and documents. Files in the account's own storage are not touched.`
+              : 'Nobody has signed in to it yet. The emailed link will stop working.'}
+          </DialogContentText>
+          {inUse && (
+            <MuiTextField label="Account name" fullWidth autoFocus value={typed}
+                          onChange={(e) => setTyped(e.target.value)}
+                          helperText={`Type ${record.name} to confirm.`} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button label="Cancel" onClick={close} />
+          <Button label="Delete" color="error" variant="contained"
+                  disabled={!ready || isPending} onClick={confirm} />
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

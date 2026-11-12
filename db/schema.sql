@@ -3374,8 +3374,8 @@ BEGIN
     _id := OLD.id;
   END IF;
 
-  SELECT v.id, v.name, v.created_at, v.user_count, v.owner_email, v.status, v.invite_expires_at, false
-    INTO NEW.id, NEW.name, NEW.created_at, NEW.user_count, NEW.owner_email, NEW.status, NEW.invite_expires_at, NEW.resend
+  SELECT v.id, v.name, v.created_at, v.user_count, v.owner_email, v.status, v.invite_expires_at, false, v.is_mine
+    INTO NEW.id, NEW.name, NEW.created_at, NEW.user_count, NEW.owner_email, NEW.status, NEW.invite_expires_at, NEW.resend, NEW.is_mine
     FROM api.site_account v WHERE v.id = _id;
   RETURN NEW;
 END;
@@ -3753,8 +3753,8 @@ BEGIN
     RAISE EXCEPTION 'Only the site admin can delete accounts.'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
-  IF EXISTS (SELECT 1 FROM music.user_account u WHERE u.account_id = p_account) THEN
-    RAISE EXCEPTION 'Someone has signed in to this account, so it can no longer be deleted here.'
+  IF p_account = music.current_account() THEN
+    RAISE EXCEPTION 'You cannot delete the account you are signed in to.'
       USING ERRCODE = 'check_violation';
   END IF;
   DELETE FROM music.account a WHERE a.id = p_account;
@@ -3765,7 +3765,7 @@ $$;
 -- Name: FUNCTION delete_account(p_account uuid); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.delete_account(p_account uuid) IS 'Site admin only: deletes an account nobody has signed in to yet, with its invite, for an account created by mistake. Owner rights because the account is not the signed-in user''s.';
+COMMENT ON FUNCTION music.delete_account(p_account uuid) IS 'Site admin only: deletes an account and everything in it, its users included, except the account the site admin is signed in to. Owner rights because the account is not the signed-in user''s.';
 
 --
 -- Name: document_storage_kind(); Type: FUNCTION; Schema: music; Owner: -
@@ -3820,7 +3820,9 @@ CREATE FUNCTION music.keep_an_owner() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  IF music.current_app_user() IS NOT NULL AND NOT EXISTS (
+  IF music.current_app_user() IS NOT NULL
+     AND OLD.account_id = music.current_account()
+     AND NOT EXISTS (
     SELECT 1
       FROM music.user_account u
       JOIN music.account_role r ON r.id = u.role_id
@@ -3837,7 +3839,7 @@ $$;
 -- Name: FUNCTION keep_an_owner(); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave an account without an Owner. Work outside an API request, such as deleting a whole account, is not checked.';
+COMMENT ON FUNCTION music.keep_an_owner() IS 'Refuses a role change or removal through the app that would leave the signed-in user''s account without an Owner. Users leaving with a whole account, deleted by the site admin or outside an API request, are not checked.';
 
 --
 -- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -5136,14 +5138,15 @@ CREATE VIEW api.site_account WITH (security_invoker='true') AS
     owner_email,
     status,
     invite_expires_at,
-    false AS resend
+    false AS resend,
+    (id = music.current_account()) AS is_mine
    FROM music.site_account() site_account(id, name, created_at, user_count, owner_email, status, invite_expires_at);
 
 --
 -- Name: VIEW site_account; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update name and owner_email to rename it or correct the invite, or set resend true to send a new link; delete to remove an account nobody has signed in to.';
+COMMENT ON VIEW api.site_account IS 'Site admin only: every account. Insert a name and owner_email to create an account and invite its first Owner; update name and owner_email to rename it or correct the invite, or set resend true to send a new link; delete to remove an account and everything in it, other than the site admin''s own.';
 
 --
 -- Name: song_split_check; Type: VIEW; Schema: api; Owner: -
