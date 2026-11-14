@@ -288,6 +288,34 @@ The alternative was a foreign key that points at either a person or a company
 depending on a type column, which PostgreSQL can't enforce. That pattern is the
 thing this project exists to avoid.
 
+## Statements are kept as received
+
+A statement's rows are stored exactly as the file had them, every value as
+text under its own header, in one table for every payer. A payer that adds,
+drops or renames a column needs no schema change, and the stored row is always
+the one the payer sent. Only a few values are read out of it: the amount, the
+payer's own work number, the usage period, and the song the line matched.
+Matching can change; the row cannot.
+
+A statement has one date, when the payer issued it, and income is reported by
+that date. The usage period belongs to each line instead: one distribution
+pays for the current month and for late usage years back, so no single period
+describes the statement.
+
+The mapping from headers to those values is kept on each statement rather than
+in a table of formats, so every file records exactly how it was read, and the
+next statement from the same payer starts from the last one.
+
+A payer's work number is remembered through the lines themselves: once one line
+is matched, later lines with the same number from the same payer match too.
+There is no separate lookup table to fall out of step.
+
+## A song in use cannot be deleted
+
+A song that a recording records, or that a statement line is matched to, cannot
+be deleted. Removing it would silently detach the recording or turn earned
+income into unmatched lines.
+
 ## Publishing and master royalties are accounted apart
 
 Publishing income is earned by a composition and paid by its writer and
@@ -308,3 +336,5 @@ contract does it, it is settled outside the catalog.
 | 2026-10-27 | A song's publisher can be a person (#4). |
 | 2026-10-28 | Phone country codes are ITU calling codes; countries carry theirs (#51). |
 | 2026-11-12 | Publishing and master royalties are accounted apart; cross-collateralization is not modeled. |
+| 2026-11-13 | Statements are kept as received; a song in use cannot be deleted. |
+| 2026-11-14 | A statement has one date; each line has its own usage period. |

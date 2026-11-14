@@ -22,6 +22,7 @@ func TestContentHash(t *testing.T) {
 		{"", "documents/" + hash + ".pdf", true},
 		{"", "audio/" + hash, true},
 		{"acme", "acme/artwork/" + hash + ".png", true},
+		{"", "statements/" + hash + ".xlsx", true},
 		{"", "documents/x.html", false},
 		{"", "documents/" + hash + ".pdf.html", false},
 		{"", "scripts/" + hash + ".js", false},

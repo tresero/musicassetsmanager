@@ -19,6 +19,10 @@ const messages = {
     document_orphan:   { name: 'Unattached document |||| Unattached documents' },
     email_duplicate:   { name: 'Duplicate email |||| Duplicate emails' },
 
+    statement:         { name: 'Statement |||| Statements' },
+    statement_line:    { name: 'Statement line |||| Statement lines' },
+    account_setting:   { name: 'Currency |||| Currency' },
+
     country:           { name: 'Country |||| Countries' },
     pro:               { name: 'Society |||| Societies' },
     pro_territory:     { name: 'Society territory |||| Society territories' },

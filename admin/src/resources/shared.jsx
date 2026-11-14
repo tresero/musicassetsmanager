@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider,
 } from 'react-admin';
-import { useCan, useIsSiteAdmin, useDefaultCountry } from '../permissions';
+import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency } from '../permissions';
 import { QuickCreateName } from './quickCreate';
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
@@ -90,6 +90,20 @@ export const CountryInput = ({ source, label = 'Country', helperText, prefill = 
       </PinFirst>
     </ReferenceInput>
   );
+};
+
+// A currency picker: ISO 4217 codes with their names, from the browser, with
+// the account currency first. Not a database list, so it sorts its own
+// choices rather than using PinFirst.
+export const CurrencyInput = ({ source, label = 'Currency', helperText, validate, sx }) => {
+  const account = useAccountCurrency();
+  const choices = useMemo(() => {
+    const names = new Intl.DisplayNames(['en'], { type: 'currency' });
+    const codes = [...new Set([account, ...(Intl.supportedValuesOf?.('currency') ?? [])])];
+    return codes.map((code) => ({ id: code, name: `${code}: ${names.of(code)}` }));
+  }, [account]);
+  return <AutocompleteInput source={source} label={label} choices={choices}
+                            helperText={helperText} validate={validate} sx={sx} />;
 };
 
 // A list of whole records. Bulk delete shows only for roles that may delete.

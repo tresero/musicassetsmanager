@@ -40,6 +40,9 @@ import accountInvite from './resources/accountInvite';
 import siteAccount from './resources/siteAccount';
 import accountRole from './resources/accountRole';
 import siteSetting from './resources/siteSetting';
+import statement from './resources/statement';
+import statementLine from './resources/statementLine';
+import accountSetting from './resources/accountSetting';
 import { sharedList } from './resources/shared';
 
 const nameList = sharedList();
@@ -69,6 +72,10 @@ export default function App() {
           can(permissions, code) ? def : { ...def, create: undefined };
         const catalog = addable('catalog.edit');
         const settings = addable('settings.edit');
+        const money = addable('money.edit');
+        // Matching a statement line by hand is its edit page.
+        const moneyEdit = (def) =>
+          can(permissions, 'money.edit') ? def : { ...def, edit: undefined };
         // Only the site admin gets edit and create pages for the shared lists.
         const shared = (def) =>
           permissions?.site_admin ? def : { ...def, edit: undefined, create: undefined };
@@ -86,6 +93,10 @@ export default function App() {
       <Resource name="song_unregistered" {...songUnregistered} />
       <Resource name="document_expiring" {...documentExpiring} />
       <Resource name="email_duplicate" {...emailDuplicate} />
+
+      <Resource name="statement" {...moneyEdit(money(statement))} />
+      <Resource name="statement_line" {...moneyEdit(statementLine)} />
+      <Resource name="account_setting" {...moneyEdit(accountSetting)} />
 
       <Resource name="country" {...shared(country)} />
       <Resource name="pro" {...pro} />

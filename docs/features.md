@@ -142,6 +142,43 @@ where a document that already exists can be attached rather than uploaded
 again. A copyright registration covering ten works is one document linked ten
 times. Removing it from one record detaches it without deleting it.
 
+## Statements
+
+Royalty statements import from CSV, TSV, XLS or XLSX files, from any payer: a
+society, the MLC, a publisher, an administrator or a distributor. The import
+goes step by step: pick the header row and any rows to leave out at the end,
+say which columns hold the amount, work number, ISWC, title, writers, usage
+period and statement date, check the rows that do not read, then import. The
+columns chosen are remembered: the next statement from the same payer starts
+from them. Several amount columns can be added together, and amounts are read
+with the decimal mark the file uses, 1,234.56 or 1.234,56.
+
+Each line keeps its own usage period, read from the usage columns, such as the
+MLC's usage period start and end dates; one statement can pay for many months.
+The statement has one date, read from a column such as the MLC's Distribution
+Date or entered at the Check step, and income is reported by it. Dates, months,
+quarters and years are read.
+
+The file is kept, and every row is stored exactly as it reads, for audit. The
+same file cannot be imported twice. Each line is matched to a song by ISWC,
+then by the payer's work number from earlier statements, then by title and a
+writer's name. **Statement lines** lists the lines left unmatched. The
+**Match** button on an unmatched line, there or on the statement's page, picks
+the song from the catalog, or creates it from the line with the title and ISWC
+filled in (with a Title case button for titles sent in capitals). Matching one
+line also matches the payer's other lines with the same work number, now and in
+later statements.
+
+The account's currency is set under **Money > Currency**, before the first
+statement; it cannot change once statements are imported. A statement in
+another currency records what it paid in the account's currency, and its lines
+are converted at that rate. Seeing statements needs the
+money.view permission and importing or changing them money.edit; the Owner role
+has both.
+
+A song cannot be deleted while a recording records it or a statement line is
+matched to it.
+
 ## Reports
 
 - **Split problems**: works whose writer or publisher shares do not total 100.
@@ -277,3 +314,6 @@ it shows: names by name and lengths by time.
 | 2026-11-11 | The site admin deletes any account but their own, typing its name when it is in use (#34). |
 | 2026-11-11 | Site settings; Local disk only for the site admin's account unless allowed there (#39). |
 | 2026-11-11 | The site admin creates, edits and deletes account roles and their permissions. |
+| 2026-11-13 | Statement import, matching and unmatched lines; songs in use cannot be deleted (#52, #53, #54). |
+| 2026-11-14 | Usage period per line and a statement date, read from the file; account currency setting. |
+| 2026-11-14 | Match button on unmatched lines; create a song from a line. |

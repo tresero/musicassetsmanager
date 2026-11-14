@@ -91,9 +91,9 @@ like the rest of the project.
 
 ### Royalty and project reporting
 
-Import statements from the MLC, PROs, and distributors. Match them to works and
-recordings by ISWC, ISRC, and society work number. Report earnings per song,
-per recording, per project.
+Statement import and matching to songs is built; see [features](features.md).
+Still to come: matching distributor lines to recordings by ISRC, and reporting
+earnings per song, per recording and per period.
 
 Reporting, not bookkeeping. It answers "what earns" rather than replacing an
 accountant.
@@ -222,3 +222,4 @@ sharing layer, not a network.
 | Date | Revision |
 |---|---|
 | 2026-09-30 | Conversion writes the pitch comment into the MP3; shared vocabularies for hosted accounts added under Planned. |
+| 2026-11-13 | Statement import built; recording matching and earnings reports remain. |

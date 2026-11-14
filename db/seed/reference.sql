@@ -1198,6 +1198,8 @@ COPY music.permission (id, code, description) FROM stdin;
 2	catalog.delete	deleting songs, recordings, releases, people, companies, artists or documents
 3	settings.edit	changing settings
 4	users.manage	managing users
+5	money.view	seeing statements and amounts
+6	money.edit	importing, editing or deleting statements
 \.
 SELECT setval(pg_get_serial_sequence('music.permission', 'id'), (SELECT max(id) FROM music.permission));
 
@@ -1207,4 +1209,6 @@ COPY music.account_role_permission (role_id, permission_id) FROM stdin;
 1	2
 1	3
 1	4
+1	5
+1	6
 \.

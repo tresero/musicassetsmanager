@@ -25,6 +25,9 @@ export const useIsSiteAdmin = () => !!usePermissions().permissions?.site_admin;
 // The user's default country from My settings, United States when unset.
 export const useDefaultCountry = () => usePermissions().permissions?.country ?? 'US';
 
+// The currency the account reports in, from Currency under Money.
+export const useAccountCurrency = () => usePermissions().permissions?.currency ?? 'USD';
+
 // The calling code of the user's default country, which a new phone number
 // starts on; 1 when the country has none.
 export const useDefaultCallingCode = () => {

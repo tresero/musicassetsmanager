@@ -17,7 +17,8 @@ export const sha256File = async (file, onProgress) => {
 
 /*
  * Hash the file, ask the service where it goes, and send it unless an
- * identical file is already stored. Resolves to { key, backend, exists }.
+ * identical file is already stored. Resolves to { key, backend, exists,
+ * sha256 }.
  */
 export const uploadFile = async (file, { kind, onHashProgress, onUploadProgress } = {}) => {
   const sha256 = await sha256File(file, onHashProgress);
@@ -41,7 +42,7 @@ export const uploadFile = async (file, { kind, onHashProgress, onUploadProgress 
 
   if (plan.exists) {
     onUploadProgress?.(1);
-    return plan;
+    return { ...plan, sha256 };
   }
 
   await new Promise((resolve, reject) => {
@@ -60,7 +61,7 @@ export const uploadFile = async (file, { kind, onHashProgress, onUploadProgress 
     xhr.send(file);
   });
 
-  return plan;
+  return { ...plan, sha256 };
 };
 // A short-lived link to a stored file, served under the given name.
 export const fileUrl = async (key, name) => {

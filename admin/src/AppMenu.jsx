@@ -37,6 +37,7 @@ const Folded = ({ label, children }) => {
 export const AppMenu = () => {
   const canSettings = useCan('settings.edit');
   const canUsers = useCan('users.manage');
+  const canMoney = useCan('money.view');
   const siteAdmin = useIsSiteAdmin();
   return (
     <Menu>
@@ -48,6 +49,11 @@ export const AppMenu = () => {
       <Menu.ResourceItem name="contact" />
       <Menu.ResourceItem name="organization" />
       <Menu.ResourceItem name="document" />
+
+      {canMoney && <Heading>Money</Heading>}
+      {canMoney && <Menu.ResourceItem name="statement" />}
+      {canMoney && <Menu.ResourceItem name="statement_line" />}
+      {canMoney && <Menu.ResourceItem name="account_setting" />}
 
       <Heading>Reports</Heading>
       <Menu.ResourceItem name="song_split_check" />

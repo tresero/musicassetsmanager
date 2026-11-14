@@ -11,6 +11,10 @@ confirmations. Small, read rarely.
 **Audio.** Masters, alternates, stems, reference copies. Large, streamed or
 downloaded by supervisors, sometimes multi-gigabyte on upload.
 
+Imported statement files are kept the same way as documents, under their own
+`statements/` prefix, so every statement line can be traced to the file it came
+from.
+
 ## Why not store files in the database
 
 PostgreSQL can hold bytea or large objects, and for a few hundred PDFs it would
@@ -102,10 +106,10 @@ A file becomes unreferenced when its row is deleted, or when it was uploaded to
 a form that was never saved. `mam-upload sweep` deletes those.
 
 It lists every object under the service's own prefixes, compares them against
-every location the database records for documents and audio, and deletes what
+every location the database records for documents, audio and statements, and deletes what
 nothing refers to. Three rules keep it safe:
 
-- It only looks under `documents/`, `audio/`, and `artwork/`, so anything else
+- It only looks under `documents/`, `audio/`, `artwork/` and `statements/`, so anything else
   kept in the bucket is left alone.
 - It leaves anything younger than a grace period, 24 hours by default, so a
   file uploaded to a form still being edited survives.
@@ -146,3 +150,4 @@ earn its place when one database holds credentials for many clients.
 |---|---|
 | 2026-11-11 | A deleted account's files are left in its storage; added this history |
 | 2026-11-11 | Only the site admin's account uses Local disk unless the site setting allows it (#39) |
+| 2026-11-13 | Imported statement files kept under `statements/`, which the sweep checks |

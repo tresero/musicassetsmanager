@@ -76,7 +76,7 @@ type server struct {
 
 // Top-level prefixes this service writes under. The sweep never looks
 // outside them, so anything else kept in the bucket is left alone.
-var kinds = []string{"documents", "audio", "artwork"}
+var kinds = []string{"documents", "audio", "artwork", "statements"}
 
 func main() {
 	cfg := Config{
@@ -632,7 +632,8 @@ func (s *server) serveSigned(w http.ResponseWriter, r *http.Request) {
 
 // ----------------------------------------------------------------- sweep
 
-// sweep deletes stored files that no document or audio row refers to.
+// sweep deletes stored files that no document, audio or statement row
+// refers to.
 //
 // Only keys under the service's own prefixes are considered, and anything
 // younger than the grace period is left alone, so a file uploaded to a
@@ -670,7 +671,10 @@ func (s *server) referenced(ctx context.Context, account string) (map[string]boo
 		UNION
 		SELECT a.storage_uri FROM music.audio_file a
 		  JOIN music.recording r ON r.id = a.recording_id
-		 WHERE r.account_id = $1`, account)
+		 WHERE r.account_id = $1
+		UNION
+		SELECT s.storage_uri FROM music.statement s
+		 WHERE s.account_id = $1`, account)
 	if err != nil {
 		return nil, err
 	}
