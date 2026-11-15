@@ -11,10 +11,12 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
  * pick its header row, say which columns hold the fields the target needs,
  * check the rows, then hand them to onImport.
  *
- * fields: [{ key, label, help, required, multiple, amount, period, date, guess }].
+ * fields: [{ key, label, help, required, multiple, amount, quantity, period, date, guess }].
  * A multiple field takes several columns; an amount field's columns are
  * added together, read with the decimal mark the file uses (see
- * detectDecimal). A period field's columns give each row's own period (see
+ * detectDecimal). A quantity field, when a column is chosen, multiplies
+ * every amount on its row, for files whose amount is a price per unit; a
+ * blank quantity is 1. A period field's columns give each row's own period (see
  * readPeriod), passed on as <key>_start and <key>_end, null when blank or
  * unreadable. A date field is one date for the whole file: the Check step
  * shows the latest date in its column, or asks for one when no column is
@@ -364,6 +366,8 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
   const checked = useMemo(() => {
     if (step < 3) return null;
     const amountFields = fields.filter((f) => f.amount);
+    const quantityColumn = fields.filter((f) => f.quantity)
+      .flatMap((f) => mapping[f.key] || [])[0];
     const amountColumns = amountFields.flatMap((f) => mapping[f.key] || [])
       .map((h) => headers.indexOf(h));
     const decimal = detectDecimal(dataRows.flatMap((r) => amountColumns.map((i) => r.cells[i])));
@@ -379,6 +383,12 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
       const data = {};
       headers.forEach((h, i) => { data[h] = r.cells[i] ?? ''; });
       const row = { row_number: r.rowNumber, data, problems: [] };
+      let quantity = 1;
+      if (quantityColumn) {
+        const q = parseAmount(data[quantityColumn], decimal);
+        if (q.error) row.problems.push(`${quantityColumn} is not a quantity: "${data[quantityColumn]}"`);
+        else if (!q.blank) quantity = q.value;
+      }
       amountFields.forEach((f) => {
         let sum = 0;
         let allBlank = true;
@@ -388,8 +398,8 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
           else { sum += a.value; if (!a.blank) allBlank = false; }
         });
         if (allBlank) blanks += 1;
-        row[f.key] = sum;
-        total += sum;
+        row[f.key] = sum * quantity;
+        total += sum * quantity;
       });
       periodFields.forEach((f) => {
         const cols = mapping[f.key] || [];

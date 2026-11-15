@@ -1,6 +1,7 @@
 import { ReferenceInput, AutocompleteInput } from 'react-admin';
 import { useSourceContext } from 'ra-core';
-import { useFormContext } from 'react-hook-form';
+import { useEffect } from 'react';
+import { useFormContext, useWatch } from 'react-hook-form';
 import { QuickCreateContact, QuickCreateName, QuickCreateArtist } from './quickCreate';
 
 /*
@@ -50,7 +51,8 @@ export const ArtistInput = ({
 /*
  * A party that is either a person or a company. Choosing one clears the
  * other, so a row can't end up with both, which the database refuses.
- * With required, saving is refused until one of the two is chosen.
+ * With required, saving is refused until one of the two is chosen, and
+ * filling in either one, by hand or by code, clears the error on both.
  * Works at the top of a form and inside list rows alike.
  */
 export const PersonOrCompanyInput = ({
@@ -59,9 +61,15 @@ export const PersonOrCompanyInput = ({
   personHelperText = false, companyHelperText = false,
   companyFirst = false, w = 260, required = false,
 }) => {
-  const { setValue, getValues } = useFormContext();
+  const { setValue, getValues, clearErrors } = useFormContext();
   const ctx = useSourceContext();
   const path = (s) => (ctx ? ctx.getSource(s) : s);
+  const personPath = path(personSource);
+  const companyPath = path(companySource);
+  const chosen = !!useWatch({ name: personPath }) || !!useWatch({ name: companyPath });
+  useEffect(() => {
+    if (required && chosen) clearErrors([personPath, companyPath]);
+  }, [required, chosen, personPath, companyPath, clearErrors]);
   const clear = (s) => (value) => {
     if (value) setValue(path(s), null, { shouldDirty: true, shouldValidate: true });
   };

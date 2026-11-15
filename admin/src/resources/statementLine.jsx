@@ -67,8 +67,8 @@ const titleCase = (value) =>
 
 // The identifying fields of a line, as the payer gave them.
 const lineFields = (line) => (isMaster(line)
-  ? [['Title', line.title], ['Artist', line.artist], ['ISRC', line.isrc],
-     ['Barcode', line.upc], ['Work number', line.work_ref]]
+  ? [['Title', line.title], ['Release', line.release_title], ['Artist', line.artist],
+     ['ISRC', line.isrc], ['Barcode', line.upc], ['Work number', line.work_ref]]
   : [['Title', line.title], ['Writers', line.writers], ['ISWC', line.iswc],
      ['Work number', line.work_ref]]);
 
@@ -222,7 +222,7 @@ const MatchDialog = ({ onClose }) => {
   const master = isMaster(line);
   const canCreate = useCan('catalog.edit');
   const [target, setTarget] = useState(
-    master ? (!line.isrc && line.upc ? 'release' : 'recording') : 'song');
+    master ? (!line.isrc && (line.upc || (line.release_title && !line.title)) ? 'release' : 'recording') : 'song');
   const [creating, setCreating] = useState(false);
   const [update, { isPending: matching }] = useUpdate();
   const [create, { isPending: saving }] = useCreate();

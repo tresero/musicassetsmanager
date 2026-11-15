@@ -38,9 +38,14 @@ const statementFields = [
     guess: ['net payable', 'distributed amount', 'royalty amount', 'dollars', 'amount', 'net amount', 'royalty', 'earnings'],
   },
   {
+    key: 'quantity', label: 'Quantity', quantity: true,
+    help: 'Only when the amount is a price per unit, as on CD Baby sales: each line\'s amount is multiplied by this column. Leave it empty when the amount is already the line\'s total, as on almost every royalty statement.',
+    guess: [],
+  },
+  {
     key: 'work_ref', label: 'Work number',
     help: 'The payer\'s own number for the work, such as a BMI title number, ASCAP work ID or MLC song code. Once one line is matched, later lines with the same number match on their own.',
-    guess: ['title number', 'title #', 'work id', 'mlc song code', 'song code', 'work number', 'track code', 'work code'],
+    guess: ['title number', 'title #', 'work id', 'mlc song code', 'song code', 'work number', 'track code', 'work code', 'album id'],
   },
   {
     key: 'iswc', label: 'ISWC', side: 'publishing',
@@ -61,6 +66,11 @@ const statementFields = [
     key: 'title', label: 'Title',
     help: 'Matched against song or recording titles when nothing else matches.',
     guess: ['title name', 'work title', 'work primary title', 'track title', 'song title', 'title'],
+  },
+  {
+    key: 'release_title', label: 'Release title', side: 'master',
+    help: 'The album or release a line is on. A line with no ISRC and no track title, such as a CD or album download, matches the one release with this title.',
+    guess: ['album name', 'release title', 'album title', 'release name', 'album', 'product title'],
   },
   {
     key: 'artist', label: 'Artist', side: 'master',

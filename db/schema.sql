@@ -4980,6 +4980,20 @@ BEGIN
     GET DIAGNOSTICS _count = ROW_COUNT;
     _total := _total + _count;
 
+    UPDATE music.statement_line l
+       SET release_id = m.id, match_method = 'title'
+      FROM (SELECT music.title_key(title) AS k, min(id) AS id
+              FROM music.release
+             GROUP BY 1
+            HAVING count(*) = 1) m
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.isrc IS NULL
+       AND coalesce(music.statement_value(l.data, _mapping, 'title'), '') = ''
+       AND music.title_key(music.statement_value(l.data, _mapping, 'release_title')) = m.k;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
     WITH line_key AS MATERIALIZED (
       SELECT l.id, l.isrc,
              music.title_key(music.statement_value(l.data, _mapping, 'title')) AS k
@@ -5034,7 +5048,7 @@ $$;
 -- Name: FUNCTION match_statement(p_statement integer); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.match_statement(p_statement integer) IS 'Matches the statement''s unmatched lines. On a publishing statement, to songs: ISWC; then work_ref against earlier matched lines from the same payer; then title or alternate title compared by title_key. A title that fits one song matches it, by title and writer when one of the song''s writers is on the line; a title that fits several matches the one whose writer is on the line, when exactly one is. On a master statement, to recordings and releases: ISRC, the recording''s own or one of its other ISRCs; then ISRC, then work_ref, against earlier matched lines from the same payer; then a line with no ISRC to the release with its barcode; then title, when exactly one recording has it, never pairing two different ISRCs. Lines still unmatched are marked not in catalog when an earlier line from the same payer and side was: the same work_ref, else the same ISRC, else the same title. Returns how many lines it matched or marked.';
+COMMENT ON FUNCTION music.match_statement(p_statement integer) IS 'Matches the statement''s unmatched lines. On a publishing statement, to songs: ISWC; then work_ref against earlier matched lines from the same payer; then title or alternate title compared by title_key. A title that fits one song matches it, by title and writer when one of the song''s writers is on the line; a title that fits several matches the one whose writer is on the line, when exactly one is. On a master statement, to recordings and releases: ISRC, the recording''s own or one of its other ISRCs; then ISRC, then work_ref, against earlier matched lines from the same payer; then a line with no ISRC to the release with its barcode, or, when it has no track title either, to the one release with its release title; then title, when exactly one recording has it, never pairing two different ISRCs. Lines still unmatched are marked not in catalog when an earlier line from the same payer and side was: the same work_ref, else the same ISRC, else the same title. Returns how many lines it matched or marked.';
 
 --
 -- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -7014,7 +7028,8 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
     l.release_id,
     l.isrc,
     l.upc,
-    music.statement_value(l.data, s.mapping, 'artist'::text) AS artist
+    music.statement_value(l.data, s.mapping, 'artist'::text) AS artist,
+    music.statement_value(l.data, s.mapping, 'release_title'::text) AS release_title
    FROM ((music.statement_line l
      JOIN music.statement s ON ((s.id = l.statement_id)))
      JOIN music.organization o ON ((o.id = s.organization_id)));
@@ -7023,7 +7038,7 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
 -- Name: VIEW statement_line; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, writers, artist and ISWC read from the raw row, the ISRC, barcode and usage period read at import, and the amount converted into the account currency at the statement''s payout. Only song_id, recording_id, release_id and match_method can be changed.';
+COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, writers, artist, release title and ISWC read from the raw row, the ISRC, barcode and usage period read at import, and the amount converted into the account currency at the statement''s payout. Only song_id, recording_id, release_id and match_method can be changed.';
 
 --
 -- Name: user_preference; Type: TABLE; Schema: music; Owner: -

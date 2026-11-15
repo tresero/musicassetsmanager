@@ -66,6 +66,15 @@ To show it:
 3. Import, open the statement, and click **Match** on an unmatched line.
 4. Pick the recording, or choose **Whole release** for an album line.
 
+### How do I import CD Baby sales?
+
+As a **Master** statement. Map Amount to Price and **Quantity** to Quantity,
+since CD Baby's price is per unit; Release title is guessed from Album Name, and
+Work number can be Album ID. A CD line has no ISRC or song title, so it matches
+the release with that album's title, or, when the title is not in the catalog,
+is matched once by hand with **Whole release**; later lines with the same Album
+ID then match on their own.
+
 ### Can an expense be for no song?
 
 Yes. A transaction with nothing on its **For** tab is overhead: it belongs to
@@ -82,3 +91,4 @@ leave **For** empty, and save. The list shows Overhead under For.
 | 2026-11-15 | Not a song is now Not in catalog; importing master statements; expenses for no song are built. |
 | 2026-11-15 | Other ISRCs for reissues. |
 | 2026-11-15 | A final totals row is left out on its own. |
+| 2026-11-15 | Importing CD Baby sales. |

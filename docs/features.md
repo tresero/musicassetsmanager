@@ -162,7 +162,9 @@ goes step by step: pick the header row and any rows to leave out at the end
 (a final row reading Total, Totals, Grand total or Subtotal is left out on its
 own, and can be kept), say which columns hold the amount, work number, title,
 usage period and statement date, plus ISWC and writers for publishing or ISRC,
-barcode and artist for master, check the rows that do not read, then import. The
+barcode, release title and artist for master, and a quantity when the amount
+is a price per unit (each line's amount is then price times quantity, as on CD
+Baby sales), check the rows that do not read, then import. The
 columns chosen are remembered: the next statement from the same payer and Paid
 to starts from them. Several amount columns can be added together, and amounts are read
 with the decimal mark the file uses, 1,234.56 or 1.234,56.
@@ -195,8 +197,9 @@ Each line of a master statement, such as one from Curve or a distributor, is
 matched to a recording by its ISRC or one of its other ISRCs, then by the ISRC or work number of the payer's
 earlier matched lines, then by title when exactly one recording has it; a line
 with an ISRC never matches a recording with a different one. A line on a whole
-release, such as an album download, has no ISRC and matches the release by its
-barcode. The Match dialog suggests recordings by title, ranked by artist,
+release, such as an album download or a CD sale, has no ISRC and matches the
+release by its barcode, or, with no track title either, by its release title
+when exactly one release has it. The Match dialog suggests recordings by title, ranked by artist,
 matches a whole release instead, or creates the recording from the line.
 Matching a line to a recording by hand teaches the recording the line's ISRC:
 as its ISRC when it has none, otherwise among its **Other ISRCs**, so later
@@ -413,3 +416,4 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | Money > Currency is one page with Save and Cancel. |
 | 2026-11-15 | Statements record who they pay (Paid to). |
 | 2026-11-15 | Paid to is required and starts from the payer's last statement. |
+| 2026-11-15 | Album lines match releases by title; amounts can be price times quantity. |
