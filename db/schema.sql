@@ -847,6 +847,8 @@ CREATE FUNCTION api.me() RETURNS json
         JOIN music.permission p ON p.id = rp.permission_id
        WHERE rp.role_id = u.role_id), '[]'::json),
     'country', coalesce(up.country_code::text, 'US'),
+    'languages', coalesce(to_json(nullif(up.language_codes, '{}')), '["en"]'::json),
+    'parental_warning', up.parental_warning,
     'currency', a.currency_code::text)
     FROM music.user_account u
     JOIN music.account_role r ON r.id = u.role_id
@@ -860,7 +862,7 @@ $$;
 -- Name: FUNCTION me(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do; their default country (United States unless set in music.user_preference); and the account currency.';
+COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do; their default country (United States unless set in music.user_preference), the languages listed first in language pickers (English unless set) and the explicit content a new recording starts on (none unless set); and the account currency.';
 
 --
 -- Name: organization_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -1525,8 +1527,15 @@ CREATE VIEW api.artist WITH (security_invoker='true') AS
            FROM music.artist_member m
           WHERE (m.artist_id = a.id)) AS member_count,
     created_at,
-    updated_at
+    updated_at,
+    COALESCE(NULLIF(btrim(sort_name), ''::text), name) AS sort_key
    FROM music.artist a;
+
+--
+-- Name: COLUMN artist.sort_key; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.artist.sort_key IS 'What the artist sorts by: sort_name when set, such as Beatles, The, otherwise the name.';
 
 --
 -- Name: search(api.artist); Type: FUNCTION; Schema: api; Owner: -
@@ -6997,7 +7006,11 @@ COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, wr
 
 CREATE TABLE music.user_preference (
     user_id uuid DEFAULT music.current_app_user() NOT NULL,
-    country_code music.iso_3166_alpha2
+    country_code music.iso_3166_alpha2,
+    language_codes text[],
+    parental_warning text,
+    CONSTRAINT user_preference_language_codes CHECK ((array_to_string(language_codes, ','::text) ~ '^([a-z]{2,3}(,|$))*$'::text)),
+    CONSTRAINT user_preference_parental_warning CHECK ((parental_warning = ANY (ARRAY['Explicit'::text, 'NotExplicit'::text, 'ExplicitContentEdited'::text])))
 );
 
 ALTER TABLE ONLY music.user_preference FORCE ROW LEVEL SECURITY;
@@ -7006,7 +7019,19 @@ ALTER TABLE ONLY music.user_preference FORCE ROW LEVEL SECURITY;
 -- Name: TABLE user_preference; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON TABLE music.user_preference IS 'Each user''s own defaults, one row per user. country_code is listed first in every country picker and fills the countries of a new recording; United States when unset. Users edit their own row whatever their role, so it has no permission trigger.';
+COMMENT ON TABLE music.user_preference IS 'Each user''s own defaults, one row per user. country_code is listed first in every country picker and fills the countries of a new recording; United States when unset. language_codes are listed first in every language picker; English when unset. parental_warning fills the explicit content of a new recording. Users edit their own row whatever their role, so it has no permission trigger.';
+
+--
+-- Name: COLUMN user_preference.language_codes; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_preference.language_codes IS 'Languages listed first in every language picker, in this order, as ISO 639 codes. English alone when unset. A code no longer in the language list is skipped.';
+
+--
+-- Name: COLUMN user_preference.parental_warning; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_preference.parental_warning IS 'The explicit content value a new recording starts on, as recording.parental_warning: Explicit, NotExplicit or ExplicitContentEdited. Blank leaves new recordings unset.';
 
 --
 -- Name: user_preference; Type: VIEW; Schema: api; Owner: -
@@ -7014,7 +7039,9 @@ COMMENT ON TABLE music.user_preference IS 'Each user''s own defaults, one row pe
 
 CREATE VIEW api.user_preference WITH (security_invoker='true') AS
  SELECT user_id AS id,
-    country_code
+    country_code,
+    language_codes,
+    parental_warning
    FROM music.user_preference
   WHERE (user_id = music.current_app_user());
 

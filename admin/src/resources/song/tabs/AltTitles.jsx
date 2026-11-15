@@ -1,9 +1,9 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, SelectInput,
-  ReferenceInput, AutocompleteInput,
   required,
 } from 'react-admin';
 import { titleTypes } from '../../vocab';
+import { LanguageInput } from '../../shared';
 
 const AltTitlesFields = () => (
   <ArrayInput source="titles" label={false}>
@@ -13,12 +13,7 @@ const AltTitlesFields = () => (
       <SelectInput source="title_type" choices={titleTypes} label="Type"
                    defaultValue="alternate" helperText={false}
                    sx={{ width: 160 }} />
-      <ReferenceInput source="language_code" reference="language" perPage={300}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Language"
-                           helperText={false}
-                           sx={{ width: 190 }} />
-      </ReferenceInput>
+      <LanguageInput sx={{ width: 190 }} />
     </SimpleFormIterator>
   </ArrayInput>
 );

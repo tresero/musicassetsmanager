@@ -39,7 +39,7 @@ export const ArtistInput = ({
   source = 'artist_id', label = 'Artist', helperText = false, w = 300, ...rest
 }) => (
   <ReferenceInput source={source} reference="artist" perPage={200}
-                  sort={{ field: 'sort_name', order: 'ASC' }}>
+                  sort={{ field: 'sort_key', order: 'ASC' }}>
     <AutocompleteInput optionText="name" label={label}
                        create={<QuickCreateArtist />}
                        createLabel="Type to search or add an artist"

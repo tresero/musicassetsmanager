@@ -14,8 +14,9 @@ import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
-import { versionLabels, tempos, freeText } from './vocab';
-import { CatalogDataTable, SharedListPicker, CountryInput, searchFilter } from './shared';
+import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
+import { CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, searchFilter } from './shared';
+import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
 
 const filters = [
@@ -119,8 +120,32 @@ const RecordingList = () => (
   </List>
 );
 
+// A new recording starts on the explicit content from My settings; a saved
+// one left blank stays blank.
+const ParentalWarningInput = () => (
+  <SelectInput source="parental_warning" label="Explicit content" emptyText="Not set"
+               choices={parentalWarnings} defaultValue={useDefaultParentalWarning() ?? undefined}
+               helperText="Asked per track by every distributor"
+               sx={{ width: { xs: '100%', md: 300 } }} />
+);
+
 const RecordingForm = () => (
   <TabbedForm toolbar={<EditToolbar />}>
+    <TabbedForm.Tab label="Songs">
+      <ArrayInput source="songs" label={false}
+                  helperText="More than one for a medley or mashup">
+        <SimpleFormIterator inline sx={iteratorSx}>
+          <ReferenceInput source="song_id" reference="song" perPage={500}
+                          sort={{ field: 'title', order: 'ASC' }}>
+            <AutocompleteInput optionText="title" label="Composition"
+                               helperText={false}
+                               validate={required()}
+                               sx={{ width: { xs: '100%', md: 380 } }} />
+          </ReferenceInput>
+        </SimpleFormIterator>
+      </ArrayInput>
+    </TabbedForm.Tab>
+
     <TabbedForm.Tab label="Details">
       <TextInput source="title" fullWidth
                  helperText="Leave blank to take the composition's title" />
@@ -153,23 +178,12 @@ const RecordingForm = () => (
                            helperText="Who sings lead. Leave blank for an instrumental."
                            sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
-      <ReferenceInput source="language_code" reference="language" perPage={300}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Language"
-                           helperText="Language of the vocal. Leave blank to use the song's language."
-                           sx={{ width: { xs: '100%', md: 240 } }} />
-      </ReferenceInput>
+      <LanguageInput helperText="Language of the vocal. Leave blank to use the song's language."
+                     sx={{ width: { xs: '100%', md: 240 } }} />
       <BooleanInput source="is_instrumental" label="Instrumental" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
-      <SelectInput source="parental_warning" label="Explicit content" emptyText="Not set"
-                   choices={[
-                     { id: 'NotExplicit', name: 'Not explicit' },
-                     { id: 'Explicit', name: 'Explicit' },
-                     { id: 'ExplicitContentEdited', name: 'Clean edit of an explicit track' },
-                   ]}
-                   helperText="Asked per track by every distributor"
-                   sx={{ width: { xs: '100%', md: 300 } }} />
+      <ParentalWarningInput />
       <BooleanInput source="easy_clear" label="Easy clear"
                     helperText="Set by hand: can be cleared quickly for sync" />
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
@@ -193,21 +207,6 @@ const RecordingForm = () => (
           <NumberInput source="sequence" label="Order" defaultValue={1}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 100 } }} />
-        </SimpleFormIterator>
-      </ArrayInput>
-    </TabbedForm.Tab>
-
-    <TabbedForm.Tab label="Songs">
-      <ArrayInput source="songs" label={false}
-                  helperText="More than one for a medley or mashup">
-        <SimpleFormIterator inline sx={iteratorSx}>
-          <ReferenceInput source="song_id" reference="song" perPage={500}
-                          sort={{ field: 'title', order: 'ASC' }}>
-            <AutocompleteInput optionText="title" label="Composition"
-                               helperText={false}
-                               validate={required()}
-                               sx={{ width: { xs: '100%', md: 380 } }} />
-          </ReferenceInput>
         </SimpleFormIterator>
       </ArrayInput>
     </TabbedForm.Tab>

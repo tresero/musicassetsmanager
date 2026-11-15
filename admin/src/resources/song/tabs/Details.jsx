@@ -1,8 +1,9 @@
 import {
-  TextInput, BooleanInput, ReferenceInput, AutocompleteInput, useRecordContext,
+  TextInput, BooleanInput, useRecordContext,
 } from 'react-admin';
 import { useFormState } from 'react-hook-form';
 import { Box, Stack, Typography } from '@mui/material';
+import { LanguageInput } from '../../shared';
 
 // Computed by the database from the controlled writer and publisher
 // shares, so it reflects the last save rather than unsaved edits.
@@ -26,12 +27,7 @@ const DetailsFields = () => (
                  sx={{ width: { xs: '100%', md: 420 } }} />
       <TextInput source="iswc" label="ISWC" helperText={false}
                  sx={{ width: { xs: '100%', md: 200 } }} />
-      <ReferenceInput source="language_code" reference="language" perPage={300}
-                      sort={{ field: 'name', order: 'ASC' }}>
-        <AutocompleteInput optionText="name" label="Language"
-                           helperText={false}
-                           sx={{ width: { xs: '100%', md: 240 } }} />
-      </ReferenceInput>
+      <LanguageInput sx={{ width: { xs: '100%', md: 240 } }} />
     </Box>
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
       <BooleanInput source="easy_clear" label="Easy clear" helperText={false} />

@@ -25,6 +25,14 @@ export const useIsSiteAdmin = () => !!usePermissions().permissions?.site_admin;
 // The user's default country from My settings, United States when unset.
 export const useDefaultCountry = () => usePermissions().permissions?.country ?? 'US';
 
+// The languages listed first in language pickers, from My settings, English
+// when unset.
+export const useFirstLanguages = () => usePermissions().permissions?.languages ?? ['en'];
+
+// The explicit content a new recording starts on, from My settings; none
+// when unset.
+export const useDefaultParentalWarning = () => usePermissions().permissions?.parental_warning ?? null;
+
 // The currency the account reports in, from Currency under Money.
 export const useAccountCurrency = () => usePermissions().permissions?.currency ?? 'USD';
 

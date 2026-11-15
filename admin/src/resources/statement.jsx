@@ -329,9 +329,8 @@ const StatementImport = () => {
           <Stack spacing={1} sx={{ maxWidth: 900 }}>
             <Typography variant="body2" color="text.secondary">
               The file is kept as it is, and each row is stored exactly as it reads.
-              Columns are pre-filled from the last statement from the same payer. If the
-              file ends with a total row, set Rows to leave out at the end so it isn't
-              counted as a line.
+              Columns are pre-filled from the last statement from the same payer. A
+              final totals row is left out; check Rows to leave out at the end.
             </Typography>
             <StatementDetails accountCurrency={accountCurrency} />
             <StatementWizard />

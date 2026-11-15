@@ -4,7 +4,7 @@ import {
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider,
 } from 'react-admin';
-import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency } from '../permissions';
+import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
 import { QuickCreateName } from './quickCreate';
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
@@ -87,6 +87,20 @@ export const CountryInput = ({ source, label = 'Country', helperText, prefill = 
       <PinFirst pin={[country]}>
         <AutocompleteInput optionText="name" label={label} helperText={helperText}
                            defaultValue={prefill ? country : undefined} sx={sx} />
+      </PinFirst>
+    </ReferenceInput>
+  );
+};
+
+// A language picker (ISO 639 codes from the language list), with the user's
+// languages from My settings first, in their order, and the rest by name.
+export const LanguageInput = ({ source = 'language_code', label = 'Language', helperText = false, sx }) => {
+  const first = useFirstLanguages();
+  return (
+    <ReferenceInput source={source} reference="language" perPage={300}
+                    sort={{ field: 'name', order: 'ASC' }}>
+      <PinFirst pin={first} by="code">
+        <AutocompleteInput optionText="name" label={label} helperText={helperText} sx={sx} />
       </PinFirst>
     </ReferenceInput>
   );

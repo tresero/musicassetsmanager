@@ -35,6 +35,13 @@ export const storageKinds = [
   { id: 'url',   name: 'URL' },
 ];
 
+// DDEX ParentalWarningType values, as recording.parental_warning stores them.
+export const parentalWarnings = [
+  { id: 'NotExplicit', name: 'Not explicit' },
+  { id: 'Explicit', name: 'Explicit' },
+  { id: 'ExplicitContentEdited', name: 'Clean edit of an explicit track' },
+];
+
 export const freeText = (v) => ({ id: v, name: v });
 
 export const byCode = (q) => ({ 'code@ilike': `*${q}*` });

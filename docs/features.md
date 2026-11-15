@@ -47,6 +47,9 @@ does not add up is visible without opening it.
 
 A recording is one master, separate from the composition it records.
 
+**Songs**, the first tab, links the composition it records, or several for a
+medley. Linking it first lets the title and language default from it.
+
 **Details**: title, which defaults from the composition when left blank;
 version; ISRC; BPM; tempo, described as it feels rather than as a number; key;
 vocals (female, male, mixed, or group); the language of the vocal, which
@@ -57,8 +60,6 @@ description, keywords, and "sounds like" for pitching.
 
 **Artists** are who the record is by, billed as main or featured and in order.
 Two main artists read as a duet.
-
-**Songs** links the composition, or several for a medley.
 
 **Credits** are who played on it: a person or a company, with any number of
 roles and instruments on one row, the name they are credited under, and a note.
@@ -130,7 +131,8 @@ per account.
 
 The identity a record is released under: name, how it sorts, whether it is a
 person or a group, and its ISNI. A solo act under its own name inherits the
-member's ISNI. An ISNI is used once per account. Members are listed with the
+member's ISNI. An ISNI is used once per account. Artists are listed by how they sort, or by name
+when that is blank. Members are listed with the
 dates they joined and left.
 
 ## Documents
@@ -150,7 +152,8 @@ society, the MLC, a publisher, an administrator, a label or a distributor. Each
 statement is one side: **Publishing**, whose lines are on songs, or **Master**,
 whose lines are on recordings; the payer's last statement sets it. The import
 goes step by step: pick the header row and any rows to leave out at the end
-(such as a total row), say which columns hold the amount, work number, title,
+(a final row reading Total, Totals, Grand total or Subtotal is left out on its
+own, and can be kept), say which columns hold the amount, work number, title,
 usage period and statement date, plus ISWC and writers for publishing or ISRC,
 barcode and artist for master, check the rows that do not read, then import. The
 columns chosen are remembered: the next statement from the same payer starts
@@ -275,6 +278,14 @@ listed first in every country picker and filled in on a new recording's country
 of recording and of commissioning. A new phone number starts on its calling
 code. It is United States until set.
 
+**Languages listed first**, also in My settings, lead every language picker
+(song, alternate title, recording) in the order chosen there, followed by the
+rest by name. It is English until set.
+
+**New recordings start as** sets the explicit content a new recording starts
+on: not explicit, explicit, or a clean edit. Each recording can still be
+changed, and saved recordings keep what they have.
+
 **Pitch settings** holds the default pitch contact, used by any recording that
 has no contact of its own. A new person can be added from the picker.
 Storage and pitch settings belong to the account. The Recordings list can be filtered to recordings
@@ -383,3 +394,7 @@ it shows: names by name and lengths by time.
 | 2026-11-14 | Softer title matching; suggested songs in the Match dialog. |
 | 2026-11-15 | Master statements matched to recordings and releases; Not in catalog; transactions with splits, receipts and recoupable expenses. |
 | 2026-11-15 | Recordings have other ISRCs, matched like their own. |
+| 2026-11-15 | Language pickers list the user's languages from My settings first. |
+| 2026-11-15 | The Songs tab comes first on a recording. |
+| 2026-11-15 | Explicit content default in My settings; artists sort by Sorts as, else name. |
+| 2026-11-15 | The import leaves out a final totals row on its own. |

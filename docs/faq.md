@@ -47,9 +47,10 @@ row as imported, below, still shows 0.
 
 Choose **Master** as the side. Its lines are matched to recordings by ISRC, or
 to a release by barcode when a line is on a whole album, rather than to songs.
-Map the ISRC, Barcode and Artist columns at the Columns step. If the file ends
-with a total row, as Curve's does, set **Rows to leave out at the end** to 1,
-or the total counts as a line and doubles the statement.
+Map the ISRC, Barcode and Artist columns at the Columns step. A file that ends
+with a totals row, as Curve's does, has it left out on its own: **Rows to leave
+out at the end** starts at 1 and says why. Check it, since a totals row
+imported as a line doubles the statement.
 
 A recording with no ISRC yet gets one the first time a line is matched to it
 by hand, so the next statement matches it on its own. A recording that already
@@ -80,3 +81,4 @@ leave **For** empty, and save. The list shows Overhead under For.
 | 2026-11-14 | Initial version: Not a song lines, work number 0, expenses on no song. |
 | 2026-11-15 | Not a song is now Not in catalog; importing master statements; expenses for no song are built. |
 | 2026-11-15 | Other ISRCs for reissues. |
+| 2026-11-15 | A final totals row is left out on its own. |

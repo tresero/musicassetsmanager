@@ -32,7 +32,7 @@ const iteratorSx = {
 };
 
 const ArtistList = () => (
-  <List filters={filters} sort={{ field: 'sort_name', order: 'ASC' }} perPage={50}>
+  <List filters={filters} sort={{ field: 'sort_key', order: 'ASC' }} perPage={50}>
     <CatalogDatagrid rowClick="edit">
       <TextField source="name" />
       <TextField source="sort_name" label="Sorts as" emptyText="—" />
@@ -91,7 +91,7 @@ const ArtistForm = () => (
   </TabbedForm>
 );
 
-const strip = ({ isni, isni_inherited, member_count,
+const strip = ({ isni, isni_inherited, member_count, sort_key,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

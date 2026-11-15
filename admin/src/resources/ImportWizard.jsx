@@ -91,6 +91,27 @@ const readSheets = async (file) => {
 
 const blank = (row) => row.every((v) => v === '');
 
+// A totals row, as statements such as Curve's end with: a cell that reads
+// Total, Totals, Grand total or Subtotal.
+const TOTAL = /^(grand\s+|sub)?totals?:?$/i;
+const isTotalRow = (row) => row.some((v) => TOTAL.test(String(v ?? '').trim()));
+
+// How many rows at the end of the file to leave out so that its trailing
+// totals rows, and any blank rows among or after them, are not imported.
+// 0 when the file does not end with one.
+const trailingTotals = (rows, headerIndex) => {
+  const body = rows.slice(headerIndex + 1);
+  let count = 0;
+  let found = 0;
+  for (let i = body.length - 1; i >= 0; i -= 1) {
+    if (blank(body[i])) { count += 1; continue; }
+    if (!isTotalRow(body[i])) break;
+    count += 1;
+    found = count;
+  }
+  return found;
+};
+
 // Headers must be unique keys; a repeated header gets " (2)", " (3)".
 const uniqueHeaders = (row) => {
   const seen = {};
@@ -264,6 +285,7 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
   const [sheetIndex, setSheetIndex] = useState(0);
   const [headerIndex, setHeaderIndex] = useState(0);
   const [skipEnd, setSkipEnd] = useState(0);
+  const [autoSkip, setAutoSkip] = useState(0);
   const [mapping, setMapping] = useState({});
   const [dates, setDates] = useState({});
   const [leaveOut, setLeaveOut] = useState(false);
@@ -276,6 +298,14 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
   const headers = useMemo(
     () => (sheet ? uniqueHeaders(sheet.rows[headerIndex] || []) : []),
     [sheet, headerIndex]);
+
+  // A file that ends with a totals row starts with it left out; the user
+  // can set the count back to keep it.
+  useEffect(() => {
+    const n = sheet ? trailingTotals(sheet.rows, headerIndex) : 0;
+    setSkipEnd(n);
+    setAutoSkip(n);
+  }, [sheet, headerIndex]);
 
   const dataRows = useMemo(() => {
     if (!sheet) return [];
@@ -322,7 +352,6 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
       setSheets(read);
       setSheetIndex(first);
       setHeaderIndex(guessHeaderRow(read[first].rows));
-      setSkipEnd(0);
       setStep(1);
     } catch (e) {
       setError(e.message || 'Could not read the file.');
@@ -487,8 +516,10 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
             </TextField>
             <TextField type="number" label="Rows to leave out at the end" value={skipEnd}
                        onChange={(e) => setSkipEnd(Math.max(0, Number(e.target.value) || 0))}
-                       helperText="Such as a totals row"
-                       sx={{ width: 240 }} />
+                       helperText={autoSkip && skipEnd === autoSkip
+                         ? 'The file ends with a totals row, so it is left out. Set 0 to keep it.'
+                         : 'Such as a totals row'}
+                       sx={{ width: 320 }} />
           </Stack>
           <Typography variant="body2" color="text.secondary">
             {dataRows.length} rows to import. The first few:
