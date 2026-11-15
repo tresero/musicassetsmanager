@@ -160,7 +160,11 @@ Date or entered at the Check step, and income is reported by it. Dates, months,
 quarters and years are read.
 
 The file is kept, and every row is stored exactly as it reads, for audit. The
-same file cannot be imported twice. Each line is matched to a song by ISWC,
+same file cannot be imported twice. When a statement from the same payer
+with the same statement date is already imported, the Check step warns, naming
+that file, and the import waits until the user confirms it is a different
+statement. Rows are never deduplicated, since the same plays at the same rate
+in another period are legitimate. Each line is matched to a song by ISWC,
 then by the payer's work number from earlier statements, then by title and a
 writer's name. **Statement lines** lists the lines left unmatched. The
 **Match** button on an unmatched line, there or on the statement's page, picks
@@ -317,3 +321,4 @@ it shows: names by name and lengths by time.
 | 2026-11-13 | Statement import, matching and unmatched lines; songs in use cannot be deleted (#52, #53, #54). |
 | 2026-11-14 | Usage period per line and a statement date, read from the file; account currency setting. |
 | 2026-11-14 | Match button on unmatched lines; create a song from a line. |
+| 2026-11-14 | Warn when a statement from the same payer and date is already imported. |

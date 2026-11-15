@@ -31,6 +31,10 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
  * guessed from header names: guess lists header names in order of
  * preference, and an entry that is itself a list picks all its columns, only
  * when the file has every one.
+ *
+ * warn(dates), when given, returns a warning for the Check step, such as a
+ * statement that looks already imported, or nothing. While it warns, the
+ * import waits for the user to tick that they mean it.
  */
 
 const TEXT_EXT = /\.(csv|tsv|tab|txt)$/i;
@@ -252,7 +256,7 @@ const Preview = ({ headers, rows, max = 8 }) => (
   </TableContainer>
 );
 
-export const ImportWizard = ({ fields, initialMapping, onImport, importLabel = 'Import' }) => {
+export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLabel = 'Import' }) => {
   const inputRef = useRef(null);
   const [step, setStep] = useState(0);
   const [file, setFile] = useState(null);
@@ -263,6 +267,7 @@ export const ImportWizard = ({ fields, initialMapping, onImport, importLabel = '
   const [mapping, setMapping] = useState({});
   const [dates, setDates] = useState({});
   const [leaveOut, setLeaveOut] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [over, setOver] = useState(false);
@@ -393,6 +398,9 @@ export const ImportWizard = ({ fields, initialMapping, onImport, importLabel = '
   useEffect(() => { setDates(JSON.parse(datesRead)); }, [datesRead]);
   const dateMissing = fields.some((f) => f.date && f.required && !dates[f.key]);
 
+  const warning = step === 3 && warn ? warn(dates) : null;
+  useEffect(() => { setConfirmed(false); }, [warning]);
+
   const missingFields = fields.filter((f) => f.required && !f.date && !(mapping[f.key] || []).length);
 
   const finish = async () => {
@@ -414,7 +422,8 @@ export const ImportWizard = ({ fields, initialMapping, onImport, importLabel = '
   const canImport = checked && checked.rows.length > 0
     && (checked.problems.length === 0 || leaveOut)
     && checked.rows.length > checked.problems.length
-    && !dateMissing;
+    && !dateMissing
+    && (!warning || confirmed);
 
   return (
     <Stack spacing={2} sx={{ width: '100%' }}>
@@ -581,6 +590,14 @@ export const ImportWizard = ({ fields, initialMapping, onImport, importLabel = '
               </Alert>
             );
           })}
+          {warning && (
+            <Alert severity="warning">
+              {warning}
+              <FormControlLabel sx={{ display: 'flex' }}
+                control={<Checkbox checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />}
+                label="It is a different statement; import it anyway" />
+            </Alert>
+          )}
           {checked.problems.length > 0 ? (
             <>
               <Alert severity="warning">

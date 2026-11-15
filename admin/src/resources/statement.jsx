@@ -244,11 +244,21 @@ const StatementWizard = () => {
   const payer = useWatch({ name: 'organization_id' });
   const notify = useNotify();
   const redirect = useRedirect();
-  const { data: last } = useGetList('statement', {
+  // The payer's statements, latest first: the last one's mapping starts the
+  // columns, and any with the same date warns of a duplicate. The same file
+  // twice is refused by its hash, but the same statement downloaded again or
+  // in another format is a different file.
+  const { data: earlier } = useGetList('statement', {
     filter: { organization_id: payer },
     sort: { field: 'imported_at', order: 'DESC' },
-    pagination: { page: 1, perPage: 1 },
+    pagination: { page: 1, perPage: 1000 },
   }, { enabled: !!payer });
+  const warn = ({ statement_date: date }) => {
+    const same = (earlier ?? []).filter((s) => s.statement_date === date);
+    if (!date || !same.length) return null;
+    const files = same.map((s) => `${s.file_name}, imported ${s.imported_at.slice(0, 10)}`).join('; ');
+    return `A statement from this payer dated ${date} is already imported (${files}). If this is the same statement in another file, importing it counts its income twice.`;
+  };
 
   const onImport = async ({ file, rows, mapping, dates }) => {
     if (!(await trigger())) throw new Error('Fill in the statement details above first.');
@@ -279,7 +289,7 @@ const StatementWizard = () => {
 
   return (
     <ImportWizard fields={statementFields}
-                  initialMapping={last?.[0]?.mapping} onImport={onImport}
+                  initialMapping={earlier?.[0]?.mapping} onImport={onImport} warn={warn}
                   importLabel="Import statement" />
   );
 };
