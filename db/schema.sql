@@ -6760,7 +6760,7 @@ CREATE TABLE music.statement (
     recipient_organization_id integer,
     CONSTRAINT statement_file_name_trimmed CHECK (((file_name = btrim(file_name)) AND (file_name <> ''::text))),
     CONSTRAINT statement_mapping CHECK ((jsonb_typeof(mapping) = 'object'::text)),
-    CONSTRAINT statement_one_recipient CHECK (((recipient_contact_id IS NULL) OR (recipient_organization_id IS NULL))),
+    CONSTRAINT statement_one_recipient CHECK ((num_nonnulls(recipient_contact_id, recipient_organization_id) = 1)),
     CONSTRAINT statement_sha256 CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
     CONSTRAINT statement_side CHECK ((side = ANY (ARRAY['publishing'::text, 'master'::text]))),
     CONSTRAINT statement_storage_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text])))
@@ -6820,13 +6820,13 @@ COMMENT ON COLUMN music.statement.side IS 'publishing: the lines are on composit
 -- Name: COLUMN statement.recipient_contact_id; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON COLUMN music.statement.recipient_contact_id IS 'The person the statement pays, such as the writer on a society''s writer statement. At most one of recipient_contact_id and recipient_organization_id; both blank means the account as a whole.';
+COMMENT ON COLUMN music.statement.recipient_contact_id IS 'The person the statement pays, such as the writer on a society''s writer statement. Exactly one of recipient_contact_id and recipient_organization_id. The import starts from the payer''s last statement.';
 
 --
 -- Name: COLUMN statement.recipient_organization_id; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON COLUMN music.statement.recipient_organization_id IS 'The company the statement pays, such as the publishing company on a society''s publisher statement.';
+COMMENT ON COLUMN music.statement.recipient_organization_id IS 'The company the statement pays, such as the publishing company on a society''s publisher statement. Exactly one of recipient_contact_id and recipient_organization_id.';
 
 --
 -- Name: statement_line; Type: TABLE; Schema: music; Owner: -

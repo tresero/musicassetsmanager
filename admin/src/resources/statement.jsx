@@ -255,8 +255,8 @@ const StatementDetails = ({ accountCurrency, withDate = false }) => (
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
       <PersonOrCompanyInput personSource="recipient_contact_id"
                             companySource="recipient_organization_id"
-                            personLabel="Paid to: person" companyLabel="or Company"
-                            personHelperText="Who the statement pays, such as you on a BMI writer statement or your publishing company on its publisher statement. Leave blank for the account as a whole." />
+                            personLabel="Paid to: person" companyLabel="or Company" required
+                            personHelperText="Who the statement pays, such as you on a BMI writer statement or your publishing company on its publisher statement. Filled in from the payer's last statement." />
     </Stack>
     <RadioButtonGroupInput source="side" label="Side" choices={sides} validate={required()}
                            helperText={withDate
@@ -302,6 +302,14 @@ const StatementWizard = () => {
     const files = same.map((s) => `${s.file_name}, imported ${s.imported_at.slice(0, 10)}`).join('; ');
     return `A statement from this payer${recipient.recipient_contact_id || recipient.recipient_organization_id ? ', paid to the same,' : ''} dated ${date} is already imported (${files}). If this is the same statement in another file, importing it counts its income twice.`;
   };
+  // Paid to starts as on the payer's last statement, when not yet chosen.
+  const lastPaid = earlier?.[0];
+  useEffect(() => {
+    if (!lastPaid || getValues('recipient_contact_id') || getValues('recipient_organization_id')) return;
+    const opts = { shouldDirty: true, shouldValidate: true };
+    setValue('recipient_contact_id', lastPaid.recipient_contact_id ?? null, opts);
+    setValue('recipient_organization_id', lastPaid.recipient_organization_id ?? null, opts);
+  }, [lastPaid, getValues, setValue]);
   const last = (earlier ?? []).find((s) => sameRecipient(s, recipient)) ?? earlier?.[0];
   const lastSide = last?.side;
   useEffect(() => { if (lastSide) setValue('side', lastSide); }, [lastSide, setValue]);

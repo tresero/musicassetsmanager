@@ -152,8 +152,9 @@ society, the MLC, a publisher, an administrator, a label or a distributor. Each
 statement is one side: **Publishing**, whose lines are on songs, or **Master**,
 whose lines are on recordings; the payer's last statement sets it. **Paid to**
 names the person or company the statement pays, such as you on a BMI writer
-statement and your publishing company on its publisher statement; blank is the
-account as a whole. The columns and side start from the last statement with the
+statement and your publishing company on its publisher statement. It is
+required, since paying people out later depends on it, and starts as on the
+payer's last statement. The columns and side start from the last statement with the
 same payer and Paid to, else the payer's last, so a writer and a publisher
 layout from one society each keep their own. Statements can be filtered by
 Paid to. The import
@@ -411,3 +412,4 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | My settings is one page with defaults, Save and Cancel. |
 | 2026-11-15 | Money > Currency is one page with Save and Cancel. |
 | 2026-11-15 | Statements record who they pay (Paid to). |
+| 2026-11-15 | Paid to is required and starts from the payer's last statement. |

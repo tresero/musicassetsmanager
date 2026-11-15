@@ -94,7 +94,7 @@ like the rest of the project.
 Statement import, matching to songs, recordings and releases, and
 hand-entered transactions are built; see [features](features.md). Still to
 come: profit and loss per song, recording, release and period (#58), payee
-balances for recoupable expenses, and outgoing statements to payees.
+balances for recoupable expenses, and payouts to writers and other payees (#63).
 
 Reporting, not bookkeeping. It answers "what earns" rather than replacing an
 accountant.
