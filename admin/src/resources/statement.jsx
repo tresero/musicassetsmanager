@@ -11,7 +11,7 @@ import { Card, CardContent, Stack, Typography } from '@mui/material';
 import OpenIcon from '@mui/icons-material/OpenInNew';
 import RematchIcon from '@mui/icons-material/Sync';
 import { useEffect, useMemo, useState } from 'react';
-import { CompanyInput } from './partyInputs';
+import { CompanyInput, PersonInput, PersonOrCompanyInput } from './partyInputs';
 import { ImportWizard } from './ImportWizard';
 import { uploadFile, fileUrl } from './uploadClient';
 import { useCan, useAccountCurrency } from '../permissions';
@@ -94,7 +94,15 @@ const statementFilters = [
                   perPage={200} sort={{ field: 'name', order: 'ASC' }} alwaysOn>
     <AutocompleteInput optionText="name" label="Payer" />
   </ReferenceInput>,
+  <CompanyInput key="rorg" source="recipient_organization_id" label="Paid to: company" />,
+  <PersonInput key="rcon" source="recipient_contact_id" label="Paid to: person" />,
 ];
+
+// Whether an earlier statement was paid to the same person or company as
+// the one being imported; both blank is the account as a whole.
+const sameRecipient = (s, v) =>
+  (s.recipient_contact_id ?? null) === (v.recipient_contact_id ?? null)
+  && (s.recipient_organization_id ?? null) === (v.recipient_organization_id ?? null);
 
 const ListActions = () => {
   const canEdit = useCan('money.edit');
@@ -113,6 +121,7 @@ const StatementList = () => {
           perPage={50} actions={<ListActions />}>
       <Datagrid rowClick="show" bulkActionButtons={canEdit ? undefined : false}>
         <TextField source="payer_name" label="Payer" />
+        <TextField source="recipient_name" label="Paid to" emptyText="" sortable={false} />
         <DateField source="statement_date" label="Date" />
         <FunctionField source="side" label="Side" render={(r) => sideName[r.side]} />
         <FunctionField source="total" label="Total"
@@ -183,6 +192,7 @@ const StatementShow = () => {
       <SimpleShowLayout>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4}>
           <Labeled label="Payer"><TextField source="payer_name" /></Labeled>
+          <Labeled label="Paid to"><TextField source="recipient_name" emptyText="—" /></Labeled>
           <Labeled label="Date"><DateField source="statement_date" /></Labeled>
           <Labeled label="Side">
             <FunctionField render={(r) => sideName[r.side]} />
@@ -242,6 +252,12 @@ const StatementDetails = ({ accountCurrency, withDate = false }) => (
   <>
     <CompanyInput source="organization_id" label="Payer" validate={required()}
                   helperText="The company that sent the statement: a society, the MLC, a publisher, an administrator or a distributor. Choose it first: the columns from its last statement are reused." />
+    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+      <PersonOrCompanyInput personSource="recipient_contact_id"
+                            companySource="recipient_organization_id"
+                            personLabel="Paid to: person" companyLabel="or Company"
+                            personHelperText="Who the statement pays, such as you on a BMI writer statement or your publishing company on its publisher statement. Leave blank for the account as a whole." />
+    </Stack>
     <RadioButtonGroupInput source="side" label="Side" choices={sides} validate={required()}
                            helperText={withDate
                              ? 'Changing it unmatches every line, including lines matched by hand, and matches them again.'
@@ -262,12 +278,17 @@ const StatementDetails = ({ accountCurrency, withDate = false }) => (
 const StatementWizard = () => {
   const { trigger, getValues, setValue } = useFormContext();
   const payer = useWatch({ name: 'organization_id' });
+  const recipient = {
+    recipient_contact_id: useWatch({ name: 'recipient_contact_id' }) ?? null,
+    recipient_organization_id: useWatch({ name: 'recipient_organization_id' }) ?? null,
+  };
   const side = useWatch({ name: 'side' });
   const fields = useMemo(() => statementFields.filter((f) => !f.side || f.side === side), [side]);
   const notify = useNotify();
   const redirect = useRedirect();
-  // The payer's statements, latest first: the last one's mapping starts the
-  // columns, and any with the same date warns of a duplicate. The same file
+  // The payer's statements, latest first: the last one paid to the same
+  // person or company (else the payer's last) starts the columns and the
+  // side, and one paid to the same with the same date warns of a duplicate. The same file
   // twice is refused by its hash, but the same statement downloaded again or
   // in another format is a different file.
   const { data: earlier } = useGetList('statement', {
@@ -276,12 +297,13 @@ const StatementWizard = () => {
     pagination: { page: 1, perPage: 1000 },
   }, { enabled: !!payer });
   const warn = ({ statement_date: date }) => {
-    const same = (earlier ?? []).filter((s) => s.statement_date === date);
+    const same = (earlier ?? []).filter((s) => s.statement_date === date && sameRecipient(s, recipient));
     if (!date || !same.length) return null;
     const files = same.map((s) => `${s.file_name}, imported ${s.imported_at.slice(0, 10)}`).join('; ');
-    return `A statement from this payer dated ${date} is already imported (${files}). If this is the same statement in another file, importing it counts its income twice.`;
+    return `A statement from this payer${recipient.recipient_contact_id || recipient.recipient_organization_id ? ', paid to the same,' : ''} dated ${date} is already imported (${files}). If this is the same statement in another file, importing it counts its income twice.`;
   };
-  const lastSide = earlier?.[0]?.side;
+  const last = (earlier ?? []).find((s) => sameRecipient(s, recipient)) ?? earlier?.[0];
+  const lastSide = last?.side;
   useEffect(() => { if (lastSide) setValue('side', lastSide); }, [lastSide, setValue]);
 
   const onImport = async ({ file, rows, mapping, dates }) => {
@@ -294,6 +316,8 @@ const StatementWizard = () => {
         organization_id: v.organization_id,
         statement_date: dates.statement_date,
         side: v.side,
+        recipient_contact_id: v.recipient_contact_id ?? null,
+        recipient_organization_id: v.recipient_organization_id ?? null,
         currency_code: v.currency_code,
         payout_amount: v.payout_amount ?? null,
         mapping: used,
@@ -314,7 +338,7 @@ const StatementWizard = () => {
 
   return (
     <ImportWizard fields={fields}
-                  initialMapping={earlier?.[0]?.mapping} onImport={onImport} warn={warn}
+                  initialMapping={last?.mapping} onImport={onImport} warn={warn}
                   importLabel="Import statement" />
   );
 };
@@ -341,8 +365,11 @@ const StatementImport = () => {
   );
 };
 
-const editable = ({ organization_id, statement_date, side, currency_code, payout_amount, notes }) =>
-  ({ organization_id, statement_date, side, currency_code, payout_amount: payout_amount ?? null, notes });
+const editable = ({ organization_id, recipient_contact_id, recipient_organization_id,
+                    statement_date, side, currency_code, payout_amount, notes }) =>
+  ({ organization_id, recipient_contact_id: recipient_contact_id ?? null,
+     recipient_organization_id: recipient_organization_id ?? null,
+     statement_date, side, currency_code, payout_amount: payout_amount ?? null, notes });
 
 const StatementToolbar = () => (
   <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -150,14 +150,20 @@ times. Removing it from one record detaches it without deleting it.
 Royalty statements import from CSV, TSV, XLS or XLSX files, from any payer: a
 society, the MLC, a publisher, an administrator, a label or a distributor. Each
 statement is one side: **Publishing**, whose lines are on songs, or **Master**,
-whose lines are on recordings; the payer's last statement sets it. The import
+whose lines are on recordings; the payer's last statement sets it. **Paid to**
+names the person or company the statement pays, such as you on a BMI writer
+statement and your publishing company on its publisher statement; blank is the
+account as a whole. The columns and side start from the last statement with the
+same payer and Paid to, else the payer's last, so a writer and a publisher
+layout from one society each keep their own. Statements can be filtered by
+Paid to. The import
 goes step by step: pick the header row and any rows to leave out at the end
 (a final row reading Total, Totals, Grand total or Subtotal is left out on its
 own, and can be kept), say which columns hold the amount, work number, title,
 usage period and statement date, plus ISWC and writers for publishing or ISRC,
 barcode and artist for master, check the rows that do not read, then import. The
-columns chosen are remembered: the next statement from the same payer starts
-from them. Several amount columns can be added together, and amounts are read
+columns chosen are remembered: the next statement from the same payer and Paid
+to starts from them. Several amount columns can be added together, and amounts are read
 with the decimal mark the file uses, 1,234.56 or 1.234,56.
 
 Each line keeps its own usage period, read from the usage columns, such as the
@@ -167,8 +173,8 @@ Date or entered at the Check step, and income is reported by it. Dates, months,
 quarters and years are read.
 
 The file is kept, and every row is stored exactly as it reads, for audit. The
-same file cannot be imported twice. When a statement from the same payer
-with the same statement date is already imported, the Check step warns, naming
+same file cannot be imported twice. When a statement from the same payer,
+paid to the same, with the same statement date is already imported, the Check step warns, naming
 that file, and the import waits until the user confirms it is a different
 statement. Rows are never deduplicated, since the same plays at the same rate
 in another period are legitimate. Each line of a publishing statement is matched to a song by ISWC,
@@ -206,8 +212,10 @@ statements from the payer mark the same work on their own (see
 [faq.md](faq.md)). A work number made only of zeros, as BMI sends for such
 lines, is stored as none.
 
-The account's currency is set under **Money > Currency**, before the first
-statement; it cannot change once statements are imported. A statement in
+The account's currency is set under **Money > Currency**, a page with Save and
+Cancel, before the first
+statement; it cannot change once statements are imported or transactions
+entered. A statement in
 another currency records what it paid in the account's currency, and its lines
 are converted at that rate. Seeing statements needs the
 money.view permission and importing or changing them money.edit; the Owner role
@@ -273,7 +281,9 @@ on.
 
 ## Settings
 
-**My settings** belong to each user, whatever their role: the default country,
+**My settings** belong to each user, whatever their role, on one page that
+opens with the current values (or the defaults: United States, English,
+explicit content not set) and saves or cancels: the default country,
 listed first in every country picker and filled in on a new recording's country
 of recording and of commissioning. A new phone number starts on its calling
 code. It is United States until set.
@@ -398,3 +408,6 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | The Songs tab comes first on a recording. |
 | 2026-11-15 | Explicit content default in My settings; artists sort by Sorts as, else name. |
 | 2026-11-15 | The import leaves out a final totals row on its own. |
+| 2026-11-15 | My settings is one page with defaults, Save and Cancel. |
+| 2026-11-15 | Money > Currency is one page with Save and Cancel. |
+| 2026-11-15 | Statements record who they pay (Paid to). |

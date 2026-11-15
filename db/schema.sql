@@ -719,7 +719,8 @@ BEGIN
 
   INSERT INTO music.statement (organization_id, statement_date, currency_code,
                                payout_amount, mapping, file_name, storage_kind,
-                               storage_uri, sha256, notes, side)
+                               storage_uri, sha256, notes, side,
+                               recipient_contact_id, recipient_organization_id)
   VALUES ((statement ->> 'organization_id')::integer,
           (statement ->> 'statement_date')::date,
           statement ->> 'currency_code',
@@ -730,7 +731,9 @@ BEGIN
           statement ->> 'storage_uri',
           statement ->> 'sha256',
           nullif(btrim(statement ->> 'notes'), ''),
-          coalesce(nullif(statement ->> 'side', ''), 'publishing'))
+          coalesce(nullif(statement ->> 'side', ''), 'publishing'),
+          nullif(statement ->> 'recipient_contact_id', '')::integer,
+          nullif(statement ->> 'recipient_organization_id', '')::integer)
   RETURNING id INTO _id;
 
   INSERT INTO music.statement_line (statement_id, row_number, data, amount, work_ref,
@@ -760,7 +763,7 @@ $_$;
 -- Name: FUNCTION import_statement(statement jsonb, lines jsonb); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.import_statement(statement jsonb, lines jsonb) IS 'Imports one statement file in one transaction: the statement (organization_id, statement_date, side, currency_code, payout_amount, mapping, file_name, storage_kind, storage_uri, sha256, notes) and its lines (row_number, data, amount, usage_start, usage_end; work_ref, isrc and upc are read through the mapping), then matches the lines. Refuses a file already imported. Returns the statement id and how many lines were imported and matched.';
+COMMENT ON FUNCTION api.import_statement(statement jsonb, lines jsonb) IS 'Imports one statement file in one transaction: the statement (organization_id, statement_date, side, recipient_contact_id or recipient_organization_id, currency_code, payout_amount, mapping, file_name, storage_kind, storage_uri, sha256, notes) and its lines (row_number, data, amount, usage_start, usage_end; work_ref, isrc and upc are read through the mapping), then matches the lines. Refuses a file already imported. Returns the statement id and how many lines were imported and matched.';
 
 --
 -- Name: login(text, text); Type: FUNCTION; Schema: api; Owner: -
@@ -4246,6 +4249,8 @@ BEGIN
      SET organization_id = NEW.organization_id,
          statement_date = NEW.statement_date,
          side = NEW.side,
+         recipient_contact_id = NEW.recipient_contact_id,
+         recipient_organization_id = NEW.recipient_organization_id,
          currency_code = NEW.currency_code,
          payout_amount = NEW.payout_amount,
          notes = nullif(btrim(NEW.notes), '')
@@ -4266,7 +4271,7 @@ $$;
 -- Name: FUNCTION statement_write(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.statement_write() IS 'Edits or deletes a statement through api.statement. Only the payer, statement date, side, currency, payout and notes change; the file, mapping and lines stay as imported. Changing the side unmatches every line and matches them again. Deleting a statement deletes its lines.';
+COMMENT ON FUNCTION api.statement_write() IS 'Edits or deletes a statement through api.statement. Only the payer, recipient, statement date, side, currency, payout and notes change; the file, mapping and lines stay as imported. Changing the side unmatches every line and matches them again. Deleting a statement deletes its lines.';
 
 --
 -- Name: transaction_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -6751,8 +6756,11 @@ CREATE TABLE music.statement (
     imported_at timestamp with time zone DEFAULT now() NOT NULL,
     statement_date date NOT NULL,
     side text DEFAULT 'publishing'::text NOT NULL,
+    recipient_contact_id integer,
+    recipient_organization_id integer,
     CONSTRAINT statement_file_name_trimmed CHECK (((file_name = btrim(file_name)) AND (file_name <> ''::text))),
     CONSTRAINT statement_mapping CHECK ((jsonb_typeof(mapping) = 'object'::text)),
+    CONSTRAINT statement_one_recipient CHECK (((recipient_contact_id IS NULL) OR (recipient_organization_id IS NULL))),
     CONSTRAINT statement_sha256 CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
     CONSTRAINT statement_side CHECK ((side = ANY (ARRAY['publishing'::text, 'master'::text]))),
     CONSTRAINT statement_storage_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text])))
@@ -6807,6 +6815,18 @@ COMMENT ON COLUMN music.statement.statement_date IS 'The date of the statement a
 --
 
 COMMENT ON COLUMN music.statement.side IS 'publishing: the lines are on compositions and match songs (societies, the MLC, publishers). master: the lines are on recordings and match recordings or releases (labels, distributors). The next statement from the same payer starts from the same side. Changing it unmatches every line and matches them again.';
+
+--
+-- Name: COLUMN statement.recipient_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement.recipient_contact_id IS 'The person the statement pays, such as the writer on a society''s writer statement. At most one of recipient_contact_id and recipient_organization_id; both blank means the account as a whole.';
+
+--
+-- Name: COLUMN statement.recipient_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement.recipient_organization_id IS 'The company the statement pays, such as the publishing company on a society''s publisher statement.';
 
 --
 -- Name: statement_line; Type: TABLE; Schema: music; Owner: -
@@ -6939,10 +6959,15 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
     s.sha256,
     s.notes,
     s.imported_by,
-    s.imported_at
-   FROM (((music.statement s
+    s.imported_at,
+    s.recipient_contact_id,
+    s.recipient_organization_id,
+    COALESCE(rc.display_name, ro.name) AS recipient_name
+   FROM (((((music.statement s
      JOIN music.organization o ON ((o.id = s.organization_id)))
      JOIN music.account a ON ((a.id = s.account_id)))
+     LEFT JOIN music.contact rc ON ((rc.id = s.recipient_contact_id)))
+     LEFT JOIN music.organization ro ON ((ro.id = s.recipient_organization_id)))
      CROSS JOIN LATERAL ( SELECT COALESCE(sum(l.amount), (0)::numeric) AS total,
             count(*) AS line_count,
             count(*) FILTER (WHERE (l.match_method IS NULL)) AS unmatched_count,
@@ -6956,7 +6981,7 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
 -- Name: VIEW statement; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.statement IS 'Imported statements with their payer, side, line counts and totals. total is in the statement currency; total_converted is in the account currency. unmatched_count counts lines not yet matched or marked; not_in_catalog_count counts lines marked as income on nothing in the catalog. usage_start and usage_end span the lines'' usage periods.';
+COMMENT ON VIEW api.statement IS 'Imported statements with their payer, recipient, side, line counts and totals. total is in the statement currency; total_converted is in the account currency. unmatched_count counts lines not yet matched or marked; not_in_catalog_count counts lines marked as income on nothing in the catalog. usage_start and usage_end span the lines'' usage periods. recipient_name is the person or company the statement pays, blank for the account as a whole.';
 
 --
 -- Name: statement_line; Type: VIEW; Schema: api; Owner: -
@@ -8851,6 +8876,18 @@ CREATE INDEX statement_line_work_ref_idx ON music.statement_line USING btree (wo
 CREATE INDEX statement_organization_id_idx ON music.statement USING btree (organization_id);
 
 --
+-- Name: statement_recipient_contact_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_recipient_contact_idx ON music.statement USING btree (recipient_contact_id) WHERE (recipient_contact_id IS NOT NULL);
+
+--
+-- Name: statement_recipient_organization_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_recipient_organization_idx ON music.statement USING btree (recipient_organization_id) WHERE (recipient_organization_id IS NOT NULL);
+
+--
 -- Name: transaction_account_date_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -10485,6 +10522,20 @@ ALTER TABLE ONLY music.statement
     ADD CONSTRAINT statement_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES music.organization(id);
 
 --
+-- Name: statement statement_recipient_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.statement
+    ADD CONSTRAINT statement_recipient_contact_id_fkey FOREIGN KEY (recipient_contact_id) REFERENCES music.contact(id);
+
+--
+-- Name: statement statement_recipient_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.statement
+    ADD CONSTRAINT statement_recipient_organization_id_fkey FOREIGN KEY (recipient_organization_id) REFERENCES music.organization(id);
+
+--
 -- Name: transaction transaction_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -11329,13 +11380,13 @@ ALTER TABLE music.statement ENABLE ROW LEVEL SECURITY;
 -- Name: statement statement_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY statement_account ON music.statement USING (((account_id = ( SELECT music.current_account() AS current_account)) AND ( SELECT music.can('money.view'::text) AS can))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND music.own_organization(organization_id)));
+CREATE POLICY statement_account ON music.statement USING (((account_id = ( SELECT music.current_account() AS current_account)) AND ( SELECT music.can('money.view'::text) AS can))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND music.own_organization(organization_id) AND ((recipient_contact_id IS NULL) OR music.own_contact(recipient_contact_id)) AND ((recipient_organization_id IS NULL) OR music.own_organization(recipient_organization_id))));
 
 --
 -- Name: POLICY statement_account ON statement; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON POLICY statement_account ON music.statement IS 'Rows of the account in the request token, and only for a role with money.view; on write, the payer must be in the same account.';
+COMMENT ON POLICY statement_account ON music.statement IS 'Rows of the account in the request token, and only for a role with money.view; on write, the payer and recipient must be in the same account.';
 
 --
 -- Name: statement_line; Type: ROW SECURITY; Schema: music; Owner: -
@@ -12880,6 +12931,18 @@ GRANT UPDATE(statement_date) ON TABLE music.statement TO app_user;
 --
 
 GRANT UPDATE(side) ON TABLE music.statement TO app_user;
+
+--
+-- Name: COLUMN statement.recipient_contact_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT UPDATE(recipient_contact_id) ON TABLE music.statement TO app_user;
+
+--
+-- Name: COLUMN statement.recipient_organization_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT UPDATE(recipient_organization_id) ON TABLE music.statement TO app_user;
 
 --
 -- Name: TABLE statement_line; Type: ACL; Schema: music; Owner: -

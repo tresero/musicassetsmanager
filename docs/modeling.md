@@ -317,6 +317,12 @@ the work's, so the side is chosen per statement rather than guessed from the
 columns. A master line on a whole release, such as an album download, is the
 release's income rather than split across its tracks.
 
+A statement can name who it pays, a person or a company, since one society
+sends a writer statement to the writer and a publisher statement to the
+publishing company for the same works and period. Both are income on the same
+songs; keeping who was paid lets them be reported apart and keeps their two
+file layouts from overwriting each other's column mapping.
+
 A recording can earn under several ISRCs: a reissue through a later
 distributor gets a new one while the original keeps earning elsewhere. The
 recording keeps one ISRC of its own and a list of others, all matched alike,
@@ -376,3 +382,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-14 | Statement lines can be income on no song; an all-zero work number is none. |
 | 2026-11-15 | Statements have a side; master lines match recordings or releases; not in catalog; transactions spread by weight. |
 | 2026-11-15 | Recordings have other ISRCs. |
+| 2026-11-15 | Statements record who they pay. |
