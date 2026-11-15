@@ -4,7 +4,9 @@ import { useSourceContext } from 'ra-core';
 import { TextField, MenuItem } from '@mui/material';
 
 /*
- * Picks which writer on THIS song a publisher share is for.
+ * Picks which writer on THIS song a publisher share is for. Blank means all
+ * of them: a publisher that represents every writer on the song is one row,
+ * and one that represents only some is a row per writer.
  *
  * The options are the writers in the sibling `writers` array, not a
  * reference lookup, so it only ever offers people actually credited on
@@ -46,7 +48,7 @@ export const ForWriterInput = () => {
       helperText={saved.length === 0 ? 'Save the writers first' : false}
     >
       <MenuItem value="">
-        <em>Not specified</em>
+        <em>All writers</em>
       </MenuItem>
       {saved.map((w) => (
         <MenuItem key={w.id} value={w.id}>

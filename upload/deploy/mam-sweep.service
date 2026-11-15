@@ -1,0 +1,19 @@
+[Unit]
+Description=Music Assets Manager: delete stored files nothing refers to
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mam-upload sweep -grace 24h
+User=mamupload
+EnvironmentFile=/etc/mam-upload.env
+
+# the local backend deletes here; harmless when using s3
+ReadWritePaths=/var/lib/mam/files
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

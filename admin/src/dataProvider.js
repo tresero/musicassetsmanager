@@ -33,9 +33,11 @@ const provider = postgrestRestProvider({
 const searchQuery = (q) =>
   q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => `${w}:*`).join(' & ');
 
-// Searches saved in the browser under these keys would filter the list
-// invisibly, since no input shows them any more.
-const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike', 'search@ilike'];
+// Searches and filters saved in the browser under these keys would filter
+// the list invisibly, since no input shows them any more. Unmatched
+// statement lines are now match_method@is, since a line marked not in catalog
+// has no song either.
+const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike', 'search@ilike', 'song_id@is'];
 
 const toSearch = (params) => {
   if (!params?.filter) return params;

@@ -310,11 +310,46 @@ A payer's work number is remembered through the lines themselves: once one line
 is matched, later lines with the same number from the same payer match too.
 There is no separate lookup table to fall out of step.
 
+Each statement is one side, publishing or master, and its lines are matched
+to that side only: songs for publishing, recordings or releases for master. A
+publishing statement can carry ISRCs (the MLC's does), and that income is still
+the work's, so the side is chosen per statement rather than guessed from the
+columns. A master line on a whole release, such as an album download, is the
+release's income rather than split across its tracks.
+
+A recording can earn under several ISRCs: a reissue through a later
+distributor gets a new one while the original keeps earning elsewhere. The
+recording keeps one ISRC of its own and a list of others, all matched alike,
+rather than a second recording for the same master, which would split one
+master's income in two. An ISRC belongs to one recording only.
+
+Some income is on nothing in the catalog: cable retransmission, unreported
+works, a payer's additional revenue. A line for it is marked not in catalog
+rather than left unmatched or matched to something it did not earn. It counts in the statement
+total, belongs to the catalog as a whole like overhead, and is remembered the
+same way as a match: by work number, or by title when the line has none. A
+work number made only of zeros is no work number, since BMI uses 0 for exactly
+these lines.
+
 ## A song in use cannot be deleted
 
-A song that a recording records, or that a statement line is matched to, cannot
-be deleted. Removing it would silently detach the recording or turn earned
-income into unmatched lines.
+A song that a recording records, or that a statement line or transaction is
+for, cannot be deleted; the same holds for recordings and releases with
+statement lines or transactions. Removing it would silently detach the
+recording, turn earned income into unmatched lines, or turn a cost into
+overhead.
+
+## Transactions are spread by weight
+
+A hand-entered transaction is for any number of songs, recordings and releases,
+each with a weight; a share is its weight over the total, computed and never
+stored, so adding a row never leaves shares that do not total 100. One table
+of splits with exactly one of the three set keeps "what was this for" in one
+place. No splits means overhead. Amounts are kept as paid, with the amount in
+the account currency beside them, since a foreign bill is converted at the rate
+actually paid rather than a rate looked up later. Categories are each account's
+own list; a mastering bill and a sync fee are named differently by every
+catalog.
 
 ## Publishing and master royalties are accounted apart
 
@@ -338,3 +373,6 @@ contract does it, it is settled outside the catalog.
 | 2026-11-12 | Publishing and master royalties are accounted apart; cross-collateralization is not modeled. |
 | 2026-11-13 | Statements are kept as received; a song in use cannot be deleted. |
 | 2026-11-14 | A statement has one date; each line has its own usage period. |
+| 2026-11-14 | Statement lines can be income on no song; an all-zero work number is none. |
+| 2026-11-15 | Statements have a side; master lines match recordings or releases; not in catalog; transactions spread by weight. |
+| 2026-11-15 | Recordings have other ISRCs. |

@@ -85,8 +85,9 @@ record's title, and the service signs the link with a matching
 
 ## Sweep
 
-`mam-upload sweep` deletes stored files that no document or audio row refers
-to. It only looks under `documents/`, `audio/`, and `artwork/`, leaves anything
+`mam-upload sweep` deletes stored files that no document, audio or statement
+row refers to. It only looks under `documents/`, `audio/`, `artwork/` and
+`statements/`, leaves anything
 newer than the grace period, and counts references across all rows, so a file
 two recordings share is kept.
 

@@ -136,6 +136,43 @@ non-featured performer, which is what hired players are.
 Master ownership with shares, since a co-owned master divides the rights
 owner's half by them.
 
+## Royalty statements
+
+No statement format is required. Payers send their own layouts, so the importer
+reads any CSV, TSV or Excel file and the user maps its headers once per payer;
+the next statement from that payer starts from the same mapping. What makes the
+lines match is the identifiers: ISWC for works, ISRC for recordings, UPC or EAN
+for releases, plus the payer's own work number.
+
+The formal standards, for reference:
+
+| Standard | From | Side | What it is |
+|---|---|---|---|
+| CRD (Common Royalty Distribution) | CISAC | Publishing | Society distributions to other societies and to publishers |
+| DSR (Digital Sales Reporting) | DDEX | Either, one per report | Streaming and download usage reported by the services |
+| CDM (Claim Detail Message) | DDEX | Publishing | Publishers' claims on reported usage |
+
+Small payees rarely receive these as is; they get the payer's export of them.
+A file in one of them imports like any other, through a mapping.
+
+Every statement is one side, publishing or master, chosen at import:
+
+- Publishing lines match songs: ISWC, then the work number, then title and
+  writers. Societies, the MLC and publishers send these. Outside the US,
+  societies such as GEMA, SACEM and JASRAC collect performance and mechanical
+  income together; both are publishing.
+- Master lines match recordings by ISRC, or releases by barcode when the line
+  is on a whole release, then by title. Labels, distributors and label
+  accounting systems such as Curve send these, as do neighboring rights bodies
+  such as PPL and SoundExchange.
+
+The side is needed because publishing statements carry ISRCs too (the MLC's
+royalty detail does), and that income belongs to the work, not the master.
+
+Not handled: one statement with both sides on it, such as a company that is
+both label and publisher paying both shares together. If one turns up, a mixed
+side that reads each line's side from a mapped column is the planned answer.
+
 ## Semantic web
 
 Two tables drive JSON-LD output. `vocabulary` holds prefix and base-URI pairs
@@ -163,3 +200,4 @@ than a CHECK constraint so they can be extended without a migration.
 | Date | Revision |
 |---|---|
 | 2026-09-30 | DDEX codes on roles and instruments, allowed value sets version 011. |
+| 2026-11-15 | Royalty statements: no required format, the identifiers that match lines, CRD, DSR and CDM, publishing and master sides. |

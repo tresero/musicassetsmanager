@@ -1,7 +1,7 @@
 import {
   List, Datagrid, TextField, DateField, NumberField, FunctionField,
   ReferenceInput, AutocompleteInput, Show, SimpleShowLayout, Edit, SimpleForm,
-  DateInput, TextInput, NumberInput, Form, Title, Toolbar, SaveButton, DeleteButton,
+  DateInput, TextInput, NumberInput, RadioButtonGroupInput, Form, Title, Toolbar, SaveButton, DeleteButton,
   TopToolbar, EditButton, CreateButton, ExportButton, ReferenceManyField, Pagination, Labeled, Button,
   useRecordContext, useNotify, useRedirect, useRefresh, useGetList,
   required,
@@ -10,42 +10,65 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Card, CardContent, Stack, Typography } from '@mui/material';
 import OpenIcon from '@mui/icons-material/OpenInNew';
 import RematchIcon from '@mui/icons-material/Sync';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CompanyInput } from './partyInputs';
 import { ImportWizard } from './ImportWizard';
 import { uploadFile, fileUrl } from './uploadClient';
 import { useCan, useAccountCurrency } from '../permissions';
+import { rpc } from '../rpc';
 import { CurrencyInput } from './shared';
-import { MatchMethodField, SongMatchField, UsageField } from './statementLine';
+import { MatchMethodField, MatchField, RefField, UsageField, WhoField } from './statementLine';
 
 const money = (v) =>
   v == null ? '' : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// The fields an imported statement needs from its file. The guesses are
-// header names seen on BMI, ASCAP, MLC and publisher statements.
+export const sides = [
+  { id: 'publishing', name: 'Publishing: lines are on songs' },
+  { id: 'master', name: 'Master: lines are on recordings' },
+];
+const sideName = { publishing: 'Publishing', master: 'Master' };
+
+// The fields an imported statement needs from its file, for either side or
+// one (side). The guesses are header names seen on BMI, ASCAP, MLC,
+// publisher, distributor and Curve statements.
 const statementFields = [
   {
     key: 'amount', label: 'Amount', amount: true, multiple: true, required: true,
-    help: 'What each line paid, complete. Choose several columns to add them together, such as dollars and premium dollars.',
-    guess: ['distributed amount', 'royalty amount', 'dollars', 'amount', 'net amount', 'royalty', 'earnings'],
+    help: 'What each line paid you, complete. Choose several columns to add them together, such as dollars and premium dollars. On a label statement, the amount payable to you, after the royalty rate.',
+    guess: ['net payable', 'distributed amount', 'royalty amount', 'dollars', 'amount', 'net amount', 'royalty', 'earnings'],
   },
   {
     key: 'work_ref', label: 'Work number',
     help: 'The payer\'s own number for the work, such as a BMI title number, ASCAP work ID or MLC song code. Once one line is matched, later lines with the same number match on their own.',
-    guess: ['title number', 'work id', 'mlc song code', 'song code', 'work number', 'track code', 'work code'],
+    guess: ['title number', 'title #', 'work id', 'mlc song code', 'song code', 'work number', 'track code', 'work code'],
   },
   {
-    key: 'iswc', label: 'ISWC',
+    key: 'iswc', label: 'ISWC', side: 'publishing',
     help: 'Matched against the songs\' ISWCs first.',
     guess: ['iswc', 'work iswc'],
   },
   {
+    key: 'isrc', label: 'ISRC', side: 'master',
+    help: 'Matched against the recordings\' ISRCs first. A line matched by hand teaches its ISRC, so later statements match it on their own.',
+    guess: ['isrc', 'track isrc'],
+  },
+  {
+    key: 'upc', label: 'Barcode', side: 'master',
+    help: 'The release\'s UPC or EAN. A line with no ISRC, such as an album download, matches the release with this barcode.',
+    guess: ['barcode', 'upc', 'ean', 'release upc', 'product upc'],
+  },
+  {
     key: 'title', label: 'Title',
-    help: 'Matched against song titles and alternate titles when there is no ISWC or known work number.',
+    help: 'Matched against song or recording titles when nothing else matches.',
     guess: ['title name', 'work title', 'work primary title', 'track title', 'song title', 'title'],
   },
   {
-    key: 'writers', label: 'Writers',
+    key: 'artist', label: 'Artist', side: 'master',
+    help: 'Shown on the line, and ranks the suggested recordings when matching by hand.',
+    guess: ['track artist', 'artist', 'artist name', 'release artist'],
+  },
+  {
+    key: 'writers', label: 'Writers', side: 'publishing',
     help: 'A title match also needs one of the song\'s writers\' last names here. Leave it empty to match on title alone.',
     guess: ['work writer list', 'composer name', 'writers', 'composers', 'writer'],
   },
@@ -55,12 +78,14 @@ const statementFields = [
     guess: [
       ['usage period start date', 'usage period end date'],
       ['performance start date', 'performance end date'],
+      'perf period',
+      'sale date',
     ],
   },
   {
     key: 'statement_date', label: 'Statement date', date: true, required: true,
     help: 'The column with the date of the statement, such as the MLC\'s Distribution Date. Income is reported by this date. If the file has none, leave this empty and enter the date at the next step.',
-    guess: ['distribution date', 'statement date'],
+    guess: ['distribution date', 'statement date', 'period', 'transaction date'],
   },
 ];
 
@@ -89,6 +114,7 @@ const StatementList = () => {
       <Datagrid rowClick="show" bulkActionButtons={canEdit ? undefined : false}>
         <TextField source="payer_name" label="Payer" />
         <DateField source="statement_date" label="Date" />
+        <FunctionField source="side" label="Side" render={(r) => sideName[r.side]} />
         <FunctionField source="total" label="Total"
                        render={(r) => `${money(r.total)} ${r.currency_code}`} />
         <FunctionField source="total_converted" label="Paid"
@@ -116,20 +142,6 @@ const OpenFileButton = () => {
     }
   };
   return <Button label="Original file" onClick={open}><OpenIcon /></Button>;
-};
-
-const rpc = async (name, body) => {
-  const res = await fetch(`/api/rpc/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.message || `Request failed (${res.status})`);
-  return json;
 };
 
 const RematchButton = () => {
@@ -172,6 +184,9 @@ const StatementShow = () => {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4}>
           <Labeled label="Payer"><TextField source="payer_name" /></Labeled>
           <Labeled label="Date"><DateField source="statement_date" /></Labeled>
+          <Labeled label="Side">
+            <FunctionField render={(r) => sideName[r.side]} />
+          </Labeled>
           <Labeled label="Usage">
             <UsageField emptyText="—" />
           </Labeled>
@@ -183,6 +198,7 @@ const StatementShow = () => {
           </Labeled>
           <Labeled label="Lines"><NumberField source="line_count" /></Labeled>
           <Labeled label="Unmatched"><NumberField source="unmatched_count" /></Labeled>
+          <Labeled label="Not in catalog"><NumberField source="not_in_catalog_count" /></Labeled>
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4}>
           <Labeled label="File"><TextField source="file_name" /></Labeled>
@@ -195,13 +211,13 @@ const StatementShow = () => {
           <Datagrid rowClick={canEdit ? 'edit' : false} bulkActionButtons={false}>
             <NumberField source="row_number" label="Row" />
             <TextField source="title" emptyText="" />
-            <TextField source="writers" emptyText="" />
-            <TextField source="work_ref" label="Work number" emptyText="" />
+            <WhoField label="Writers or artist" />
+            <RefField label="Work number or ISRC" />
             <UsageField label="Usage" />
             <NumberField source="amount" options={{ maximumFractionDigits: 6 }} />
             <NumberField source="amount_converted" label="Paid"
                          options={{ maximumFractionDigits: 6 }} />
-            <SongMatchField label="Song" sortBy="song_id" />
+            <MatchField label="Matched to" />
             <MatchMethodField label="Matched by" />
           </Datagrid>
         </ReferenceManyField>
@@ -226,6 +242,10 @@ const StatementDetails = ({ accountCurrency, withDate = false }) => (
   <>
     <CompanyInput source="organization_id" label="Payer" validate={required()}
                   helperText="The company that sent the statement: a society, the MLC, a publisher, an administrator or a distributor. Choose it first: the columns from its last statement are reused." />
+    <RadioButtonGroupInput source="side" label="Side" choices={sides} validate={required()}
+                           helperText={withDate
+                             ? 'Changing it unmatches every line, including lines matched by hand, and matches them again.'
+                             : 'Publishing statements (societies, the MLC, publishers) are matched to songs; master statements (labels, distributors) to recordings and releases. The payer\'s last statement sets it.'} />
     {withDate && (
       <DateInput source="statement_date" label="Statement date" validate={required()}
                  helperText="The date of the statement as the payer gives it. Income is reported by this date." />
@@ -240,8 +260,10 @@ const StatementDetails = ({ accountCurrency, withDate = false }) => (
 );
 
 const StatementWizard = () => {
-  const { trigger, getValues } = useFormContext();
+  const { trigger, getValues, setValue } = useFormContext();
   const payer = useWatch({ name: 'organization_id' });
+  const side = useWatch({ name: 'side' });
+  const fields = useMemo(() => statementFields.filter((f) => !f.side || f.side === side), [side]);
   const notify = useNotify();
   const redirect = useRedirect();
   // The payer's statements, latest first: the last one's mapping starts the
@@ -259,6 +281,8 @@ const StatementWizard = () => {
     const files = same.map((s) => `${s.file_name}, imported ${s.imported_at.slice(0, 10)}`).join('; ');
     return `A statement from this payer dated ${date} is already imported (${files}). If this is the same statement in another file, importing it counts its income twice.`;
   };
+  const lastSide = earlier?.[0]?.side;
+  useEffect(() => { if (lastSide) setValue('side', lastSide); }, [lastSide, setValue]);
 
   const onImport = async ({ file, rows, mapping, dates }) => {
     if (!(await trigger())) throw new Error('Fill in the statement details above first.');
@@ -269,6 +293,7 @@ const StatementWizard = () => {
       statement: {
         organization_id: v.organization_id,
         statement_date: dates.statement_date,
+        side: v.side,
         currency_code: v.currency_code,
         payout_amount: v.payout_amount ?? null,
         mapping: used,
@@ -283,12 +308,12 @@ const StatementWizard = () => {
         usage_start: r.usage_start, usage_end: r.usage_end,
       })),
     });
-    notify(`Imported ${result.lines} lines; ${result.matched} matched to songs.`, { type: 'info' });
+    notify(`Imported ${result.lines} lines; ${result.matched} matched to ${v.side === 'master' ? 'recordings and releases' : 'songs'}.`, { type: 'info' });
     redirect('show', 'statement', result.id);
   };
 
   return (
-    <ImportWizard fields={statementFields}
+    <ImportWizard fields={fields}
                   initialMapping={earlier?.[0]?.mapping} onImport={onImport} warn={warn}
                   importLabel="Import statement" />
   );
@@ -300,11 +325,13 @@ const StatementImport = () => {
     <Card sx={{ mt: 2 }}>
       <Title title="Import a statement" />
       <CardContent>
-        <Form defaultValues={{ currency_code: accountCurrency }} onSubmit={() => {}}>
+        <Form defaultValues={{ currency_code: accountCurrency, side: 'publishing' }} onSubmit={() => {}}>
           <Stack spacing={1} sx={{ maxWidth: 900 }}>
             <Typography variant="body2" color="text.secondary">
               The file is kept as it is, and each row is stored exactly as it reads.
-              Columns are pre-filled from the last statement from the same payer.
+              Columns are pre-filled from the last statement from the same payer. If the
+              file ends with a total row, set Rows to leave out at the end so it isn't
+              counted as a line.
             </Typography>
             <StatementDetails accountCurrency={accountCurrency} />
             <StatementWizard />
@@ -315,8 +342,8 @@ const StatementImport = () => {
   );
 };
 
-const editable = ({ organization_id, statement_date, currency_code, payout_amount, notes }) =>
-  ({ organization_id, statement_date, currency_code, payout_amount: payout_amount ?? null, notes });
+const editable = ({ organization_id, statement_date, side, currency_code, payout_amount, notes }) =>
+  ({ organization_id, statement_date, side, currency_code, payout_amount: payout_amount ?? null, notes });
 
 const StatementToolbar = () => (
   <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -3,7 +3,7 @@ import {
   TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
-  NullableBooleanInput, useRecordContext, required,
+  NullableBooleanInput, useRecordContext, required, TextArrayInput,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
@@ -132,6 +132,9 @@ const RecordingForm = () => (
       <TextInput source="isrc" label="ISRC"
                  helperText="Country, registrant, five digits"
                  sx={{ width: { xs: '100%', md: 220 } }} />
+      <TextArrayInput source="other_isrcs" label="Other ISRCs"
+                      helperText="ISRCs this same recording also earns under, such as a reissue's. Statement lines match these too. Type one and press Enter."
+                      sx={{ width: { xs: '100%', md: 520 } }} />
       <NumberInput source="bpm" label="BPM" step={0.01}
                    sx={{ width: { xs: '100%', md: 130 } }} />
       <AutocompleteInput source="tempo" label="Tempo"

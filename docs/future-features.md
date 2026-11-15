@@ -91,9 +91,10 @@ like the rest of the project.
 
 ### Royalty and project reporting
 
-Statement import and matching to songs is built; see [features](features.md).
-Still to come: matching distributor lines to recordings by ISRC, and reporting
-earnings per song, per recording and per period.
+Statement import, matching to songs, recordings and releases, and
+hand-entered transactions are built; see [features](features.md). Still to
+come: profit and loss per song, recording, release and period (#58), payee
+balances for recoupable expenses, and outgoing statements to payees.
 
 Reporting, not bookkeeping. It answers "what earns" rather than replacing an
 accountant.
@@ -209,8 +210,9 @@ and the schema already supports multiple accounts either way.
 
 ### General ledger accounting
 
-Expenses, invoicing, tax. That is what an accountant's software is for. The
-royalty work above is the music-specific half only.
+Invoicing, tax, payments and bank reconciliation. That is what an
+accountant's software is for. Expenses are recorded only as far as the catalog
+needs them: what a song, recording or release cost against what it earned.
 
 ### Social features
 
@@ -223,3 +225,4 @@ sharing layer, not a network.
 |---|---|
 | 2026-09-30 | Conversion writes the pitch comment into the MP3; shared vocabularies for hosted accounts added under Planned. |
 | 2026-11-13 | Statement import built; recording matching and earnings reports remain. |
+| 2026-11-15 | Recording matching and transactions built; general ledger excludes expenses no longer. |

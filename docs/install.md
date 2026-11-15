@@ -46,12 +46,13 @@ statuses) are starting points to edit.
 
 ## Extensions
 
-`schema.sql` creates the two extensions it needs:
+`schema.sql` creates the three extensions it needs:
 
 `pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
 login function. `unaccent` is used when matching titles against society
-exports, where the same work appears as both "Que Pena" and "Qué Pena". Both
-ship with PostgreSQL.
+exports, where the same work appears as both "Que Pena" and "Qué Pena".
+`pg_trgm` ranks the songs suggested for an unmatched statement line by how
+alike the titles are. All three ship with PostgreSQL.
 
 ## PostgREST
 
@@ -156,3 +157,4 @@ Then log in at the app's root URL. Invite everyone else from Settings, Users.
 |---|---|
 | 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |
 | 2026-10-10 | PostgREST db-pre-request; first user is an Owner |
+| 2026-11-14 | pg_trgm for statement line suggestions. |

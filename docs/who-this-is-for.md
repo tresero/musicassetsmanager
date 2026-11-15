@@ -61,7 +61,9 @@ depends on whether anyone wants one.
 
 ## Royalties and project accounting
 
-Planned, not built.
+Partly built: statements import and match to songs, recordings and releases,
+and income and expenses are entered by hand against them. Profit and loss
+reports are next.
 
 The goal is reporting rather than bookkeeping: which songs earn, which
 recordings earn, what a given project cost against what it brought in. Import
@@ -69,8 +71,9 @@ statements from the MLC, PROs, and distributors, match them to works and
 recordings, and answer questions you currently answer by opening four
 spreadsheets.
 
-This is not general ledger accounting. It won't file your taxes, track your
-expenses beyond a project, or replace whatever your accountant uses. It's the
+This is not general ledger accounting. It won't file your taxes, track
+expenses that aren't about the catalog, or replace whatever your accountant
+uses. It's the
 music-specific half: money in, attached to the thing that earned it.
 
 The schema is already shaped for it. Works, recordings, and releases have
@@ -93,3 +96,9 @@ will not teach you publishing.
 If you're running a rights department, you'll want something else. If you're
 running your own catalog out of your own head, this is an attempt to get it out
 of your head and into something that can answer questions.
+
+## Revision history
+
+| Date | Revision |
+|---|---|
+| 2026-11-15 | Royalties and project accounting partly built. |

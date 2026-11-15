@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Music Assets Manager sweep nightly
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

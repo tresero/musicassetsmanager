@@ -43,6 +43,7 @@ import siteSetting from './resources/siteSetting';
 import statement from './resources/statement';
 import statementLine from './resources/statementLine';
 import accountSetting from './resources/accountSetting';
+import transaction, { transactionCategory } from './resources/transaction';
 import { sharedList } from './resources/shared';
 
 const nameList = sharedList();
@@ -96,6 +97,8 @@ export default function App() {
 
       <Resource name="statement" {...moneyEdit(money(statement))} />
       <Resource name="statement_line" {...moneyEdit(statementLine)} />
+      <Resource name="transaction" {...moneyEdit(money(transaction))} />
+      <Resource name="transaction_category" {...moneyEdit(money(transactionCategory))} />
       <Resource name="account_setting" {...moneyEdit(accountSetting)} />
 
       <Resource name="country" {...shared(country)} />

@@ -15,6 +15,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 
 --
 -- Name: api; Type: SCHEMA; Schema: -; Owner: -
@@ -698,7 +699,7 @@ COMMENT ON FUNCTION api.document_write() IS 'Runs as the signed-in user, so row 
 
 CREATE FUNCTION api.import_statement(statement jsonb, lines jsonb) RETURNS json
     LANGUAGE plpgsql
-    AS $$
+    AS $_$
 DECLARE
   _id integer;
   _at timestamp with time zone;
@@ -718,7 +719,7 @@ BEGIN
 
   INSERT INTO music.statement (organization_id, statement_date, currency_code,
                                payout_amount, mapping, file_name, storage_kind,
-                               storage_uri, sha256, notes)
+                               storage_uri, sha256, notes, side)
   VALUES ((statement ->> 'organization_id')::integer,
           (statement ->> 'statement_date')::date,
           statement ->> 'currency_code',
@@ -728,16 +729,19 @@ BEGIN
           statement ->> 'storage_kind',
           statement ->> 'storage_uri',
           statement ->> 'sha256',
-          nullif(btrim(statement ->> 'notes'), ''))
+          nullif(btrim(statement ->> 'notes'), ''),
+          coalesce(nullif(statement ->> 'side', ''), 'publishing'))
   RETURNING id INTO _id;
 
   INSERT INTO music.statement_line (statement_id, row_number, data, amount, work_ref,
-                                    usage_start, usage_end)
+                                    isrc, upc, usage_start, usage_end)
   SELECT _id,
          (x ->> 'row_number')::integer,
          x -> 'data',
          coalesce((x ->> 'amount')::numeric, 0),
-         music.statement_value(x -> 'data', _mapping, 'work_ref'),
+         nullif(regexp_replace(music.statement_value(x -> 'data', _mapping, 'work_ref'), '^0+$', ''), ''),
+         nullif(upper(regexp_replace(coalesce(music.statement_value(x -> 'data', _mapping, 'isrc'), ''), '[^0-9A-Za-z]', '', 'g')), ''),
+         nullif(regexp_replace(coalesce(music.statement_value(x -> 'data', _mapping, 'upc'), ''), '[^0-9]', '', 'g'), ''),
          (x ->> 'usage_start')::date,
          (x ->> 'usage_end')::date
     FROM jsonb_array_elements(lines) x;
@@ -746,17 +750,17 @@ BEGIN
 
   RETURN (SELECT json_build_object('id', _id,
                                    'lines', count(*),
-                                   'matched', count(song_id))
+                                   'matched', count(*) FILTER (WHERE num_nonnulls(song_id, recording_id, release_id) = 1))
             FROM music.statement_line
            WHERE statement_id = _id);
 END;
-$$;
+$_$;
 
 --
 -- Name: FUNCTION import_statement(statement jsonb, lines jsonb); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.import_statement(statement jsonb, lines jsonb) IS 'Imports one statement file in one transaction: the statement (organization_id, statement_date, currency_code, payout_amount, mapping, file_name, storage_kind, storage_uri, sha256, notes) and its lines (row_number, data, amount, usage_start, usage_end), then matches the lines. Refuses a file already imported. Returns the statement id and how many lines were imported and matched.';
+COMMENT ON FUNCTION api.import_statement(statement jsonb, lines jsonb) IS 'Imports one statement file in one transaction: the statement (organization_id, statement_date, side, currency_code, payout_amount, mapping, file_name, storage_kind, storage_uri, sha256, notes) and its lines (row_number, data, amount, usage_start, usage_end; work_ref, isrc and upc are read through the mapping), then matches the lines. Refuses a file already imported. Returns the statement id and how many lines were imported and matched.';
 
 --
 -- Name: login(text, text); Type: FUNCTION; Schema: api; Owner: -
@@ -905,6 +909,41 @@ $$;
 --
 
 COMMENT ON FUNCTION api.organization_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+
+--
+-- Name: recording_suggestions(integer); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.recording_suggestions(line_id integer) RETURNS TABLE(recording_id integer, title text, artist text, isrc text, score real)
+    LANGUAGE sql STABLE
+    AS $$
+  WITH line AS (
+    SELECT music.title_key(music.statement_value(l.data, s.mapping, 'title')) AS k,
+           music.match_key(music.statement_value(l.data, s.mapping, 'artist')) AS a
+      FROM music.statement_line l
+      JOIN music.statement s ON s.id = l.statement_id
+     WHERE l.id = line_id
+  ), scored AS (
+    SELECT r.id, public.similarity(music.title_key(r.title), line.k) AS sim,
+           music.artist_billing(r.id, NULL) AS billing
+      FROM music.recording r, line
+     WHERE line.k IS NOT NULL
+  )
+  SELECT r.id, r.title, sc.billing, r.isrc::text,
+         (sc.sim + CASE WHEN line.a IS NOT NULL AND music.match_key(sc.billing) = line.a THEN 0.3 ELSE 0 END)::real
+    FROM scored sc
+    JOIN music.recording r ON r.id = sc.id
+   CROSS JOIN line
+   WHERE sc.sim >= 0.3
+   ORDER BY 5 DESC, r.title
+   LIMIT 5
+$$;
+
+--
+-- Name: FUNCTION recording_suggestions(line_id integer); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.recording_suggestions(line_id integer) IS 'Up to five recordings a master statement line may be, for matching by hand: titles that look like the line''s (trigram similarity of title_key, at least 0.3), scored higher when the recording''s artist is the line''s. Never matches anything itself.';
 
 --
 -- Name: recording_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -1188,6 +1227,18 @@ BEGIN
   PERFORM music.sync_documents('recording_document', 'recording_id', _id,
                                NEW.documents);
 
+  DELETE FROM music.recording_isrc ri
+   WHERE ri.recording_id = _id
+     AND ri.isrc::text <> ALL (SELECT upper(regexp_replace(v, '[^0-9A-Za-z]', '', 'g'))
+                                 FROM unnest(coalesce(NEW.other_isrcs, '{}'::text[])) v);
+  INSERT INTO music.recording_isrc (recording_id, isrc)
+  SELECT DISTINCT _id, y.other_isrc
+    FROM (SELECT upper(regexp_replace(v, '[^0-9A-Za-z]', '', 'g')) AS other_isrc
+            FROM unnest(coalesce(NEW.other_isrcs, '{}'::text[])) v) y
+   WHERE y.other_isrc <> ''
+     AND y.other_isrc IS DISTINCT FROM (SELECT isrc::text FROM music.recording WHERE id = _id)
+      ON CONFLICT DO NOTHING;
+
   NEW.id := _id;
   SELECT r.title, r.is_cover, r.created_at, r.updated_at
     INTO NEW.title, NEW.is_cover, NEW.created_at, NEW.updated_at
@@ -1201,7 +1252,7 @@ $$;
 -- Name: FUNCTION recording_write(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.recording_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
+COMMENT ON FUNCTION api.recording_write() IS 'Runs as the signed-in user, so row security limits every write to that account. other_isrcs is replaced by the list sent.';
 
 --
 -- Name: release_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -2630,6 +2681,23 @@ CREATE TABLE music.recording_genre (
 ALTER TABLE ONLY music.recording_genre FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: recording_isrc; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.recording_isrc (
+    recording_id integer NOT NULL,
+    isrc music.isrc NOT NULL
+);
+
+ALTER TABLE ONLY music.recording_isrc FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE recording_isrc; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.recording_isrc IS 'Other ISRCs of a recording, such as the one a reissue was given by a later distributor while the original still earns. Statement lines match them as they match the recording''s own ISRC. An ISRC belongs to one recording, as its own or as another.';
+
+--
 -- Name: recording_mood; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -2863,7 +2931,10 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
           WHERE (st.id = r.status_id)) AS status_name,
     ( SELECT l.name
            FROM music.language l
-          WHERE ((l.code)::text = (music.recording_language(r.id))::text)) AS language_name
+          WHERE ((l.code)::text = (music.recording_language(r.id))::text)) AS language_name,
+    COALESCE(( SELECT array_agg((ri.isrc)::text ORDER BY (ri.isrc)::text) AS array_agg
+           FROM music.recording_isrc ri
+          WHERE (ri.recording_id = r.id)), '{}'::text[]) AS other_isrcs
    FROM music.recording r;
 
 --
@@ -2898,7 +2969,8 @@ CREATE FUNCTION api.search(api.recording) RETURNS tsvector
     LANGUAGE sql STABLE
     AS $_$
   SELECT music.search_doc(
-    $1.title, $1.version_label, $1.isrc, $1.keywords, $1.sounds_like, $1.description,
+    $1.title, $1.version_label, $1.isrc, array_to_string($1.other_isrcs, ' '),
+    $1.keywords, $1.sounds_like, $1.description,
     $1.artist_names, $1.song_titles,
     (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ') FROM music.recording_credit c WHERE c.recording_id = $1.id),
     (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ') FROM music.recording_owner o WHERE o.recording_id = $1.id))
@@ -2908,7 +2980,7 @@ $_$;
 -- Name: FUNCTION search(api.recording); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.recording) IS 'Title, version, ISRC, keywords, sounds like, description, artist names, song titles, credit names and credited-as names, and master owner names, for search=fts(fold).term:*.';
+COMMENT ON FUNCTION api.search(api.recording) IS 'Title, version, ISRC and other ISRCs, keywords, sounds like, description, artist names, song titles, credit names and credited-as names, and master owner names, for search=fts(fold).term:*.';
 
 --
 -- Name: role; Type: TABLE; Schema: music; Owner: -
@@ -3285,6 +3357,12 @@ CREATE TABLE music.song_publisher (
 ALTER TABLE ONLY music.song_publisher FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: COLUMN song_publisher.for_writer_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song_publisher.for_writer_id IS 'The writer on this song whose share the publisher administers. Blank means every writer on the song; a publisher for only some writers has a row per writer.';
+
+--
 -- Name: COLUMN song_publisher.contact_id; Type: COMMENT; Schema: music; Owner: -
 --
 
@@ -3435,6 +3513,302 @@ $_$;
 COMMENT ON FUNCTION api.search(api.song) IS 'Title, alt titles, ISWC, writer and publisher names and registration work numbers, for search=fts(fold).term:*.';
 
 --
+-- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.current_app_user() RETURNS uuid
+    LANGUAGE sql STABLE
+    AS $$ SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'sub')::uuid $$;
+
+--
+-- Name: FUNCTION current_app_user(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.current_app_user() IS 'The signed-in user from the request token; null outside an API request.';
+
+--
+-- Name: account; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.account (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    currency_code music.iso_4217_code DEFAULT 'USD'::text NOT NULL,
+    CONSTRAINT account_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+ALTER TABLE ONLY music.account FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN account.currency_code; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.account.currency_code IS 'The currency the account reports in. A statement in another currency is converted into it at its payout. Changing it needs money.edit and money.view, and is refused once the account has statements.';
+
+--
+-- Name: transaction; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.transaction (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    kind text NOT NULL,
+    transaction_date date NOT NULL,
+    category_id integer CONSTRAINT transaction_category_id_not_null1 NOT NULL,
+    description text NOT NULL,
+    contact_id integer,
+    organization_id integer,
+    currency_code music.iso_4217_code NOT NULL,
+    amount numeric NOT NULL,
+    account_amount numeric NOT NULL,
+    recoupable boolean DEFAULT false NOT NULL,
+    recoup_contact_id integer,
+    recoup_organization_id integer,
+    notes text,
+    created_by uuid DEFAULT music.current_app_user(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT transaction_account_amount_sign CHECK ((sign(account_amount) = sign(amount))),
+    CONSTRAINT transaction_amount_nonzero CHECK ((amount <> (0)::numeric)),
+    CONSTRAINT transaction_description_trimmed CHECK (((description = btrim(description)) AND (description <> ''::text))),
+    CONSTRAINT transaction_kind CHECK ((kind = ANY (ARRAY['income'::text, 'expense'::text]))),
+    CONSTRAINT transaction_one_party CHECK (((contact_id IS NULL) OR (organization_id IS NULL))),
+    CONSTRAINT transaction_recoup_expense CHECK (((NOT recoupable) OR (kind = 'expense'::text))),
+    CONSTRAINT transaction_recoup_party CHECK (((recoupable = ((recoup_contact_id IS NOT NULL) OR (recoup_organization_id IS NOT NULL))) AND ((recoup_contact_id IS NULL) OR (recoup_organization_id IS NULL))))
+);
+
+ALTER TABLE ONLY music.transaction FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE transaction; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.transaction IS 'Income or expense entered by hand: a sync fee, a mastering bill, an advance. Statement income is not entered here; imported statement lines are income already. Project accounting for reporting: no payments or bank deposits are recorded. What it is for is in transaction_split; none means overhead.';
+
+--
+-- Name: COLUMN transaction.kind; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.kind IS 'income or expense. The amounts carry the sign of the money within the kind: a refund of an expense is a negative expense.';
+
+--
+-- Name: COLUMN transaction.transaction_date; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.transaction_date IS 'The date it is reported by, such as the invoice or receipt date.';
+
+--
+-- Name: COLUMN transaction.description; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.description IS 'What it was, as it should read in a list or report.';
+
+--
+-- Name: COLUMN transaction.contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.contact_id IS 'The person paid, or who paid. At most one of contact_id and organization_id.';
+
+--
+-- Name: COLUMN transaction.organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.organization_id IS 'The company paid, or that paid. At most one of contact_id and organization_id.';
+
+--
+-- Name: COLUMN transaction.currency_code; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.currency_code IS 'The currency of the bill or payment as it was made.';
+
+--
+-- Name: COLUMN transaction.amount; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.amount IS 'The amount in currency_code, as on the bill or receipt.';
+
+--
+-- Name: COLUMN transaction.account_amount; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.account_amount IS 'The amount in the account currency, which reports use. Set from amount when currency_code is the account currency; otherwise entered, at the rate actually paid.';
+
+--
+-- Name: COLUMN transaction.recoupable; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.recoupable IS 'An expense to be recouped from a person''s or company''s royalties, such as a recording cost recouped from an artist. Set exactly when the recoup party is.';
+
+--
+-- Name: COLUMN transaction.recoup_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.recoup_contact_id IS 'The person the expense is recouped from. At most one of recoup_contact_id and recoup_organization_id.';
+
+--
+-- Name: COLUMN transaction.recoup_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction.recoup_organization_id IS 'The company the expense is recouped from.';
+
+--
+-- Name: transaction_category; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.transaction_category (
+    id integer NOT NULL,
+    account_id uuid DEFAULT music.current_account() NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT transaction_category_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+ALTER TABLE ONLY music.transaction_category FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE transaction_category; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.transaction_category IS 'The account''s own list of income and expense categories, such as Mastering, Artwork or Sync fee. Added from the transaction form as needed; a category in use cannot be deleted.';
+
+--
+-- Name: transaction_split; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.transaction_split (
+    id integer NOT NULL,
+    transaction_id integer NOT NULL,
+    song_id integer,
+    recording_id integer,
+    release_id integer,
+    weight numeric DEFAULT 1 NOT NULL,
+    CONSTRAINT transaction_split_one_target CHECK ((num_nonnulls(song_id, recording_id, release_id) = 1)),
+    CONSTRAINT transaction_split_weight CHECK ((weight > (0)::numeric))
+);
+
+ALTER TABLE ONLY music.transaction_split FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE transaction_split; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.transaction_split IS 'What a transaction is for: one song, recording or release per row. Each row''s share is its weight over the total weight of the transaction''s rows, computed in api.transaction and never stored. A transaction with no rows is overhead, for the catalog as a whole.';
+
+--
+-- Name: COLUMN transaction_split.weight; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.transaction_split.weight IS 'Relative share, above 0, default 1: three rows of weight 1 share a third each.';
+
+--
+-- Name: transaction; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.transaction WITH (security_invoker='true') AS
+ SELECT t.id,
+    t.kind,
+    t.transaction_date,
+    t.category_id,
+    c.name AS category_name,
+    t.description,
+    t.contact_id,
+    t.organization_id,
+    COALESCE(pc.display_name, po.name) AS party_name,
+    t.currency_code,
+    t.amount,
+    t.account_amount,
+    a.currency_code AS account_currency,
+    t.recoupable,
+    t.recoup_contact_id,
+    t.recoup_organization_id,
+    COALESCE(rc.display_name, ro.name) AS recoup_name,
+    t.notes,
+    COALESCE(s.splits, '[]'::jsonb) AS splits,
+    COALESCE(s.applies_to, 'Overhead'::text) AS applies_to,
+    music.documents_of('transaction_document'::text, 'transaction_id'::text, t.id) AS documents,
+    t.created_by,
+    t.created_at,
+    t.updated_at
+   FROM (((((((music.transaction t
+     JOIN music.transaction_category c ON ((c.id = t.category_id)))
+     JOIN music.account a ON ((a.id = t.account_id)))
+     LEFT JOIN music.contact pc ON ((pc.id = t.contact_id)))
+     LEFT JOIN music.organization po ON ((po.id = t.organization_id)))
+     LEFT JOIN music.contact rc ON ((rc.id = t.recoup_contact_id)))
+     LEFT JOIN music.organization ro ON ((ro.id = t.recoup_organization_id)))
+     LEFT JOIN LATERAL ( SELECT jsonb_agg(jsonb_build_object('id', x.id, 'target', x.target, 'song_id', x.song_id, 'recording_id', x.recording_id, 'release_id', x.release_id, 'title', x.title, 'weight', x.weight, 'share', x.share) ORDER BY x.id) AS splits,
+            string_agg(x.title, ', '::text ORDER BY x.id) AS applies_to
+           FROM ( SELECT sp.id,
+                    sp.song_id,
+                    sp.recording_id,
+                    sp.release_id,
+                    sp.weight,
+                        CASE
+                            WHEN (sp.song_id IS NOT NULL) THEN 'song'::text
+                            WHEN (sp.recording_id IS NOT NULL) THEN 'recording'::text
+                            ELSE 'release'::text
+                        END AS target,
+                    COALESCE(so.title, r.title, re.title) AS title,
+                    round((sp.weight / sum(sp.weight) OVER ()), 6) AS share
+                   FROM (((music.transaction_split sp
+                     LEFT JOIN music.song so ON ((so.id = sp.song_id)))
+                     LEFT JOIN music.recording r ON ((r.id = sp.recording_id)))
+                     LEFT JOIN music.release re ON ((re.id = sp.release_id)))
+                  WHERE (sp.transaction_id = t.id)) x) s ON (true));
+
+--
+-- Name: VIEW transaction; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.transaction IS 'Income and expenses entered by hand. splits lists what each is for (target song, recording or release, its id and weight; share is computed); applies_to names them, or reads Overhead when there are none. documents are its receipts. account_amount is computed when currency_code is the account currency.';
+
+--
+-- Name: search(api.transaction); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.transaction) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.search_doc($1.description, $1.category_name, $1.party_name, $1.recoup_name, $1.applies_to, $1.notes) $_$;
+
+--
+-- Name: FUNCTION search(api.transaction); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.transaction) IS 'Description, category, party, recoup party, what it is for and notes, for search=fts(fold).term:*.';
+
+--
+-- Name: transaction_category; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.transaction_category WITH (security_invoker='true') AS
+ SELECT id,
+    name,
+    ( SELECT count(*) AS count
+           FROM music.transaction t
+          WHERE (t.category_id = c.id)) AS transaction_count
+   FROM music.transaction_category c;
+
+--
+-- Name: VIEW transaction_category; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.transaction_category IS 'The account''s income and expense categories. Insert or update name; transaction_count is computed.';
+
+--
+-- Name: search(api.transaction_category); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.transaction_category) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.search_doc($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.transaction_category); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.transaction_category) IS 'The name, for search=fts(fold).term:*.';
+
+--
 -- Name: vocal_type; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -3551,6 +3925,54 @@ $$;
 --
 
 COMMENT ON FUNCTION api.site_setting_write() IS 'Runs as the signed-in user; the site_setting_site_admin trigger refuses anyone but the site admin.';
+
+--
+-- Name: song_suggestions(integer); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.song_suggestions(line_id integer) RETURNS TABLE(song_id integer, title text, writers text, score real)
+    LANGUAGE sql STABLE
+    AS $$
+  WITH line AS (
+    SELECT music.title_key(music.statement_value(l.data, s.mapping, 'title')) AS k,
+           music.match_key(music.statement_value(l.data, s.mapping, 'writers')) AS w
+      FROM music.statement_line l
+      JOIN music.statement s ON s.id = l.statement_id
+     WHERE l.id = line_id
+  ), title AS (
+    SELECT s.id, music.title_key(s.title) AS k FROM music.song s
+    UNION ALL
+    SELECT t.song_id, music.title_key(t.title) FROM music.song_title t
+  ), scored AS (
+    SELECT t.id, max(public.similarity(t.k, line.k)) AS sim
+      FROM title t, line
+     WHERE t.k IS NOT NULL AND line.k IS NOT NULL
+     GROUP BY t.id
+  )
+  SELECT s.id, s.title, wn.names,
+         (sc.sim + CASE WHEN wn.hit THEN 0.3 ELSE 0 END)::real
+    FROM scored sc
+    JOIN music.song s ON s.id = sc.id
+   CROSS JOIN line
+   CROSS JOIN LATERAL (
+     SELECT string_agg(coalesce(c.last_name, c.first_name), ', '
+                       ORDER BY coalesce(c.last_name, c.first_name)) AS names,
+            coalesce(bool_or(' ' || line.w || ' ' LIKE
+                             '% ' || music.match_key(coalesce(c.last_name, c.first_name)) || ' %'),
+                     false) AS hit
+       FROM music.song_writer sw
+       JOIN music.contact c ON c.id = sw.contact_id
+      WHERE sw.song_id = s.id) wn
+   WHERE sc.sim >= 0.3
+   ORDER BY 4 DESC, s.title
+   LIMIT 5
+$$;
+
+--
+-- Name: FUNCTION song_suggestions(line_id integer); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.song_suggestions(line_id integer) IS 'Up to five songs a statement line may be, for matching by hand: titles and alternate titles that look like the line''s (trigram similarity of title_key, at least 0.3), scored higher when one of the song''s writers is on the line. Never matches anything itself.';
 
 --
 -- Name: song_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -3712,37 +4134,91 @@ COMMENT ON FUNCTION api.song_write() IS 'Runs as the signed-in user, so row secu
 
 CREATE FUNCTION api.statement_line_write() RETURNS trigger
     LANGUAGE plpgsql
-    AS $$
+    AS $_$
+DECLARE
+  _manual boolean := num_nonnulls(NEW.song_id, NEW.recording_id, NEW.release_id) = 1;
 BEGIN
-  IF NEW.song_id IS NOT DISTINCT FROM OLD.song_id THEN
+  IF NEW.song_id IS NOT DISTINCT FROM OLD.song_id
+     AND NEW.recording_id IS NOT DISTINCT FROM OLD.recording_id
+     AND NEW.release_id IS NOT DISTINCT FROM OLD.release_id
+     AND NEW.match_method IS NOT DISTINCT FROM OLD.match_method THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT _manual AND NEW.match_method = 'not_in_catalog' THEN
+    UPDATE music.statement_line l
+       SET song_id = NULL, recording_id = NULL, release_id = NULL, match_method = 'not_in_catalog'
+      FROM music.statement s
+     WHERE s.id = l.statement_id
+       AND (l.id = OLD.id
+            OR (s.organization_id = OLD.organization_id
+                AND s.side = OLD.side
+                AND l.match_method IS NULL
+                AND CASE WHEN OLD.work_ref IS NOT NULL THEN l.work_ref = OLD.work_ref
+                         WHEN OLD.isrc IS NOT NULL THEN l.work_ref IS NULL AND l.isrc = OLD.isrc
+                         ELSE l.work_ref IS NULL AND l.isrc IS NULL
+                              AND music.title_key(music.statement_value(l.data, s.mapping, 'title'))
+                                  = music.title_key(OLD.title)
+                    END));
+    NEW.match_method := 'not_in_catalog';
     RETURN NEW;
   END IF;
 
   UPDATE music.statement_line
      SET song_id = NEW.song_id,
-         match_method = CASE WHEN NEW.song_id IS NOT NULL THEN 'manual' END
+         recording_id = NEW.recording_id,
+         release_id = NEW.release_id,
+         match_method = CASE WHEN _manual THEN 'manual' END
    WHERE id = OLD.id;
 
-  IF NEW.song_id IS NOT NULL AND OLD.work_ref IS NOT NULL THEN
+  IF _manual AND OLD.work_ref IS NOT NULL THEN
     UPDATE music.statement_line l
-       SET song_id = NEW.song_id, match_method = 'work_ref'
+       SET song_id = NEW.song_id, recording_id = NEW.recording_id, release_id = NEW.release_id,
+           match_method = 'work_ref'
       FROM music.statement s
      WHERE s.id = l.statement_id
        AND s.organization_id = OLD.organization_id
-       AND l.song_id IS NULL
+       AND s.side = OLD.side
+       AND l.match_method IS NULL
        AND l.work_ref = OLD.work_ref;
   END IF;
 
-  NEW.match_method := CASE WHEN NEW.song_id IS NOT NULL THEN 'manual' END;
+  IF NEW.recording_id IS NOT NULL AND OLD.isrc IS NOT NULL THEN
+    UPDATE music.statement_line l
+       SET recording_id = NEW.recording_id, match_method = 'isrc'
+      FROM music.statement s
+     WHERE s.id = l.statement_id
+       AND s.organization_id = OLD.organization_id
+       AND s.side = 'master'
+       AND l.match_method IS NULL
+       AND l.isrc = OLD.isrc;
+
+    IF OLD.isrc ~ '^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$' AND music.can('catalog.edit') THEN
+      BEGIN
+        UPDATE music.recording SET isrc = OLD.isrc
+         WHERE id = NEW.recording_id AND isrc IS NULL;
+        IF NOT FOUND THEN
+          INSERT INTO music.recording_isrc (recording_id, isrc)
+          SELECT NEW.recording_id, OLD.isrc
+           WHERE NOT EXISTS (SELECT 1 FROM music.recording WHERE isrc = OLD.isrc)
+          ON CONFLICT DO NOTHING;
+        END IF;
+      EXCEPTION WHEN unique_violation THEN
+        NULL;
+      END;
+    END IF;
+  END IF;
+
+  NEW.match_method := CASE WHEN _manual THEN 'manual' END;
   RETURN NEW;
 END;
-$$;
+$_$;
 
 --
 -- Name: FUNCTION statement_line_write(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.statement_line_write() IS 'Matches a statement line to a song by hand, or clears its song. Matching one line also matches every unmatched line from the same payer with the same work_ref.';
+COMMENT ON FUNCTION api.statement_line_write() IS 'Matches a statement line by hand (a song on a publishing statement, a recording or release on a master statement), marks it not in catalog (match_method not_in_catalog, nothing matched), or clears it back to unmatched. Matching one line also matches the payer''s unmatched lines with the same work_ref, and for a recording the same ISRC. When the role has catalog.edit, a recording with no ISRC takes the line''s, and one with a different ISRC keeps the line''s among its other ISRCs, unless another recording has it. Marking one not in catalog also marks the payer''s unmatched lines with the same work_ref, else the same ISRC, else the same title.';
 
 --
 -- Name: statement_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -3760,10 +4236,19 @@ BEGIN
   UPDATE music.statement
      SET organization_id = NEW.organization_id,
          statement_date = NEW.statement_date,
+         side = NEW.side,
          currency_code = NEW.currency_code,
          payout_amount = NEW.payout_amount,
          notes = nullif(btrim(NEW.notes), '')
    WHERE id = OLD.id;
+
+  IF NEW.side IS DISTINCT FROM OLD.side THEN
+    UPDATE music.statement_line
+       SET song_id = NULL, recording_id = NULL, release_id = NULL, match_method = NULL
+     WHERE statement_id = OLD.id
+       AND match_method IS NOT NULL;
+    PERFORM music.match_statement(OLD.id);
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -3772,7 +4257,79 @@ $$;
 -- Name: FUNCTION statement_write(); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.statement_write() IS 'Edits or deletes a statement through api.statement. Only the payer, statement date, currency, payout and notes change; the file, mapping and lines stay as imported. Deleting a statement deletes its lines.';
+COMMENT ON FUNCTION api.statement_write() IS 'Edits or deletes a statement through api.statement. Only the payer, statement date, side, currency, payout and notes change; the file, mapping and lines stay as imported. Changing the side unmatches every line and matches them again. Deleting a statement deletes its lines.';
+
+--
+-- Name: transaction_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.transaction_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _id integer;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM music.transaction WHERE id = OLD.id;
+    RETURN OLD;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO music.transaction
+      (kind, transaction_date, category_id, description, contact_id, organization_id,
+       currency_code, amount, account_amount, recoupable, recoup_contact_id,
+       recoup_organization_id, notes)
+    VALUES (NEW.kind, NEW.transaction_date, NEW.category_id, btrim(NEW.description),
+            NEW.contact_id, NEW.organization_id,
+            COALESCE(NEW.currency_code,
+                     (SELECT currency_code FROM music.account WHERE id = music.current_account())),
+            NEW.amount, NEW.account_amount, COALESCE(NEW.recoupable, false),
+            NEW.recoup_contact_id, NEW.recoup_organization_id, nullif(btrim(NEW.notes), ''))
+    RETURNING id INTO _id;
+  ELSE
+    _id := OLD.id;
+    UPDATE music.transaction
+       SET kind = NEW.kind,
+           transaction_date = NEW.transaction_date,
+           category_id = NEW.category_id,
+           description = btrim(NEW.description),
+           contact_id = NEW.contact_id,
+           organization_id = NEW.organization_id,
+           currency_code = NEW.currency_code,
+           amount = NEW.amount,
+           account_amount = NEW.account_amount,
+           recoupable = COALESCE(NEW.recoupable, false),
+           recoup_contact_id = NEW.recoup_contact_id,
+           recoup_organization_id = NEW.recoup_organization_id,
+           notes = nullif(btrim(NEW.notes), '')
+     WHERE id = _id;
+  END IF;
+
+  DELETE FROM music.transaction_split WHERE transaction_id = _id;
+  INSERT INTO music.transaction_split (transaction_id, song_id, recording_id, release_id, weight)
+  SELECT _id,
+         CASE WHEN x.target = 'song' THEN nullif(e->>'song_id', '')::integer END,
+         CASE WHEN x.target = 'recording' THEN nullif(e->>'recording_id', '')::integer END,
+         CASE WHEN x.target = 'release' THEN nullif(e->>'release_id', '')::integer END,
+         COALESCE(nullif(e->>'weight', '')::numeric, 1)
+    FROM jsonb_array_elements(COALESCE(NEW.splits, '[]'::jsonb)) e,
+         LATERAL (SELECT COALESCE(nullif(e->>'target', ''),
+                                  CASE WHEN nullif(e->>'song_id', '') IS NOT NULL THEN 'song'
+                                       WHEN nullif(e->>'recording_id', '') IS NOT NULL THEN 'recording'
+                                       WHEN nullif(e->>'release_id', '') IS NOT NULL THEN 'release' END) AS target) x;
+
+  PERFORM music.sync_documents('transaction_document', 'transaction_id', _id, NEW.documents);
+
+  NEW.id := _id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION transaction_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.transaction_write() IS 'Saves a transaction through api.transaction: its own fields, then splits (replaced by the list sent; each row''s target says which of song_id, recording_id or release_id it uses) and documents (as on songs). Deleting a transaction deletes its splits and detaches its documents.';
 
 --
 -- Name: b64url(bytea); Type: FUNCTION; Schema: auth; Owner: -
@@ -3848,6 +4405,10 @@ BEGIN
     RAISE EXCEPTION 'The account currency cannot change once statements are imported'
       USING ERRCODE = 'check_violation';
   END IF;
+  IF EXISTS (SELECT 1 FROM music.transaction WHERE account_id = NEW.id) THEN
+    RAISE EXCEPTION 'The account currency cannot change once transactions are entered'
+      USING ERRCODE = 'check_violation';
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -3856,7 +4417,7 @@ $$;
 -- Name: FUNCTION account_currency_fixed(); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.account_currency_fixed() IS 'Row trigger: refuses a change to the account currency while the account has statements, since their payouts and converted amounts are in it. Runs after the money.view check, so the statements it looks for are visible.';
+COMMENT ON FUNCTION music.account_currency_fixed() IS 'Row trigger: refuses a change to the account currency while the account has statements or transactions, since their payouts and account amounts are in it. Runs after the money.view check, so the rows it looks for are visible.';
 
 --
 -- Name: can(text); Type: FUNCTION; Schema: music; Owner: -
@@ -3996,20 +4557,6 @@ $$;
 COMMENT ON FUNCTION music.create_account(p_name text, p_owner_email text) IS 'Site admin only: creates an account and emails its first Owner an invite. Owner rights because the new account is not the signed-in user''s.';
 
 --
--- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
---
-
-CREATE FUNCTION music.current_app_user() RETURNS uuid
-    LANGUAGE sql STABLE
-    AS $$ SELECT (nullif(current_setting('request.jwt.claims', true), '')::json->>'sub')::uuid $$;
-
---
--- Name: FUNCTION current_app_user(); Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON FUNCTION music.current_app_user() IS 'The signed-in user from the request token; null outside an API request.';
-
---
 -- Name: default_audio_file_type(text); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -4118,6 +4665,53 @@ END;
 $$;
 
 --
+-- Name: in_statements(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.in_statements() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF (TG_TABLE_NAME = 'recording' AND EXISTS (SELECT 1 FROM music.statement_line WHERE recording_id = OLD.id))
+     OR (TG_TABLE_NAME = 'release' AND EXISTS (SELECT 1 FROM music.statement_line WHERE release_id = OLD.id)) THEN
+    RAISE EXCEPTION '"%" has statement lines, so it cannot be deleted. Match those lines to another % first.', OLD.title, TG_TABLE_NAME
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+--
+-- Name: FUNCTION in_statements(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.in_statements() IS 'Refuses deleting a recording or release a statement line is matched to, with a clear message. The foreign keys refuse it too, including lines the caller''s role cannot see.';
+
+--
+-- Name: in_transactions(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.in_transactions() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF (TG_TABLE_NAME = 'song' AND EXISTS (SELECT 1 FROM music.transaction_split WHERE song_id = OLD.id))
+     OR (TG_TABLE_NAME = 'recording' AND EXISTS (SELECT 1 FROM music.transaction_split WHERE recording_id = OLD.id))
+     OR (TG_TABLE_NAME = 'release' AND EXISTS (SELECT 1 FROM music.transaction_split WHERE release_id = OLD.id)) THEN
+    RAISE EXCEPTION '"%" has transactions, so it cannot be deleted. Take it off its transactions first.', OLD.title
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+--
+-- Name: FUNCTION in_transactions(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.in_transactions() IS 'Refuses deleting a song, recording or release that a transaction is for, with a clear message. The foreign keys refuse it too, including transactions the caller''s role cannot see.';
+
+--
 -- Name: is_site_admin(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -4135,6 +4729,37 @@ $$;
 --
 
 COMMENT ON FUNCTION music.is_site_admin() IS 'True when the signed-in user is the site admin. Runs with owner rights because app_user cannot read other accounts'' users.';
+
+--
+-- Name: isrc_once(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.isrc_once() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'recording' THEN
+    IF NEW.isrc IS NULL THEN
+      RETURN NEW;
+    END IF;
+    DELETE FROM music.recording_isrc WHERE recording_id = NEW.id AND isrc = NEW.isrc;
+    IF EXISTS (SELECT 1 FROM music.recording_isrc WHERE isrc = NEW.isrc) THEN
+      RAISE EXCEPTION 'ISRC % is already another recording''s', NEW.isrc
+        USING ERRCODE = 'unique_violation';
+    END IF;
+  ELSIF EXISTS (SELECT 1 FROM music.recording WHERE isrc = NEW.isrc) THEN
+    RAISE EXCEPTION 'ISRC % is already a recording''s own ISRC', NEW.isrc
+      USING ERRCODE = 'unique_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION isrc_once(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.isrc_once() IS 'Keeps an ISRC on one recording, as its own or among its other ISRCs. Making one of a recording''s other ISRCs its own takes it out of the others.';
 
 --
 -- Name: keep_an_owner(); Type: FUNCTION; Schema: music; Owner: -
@@ -4209,74 +4834,181 @@ CREATE FUNCTION music.match_statement(p_statement integer) RETURNS integer
 DECLARE
   _mapping jsonb;
   _payer integer;
+  _side text;
   _count integer;
   _total integer := 0;
 BEGIN
-  SELECT mapping, organization_id INTO _mapping, _payer
+  SELECT mapping, organization_id, side INTO _mapping, _payer, _side
     FROM music.statement WHERE id = p_statement;
   IF NOT FOUND THEN
     RETURN 0;
   END IF;
 
-  UPDATE music.statement_line l
-     SET song_id = s.id, match_method = 'iswc'
-    FROM music.song s
-   WHERE l.statement_id = p_statement
-     AND l.song_id IS NULL
-     AND s.iswc::text = upper(regexp_replace(
-           music.statement_value(l.data, _mapping, 'iswc'), '[^0-9A-Za-z]', '', 'g'));
-  GET DIAGNOSTICS _count = ROW_COUNT;
-  _total := _total + _count;
-
-  UPDATE music.statement_line l
-     SET song_id = m.song_id, match_method = 'work_ref'
-    FROM (SELECT p.work_ref, min(p.song_id) AS song_id
-            FROM music.statement_line p
-            JOIN music.statement ps ON ps.id = p.statement_id
-           WHERE ps.organization_id = _payer
-             AND p.song_id IS NOT NULL
-             AND p.work_ref IS NOT NULL
-           GROUP BY p.work_ref
-          HAVING count(DISTINCT p.song_id) = 1) m
-   WHERE l.statement_id = p_statement
-     AND l.song_id IS NULL
-     AND l.work_ref = m.work_ref;
-  GET DIAGNOSTICS _count = ROW_COUNT;
-  _total := _total + _count;
-
-  WITH song_key AS MATERIALIZED (
-    SELECT s.id AS song_id, music.match_key(s.title) AS k FROM music.song s
-    UNION
-    SELECT t.song_id, music.match_key(t.title) FROM music.song_title t
-  ), line_key AS MATERIALIZED (
-    SELECT l.id,
-           music.match_key(music.statement_value(l.data, _mapping, 'title')) AS k,
-           music.match_key(music.statement_value(l.data, _mapping, 'writers')) AS w
-      FROM music.statement_line l
+  IF _side = 'publishing' THEN
+    UPDATE music.statement_line l
+       SET song_id = s.id, match_method = 'iswc'
+      FROM music.song s
      WHERE l.statement_id = p_statement
-       AND l.song_id IS NULL
-  ), candidate AS (
-    SELECT lk.id, sk.song_id, lk.w,
-           EXISTS (SELECT 1
-                     FROM music.song_writer sw
-                     JOIN music.contact c ON c.id = sw.contact_id
-                    WHERE sw.song_id = sk.song_id
-                      AND ' ' || lk.w || ' ' LIKE
-                          '% ' || music.match_key(coalesce(c.last_name, c.first_name)) || ' %') AS by_writer
-      FROM line_key lk
-      JOIN song_key sk ON sk.k = lk.k
-  ), pick AS (
-    SELECT id,
-           min(song_id) FILTER (WHERE w IS NULL OR by_writer) AS song_id,
-           CASE WHEN min(w) IS NULL THEN 'title' ELSE 'title_writer' END AS how
-      FROM candidate
-     GROUP BY id
-    HAVING count(DISTINCT song_id) FILTER (WHERE w IS NULL OR by_writer) = 1
+       AND l.match_method IS NULL
+       AND s.iswc::text = upper(regexp_replace(
+             music.statement_value(l.data, _mapping, 'iswc'), '[^0-9A-Za-z]', '', 'g'));
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    UPDATE music.statement_line l
+       SET song_id = m.song_id, match_method = 'work_ref'
+      FROM (SELECT p.work_ref, min(p.song_id) AS song_id
+              FROM music.statement_line p
+              JOIN music.statement ps ON ps.id = p.statement_id
+             WHERE ps.organization_id = _payer
+               AND p.song_id IS NOT NULL
+               AND p.work_ref IS NOT NULL
+             GROUP BY p.work_ref
+            HAVING count(DISTINCT p.song_id) = 1) m
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.work_ref = m.work_ref;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    WITH song_key AS MATERIALIZED (
+      SELECT s.id AS song_id, music.title_key(s.title) AS k FROM music.song s
+      UNION
+      SELECT t.song_id, music.title_key(t.title) FROM music.song_title t
+    ), line_key AS MATERIALIZED (
+      SELECT l.id,
+             music.title_key(music.statement_value(l.data, _mapping, 'title')) AS k,
+             music.match_key(music.statement_value(l.data, _mapping, 'writers')) AS w
+        FROM music.statement_line l
+       WHERE l.statement_id = p_statement
+         AND l.match_method IS NULL
+    ), candidate AS (
+      SELECT lk.id, sk.song_id, lk.w,
+             EXISTS (SELECT 1
+                       FROM music.song_writer sw
+                       JOIN music.contact c ON c.id = sw.contact_id
+                      WHERE sw.song_id = sk.song_id
+                        AND ' ' || lk.w || ' ' LIKE
+                            '% ' || music.match_key(coalesce(c.last_name, c.first_name)) || ' %') AS by_writer
+        FROM line_key lk
+        JOIN song_key sk ON sk.k = lk.k
+    ), pick AS (
+      SELECT id,
+             CASE WHEN count(DISTINCT song_id) = 1 THEN min(song_id)
+                  ELSE min(song_id) FILTER (WHERE by_writer) END AS song_id,
+             CASE WHEN bool_or(by_writer) THEN 'title_writer' ELSE 'title' END AS how
+        FROM candidate
+       GROUP BY id
+      HAVING count(DISTINCT song_id) = 1
+          OR count(DISTINCT song_id) FILTER (WHERE by_writer) = 1
+    )
+    UPDATE music.statement_line l
+       SET song_id = pick.song_id, match_method = pick.how
+      FROM pick
+     WHERE l.id = pick.id;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+  ELSE
+    UPDATE music.statement_line l
+       SET recording_id = r.id, match_method = 'isrc'
+      FROM (SELECT id, isrc::text AS isrc FROM music.recording WHERE isrc IS NOT NULL
+            UNION ALL
+            SELECT recording_id, isrc::text FROM music.recording_isrc) r
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.isrc = r.isrc;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    UPDATE music.statement_line l
+       SET recording_id = m.recording_id, match_method = 'isrc'
+      FROM (SELECT p.isrc, min(p.recording_id) AS recording_id
+              FROM music.statement_line p
+              JOIN music.statement ps ON ps.id = p.statement_id
+             WHERE ps.organization_id = _payer
+               AND p.recording_id IS NOT NULL
+               AND p.isrc IS NOT NULL
+             GROUP BY p.isrc
+            HAVING count(DISTINCT p.recording_id) = 1) m
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.isrc = m.isrc;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    UPDATE music.statement_line l
+       SET recording_id = m.recording_id, release_id = m.release_id, match_method = 'work_ref'
+      FROM (SELECT p.work_ref, min(p.recording_id) AS recording_id, min(p.release_id) AS release_id
+              FROM music.statement_line p
+              JOIN music.statement ps ON ps.id = p.statement_id
+             WHERE ps.organization_id = _payer
+               AND (p.recording_id IS NOT NULL OR p.release_id IS NOT NULL)
+               AND p.work_ref IS NOT NULL
+             GROUP BY p.work_ref
+            HAVING count(DISTINCT coalesce('r' || p.recording_id, 'e' || p.release_id)) = 1) m
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.work_ref = m.work_ref;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    UPDATE music.statement_line l
+       SET release_id = m.id, match_method = 'upc'
+      FROM (SELECT ltrim(upc, '0') AS upc, min(id) AS id
+              FROM music.release
+             WHERE upc IS NOT NULL
+             GROUP BY 1
+            HAVING count(*) = 1) m
+     WHERE l.statement_id = p_statement
+       AND l.match_method IS NULL
+       AND l.isrc IS NULL
+       AND ltrim(l.upc, '0') = m.upc;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+
+    WITH line_key AS MATERIALIZED (
+      SELECT l.id, l.isrc,
+             music.title_key(music.statement_value(l.data, _mapping, 'title')) AS k
+        FROM music.statement_line l
+       WHERE l.statement_id = p_statement
+         AND l.match_method IS NULL
+    ), pick AS (
+      SELECT lk.id, min(r.id) AS recording_id
+        FROM line_key lk
+        JOIN music.recording r ON music.title_key(r.title) = lk.k
+       WHERE lk.isrc IS NULL OR r.isrc IS NULL
+       GROUP BY lk.id
+      HAVING count(*) = 1
+    )
+    UPDATE music.statement_line l
+       SET recording_id = pick.recording_id, match_method = 'title'
+      FROM pick
+     WHERE l.id = pick.id;
+    GET DIAGNOSTICS _count = ROW_COUNT;
+    _total := _total + _count;
+  END IF;
+
+  WITH earlier AS MATERIALIZED (
+    SELECT DISTINCT p.work_ref, p.isrc,
+           CASE WHEN p.work_ref IS NULL AND p.isrc IS NULL
+                THEN music.title_key(music.statement_value(p.data, ps.mapping, 'title')) END AS k
+      FROM music.statement_line p
+      JOIN music.statement ps ON ps.id = p.statement_id
+     WHERE ps.organization_id = _payer
+       AND ps.side = _side
+       AND p.statement_id <> p_statement
+       AND p.match_method = 'not_in_catalog'
   )
   UPDATE music.statement_line l
-     SET song_id = pick.song_id, match_method = pick.how
-    FROM pick
-   WHERE l.id = pick.id;
+     SET match_method = 'not_in_catalog'
+   WHERE l.statement_id = p_statement
+     AND l.match_method IS NULL
+     AND EXISTS (SELECT 1 FROM earlier n
+                  WHERE CASE WHEN l.work_ref IS NOT NULL THEN n.work_ref = l.work_ref
+                             WHEN l.isrc IS NOT NULL THEN n.work_ref IS NULL AND n.isrc = l.isrc
+                             ELSE n.work_ref IS NULL AND n.isrc IS NULL
+                                  AND n.k = music.title_key(music.statement_value(l.data, _mapping, 'title'))
+                        END);
   GET DIAGNOSTICS _count = ROW_COUNT;
   _total := _total + _count;
 
@@ -4288,7 +5020,7 @@ $$;
 -- Name: FUNCTION match_statement(p_statement integer); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.match_statement(p_statement integer) IS 'Matches the statement''s unmatched lines to songs, in order: ISWC; then work_ref against earlier matched lines from the same payer; then title (or alternate title) and a writer''s last name among the line''s writers, or title alone when the line has no writers. A line matches only when exactly one song fits. Returns how many lines it matched.';
+COMMENT ON FUNCTION music.match_statement(p_statement integer) IS 'Matches the statement''s unmatched lines. On a publishing statement, to songs: ISWC; then work_ref against earlier matched lines from the same payer; then title or alternate title compared by title_key. A title that fits one song matches it, by title and writer when one of the song''s writers is on the line; a title that fits several matches the one whose writer is on the line, when exactly one is. On a master statement, to recordings and releases: ISRC, the recording''s own or one of its other ISRCs; then ISRC, then work_ref, against earlier matched lines from the same payer; then a line with no ISRC to the release with its barcode; then title, when exactly one recording has it, never pairing two different ISRCs. Lines still unmatched are marked not in catalog when an earlier line from the same payer and side was: the same work_ref, else the same ISRC, else the same title. Returns how many lines it matched or marked.';
 
 --
 -- Name: merge_contact(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -4567,6 +5299,34 @@ CREATE FUNCTION music.own_statement(p_id integer) RETURNS boolean
 --
 
 COMMENT ON FUNCTION music.own_statement(p_id integer) IS 'True when the statement row is visible to the caller, which row security limits to the signed-in account and a role with money.view. False for null.';
+
+--
+-- Name: own_transaction(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_transaction(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.transaction WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_transaction(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_transaction(p_id integer) IS 'True when the transaction row is visible to the caller, which row security limits to the signed-in account and a role with money.view. False for null.';
+
+--
+-- Name: own_transaction_category(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.own_transaction_category(p_id integer) RETURNS boolean
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$ SELECT EXISTS (SELECT 1 FROM music.transaction_category WHERE id = p_id) $$;
+
+--
+-- Name: FUNCTION own_transaction_category(p_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.own_transaction_category(p_id integer) IS 'True when the category row is visible to the caller, which row security limits to the signed-in account and a role with money.view. False for null.';
 
 --
 -- Name: party_name(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -4872,6 +5632,37 @@ END;
 $$;
 
 --
+-- Name: statement_line_side(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.statement_line_side() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _side text;
+BEGIN
+  IF num_nonnulls(NEW.song_id, NEW.recording_id, NEW.release_id) = 0 THEN
+    RETURN NEW;
+  END IF;
+  SELECT side INTO _side FROM music.statement WHERE id = NEW.statement_id;
+  IF _side = 'publishing' AND NEW.song_id IS NULL THEN
+    RAISE EXCEPTION 'A line of a publishing statement is matched to a song, not a recording or release'
+      USING ERRCODE = 'check_violation';
+  ELSIF _side = 'master' AND NEW.song_id IS NOT NULL THEN
+    RAISE EXCEPTION 'A line of a master statement is matched to a recording or release, not a song'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION statement_line_side(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.statement_line_side() IS 'Refuses matching a line to the wrong side: songs on publishing statements, recordings and releases on master statements.';
+
+--
 -- Name: statement_payout(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -5019,6 +5810,55 @@ $_$;
 --
 
 COMMENT ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) IS 'Saves the documents listed on a song, recording, person, company, or release and links them to it. A new row whose file is already a document links that document instead of creating a second one; its blank fields are filled from the row. Rows no longer listed are detached; the document itself survives.';
+
+--
+-- Name: title_key(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.title_key(p_title text) RETURNS text
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $_$
+  SELECT nullif(btrim(
+           regexp_replace(
+             regexp_replace(
+               regexp_replace(' ' || music.match_key(p_title) || ' ',
+                              '( [a-z]+[0-9][a-z0-9]*)+ $', ' '),
+               ' (the|el|la|los|las|lo|le|les|il) $', ' '),
+             '^ (the|a|an|el|la|los|las|lo|le|les|il|l) ', ' ')), '')
+$_$;
+
+--
+-- Name: FUNCTION title_key(p_title text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.title_key(p_title text) IS 'A title folded for matching (see match_key), without a leading article (the, a, an, el, la, los, las, lo, le, les, il), an article moved to the end as payers write it (RUMBA ESTA BUENA LA), or trailing codes such as ADM008. La Rumba esta Buena, RUMBA ESTA BUENA, RUMBA ESTA BUENA LA and LA RUMBA ESTA BUENA ADM008 give the same key.';
+
+--
+-- Name: transaction_amount(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.transaction_amount() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  _currency text;
+BEGIN
+  SELECT currency_code INTO _currency FROM music.account WHERE id = NEW.account_id;
+  IF NEW.currency_code = _currency THEN
+    NEW.account_amount := NEW.amount;
+  ELSIF NEW.account_amount IS NULL THEN
+    RAISE EXCEPTION 'A transaction in % needs its amount in %', NEW.currency_code, _currency
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION transaction_amount(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.transaction_amount() IS 'Sets the account-currency amount from the amount when the transaction is in the account currency, and refuses a transaction in another currency without it.';
 
 --
 -- Name: update_account(uuid, text, text); Type: FUNCTION; Schema: music; Owner: -
@@ -5291,26 +6131,6 @@ CREATE VIEW api.account_role WITH (security_invoker='true') AS
 COMMENT ON VIEW api.account_role IS 'The roles an Owner can give a user, the same for every account, with the permissions each grants. Only the site admin inserts, updates or deletes them.';
 
 --
--- Name: account; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.account (
-    id uuid DEFAULT uuidv7() NOT NULL,
-    name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    currency_code music.iso_4217_code DEFAULT 'USD'::text NOT NULL,
-    CONSTRAINT account_name_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
-
-ALTER TABLE ONLY music.account FORCE ROW LEVEL SECURITY;
-
---
--- Name: COLUMN account.currency_code; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.account.currency_code IS 'The currency the account reports in. A statement in another currency is converted into it at its payout. Changing it needs money.edit and money.view, and is refused once the account has statements.';
-
---
 -- Name: account_setting; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -5505,6 +6325,23 @@ CREATE TABLE music.release_document (
 ALTER TABLE ONLY music.release_document FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: transaction_document; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.transaction_document (
+    transaction_id integer NOT NULL,
+    document_id integer NOT NULL
+);
+
+ALTER TABLE ONLY music.transaction_document FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE transaction_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.transaction_document IS 'Receipts, invoices and other documents of a transaction.';
+
+--
 -- Name: document_orphan; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -5528,6 +6365,8 @@ CREATE VIEW api.document_orphan WITH (security_invoker='true') AS
            FROM music.organization_document x
           WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
            FROM music.release_document x
+          WHERE (x.document_id = d.id)))) AND (NOT (EXISTS ( SELECT 1
+           FROM music.transaction_document x
           WHERE (x.document_id = d.id)))));
 
 --
@@ -5902,9 +6741,11 @@ CREATE TABLE music.statement (
     imported_by uuid DEFAULT music.current_app_user(),
     imported_at timestamp with time zone DEFAULT now() NOT NULL,
     statement_date date NOT NULL,
+    side text DEFAULT 'publishing'::text NOT NULL,
     CONSTRAINT statement_file_name_trimmed CHECK (((file_name = btrim(file_name)) AND (file_name <> ''::text))),
     CONSTRAINT statement_mapping CHECK ((jsonb_typeof(mapping) = 'object'::text)),
     CONSTRAINT statement_sha256 CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT statement_side CHECK ((side = ANY (ARRAY['publishing'::text, 'master'::text]))),
     CONSTRAINT statement_storage_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text])))
 );
 
@@ -5953,6 +6794,12 @@ COMMENT ON COLUMN music.statement.sha256 IS 'SHA-256 of the file, which refuses 
 COMMENT ON COLUMN music.statement.statement_date IS 'The date of the statement as the payer gives it, such as the MLC''s distribution date. Income is reported by this date; the usage periods are on the lines.';
 
 --
+-- Name: COLUMN statement.side; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement.side IS 'publishing: the lines are on compositions and match songs (societies, the MLC, publishers). master: the lines are on recordings and match recordings or releases (labels, distributors). The next statement from the same payer starts from the same side. Changing it unmatches every line and matches them again.';
+
+--
 -- Name: statement_line; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -5967,10 +6814,17 @@ CREATE TABLE music.statement_line (
     match_method text,
     usage_start date,
     usage_end date,
+    recording_id integer,
+    release_id integer,
+    isrc text,
+    upc text,
     CONSTRAINT statement_line_data CHECK ((jsonb_typeof(data) = 'object'::text)),
-    CONSTRAINT statement_line_match CHECK (((song_id IS NULL) = (match_method IS NULL))),
-    CONSTRAINT statement_line_match_method CHECK ((match_method = ANY (ARRAY['iswc'::text, 'work_ref'::text, 'title_writer'::text, 'title'::text, 'manual'::text]))),
+    CONSTRAINT statement_line_isrc CHECK ((isrc ~ '^[A-Z0-9]+$'::text)),
+    CONSTRAINT statement_line_match CHECK (((num_nonnulls(song_id, recording_id, release_id) = 0) = ((match_method IS NULL) OR (match_method = 'not_in_catalog'::text)))),
+    CONSTRAINT statement_line_match_method CHECK ((match_method = ANY (ARRAY['iswc'::text, 'isrc'::text, 'upc'::text, 'work_ref'::text, 'title_writer'::text, 'title'::text, 'manual'::text, 'not_in_catalog'::text]))),
+    CONSTRAINT statement_line_one_target CHECK ((num_nonnulls(song_id, recording_id, release_id) <= 1)),
     CONSTRAINT statement_line_row_number CHECK ((row_number > 0)),
+    CONSTRAINT statement_line_upc CHECK ((upc ~ '^[0-9]+$'::text)),
     CONSTRAINT statement_line_usage CHECK (COALESCE((usage_end >= usage_start), ((usage_start IS NULL) AND (usage_end IS NULL)))),
     CONSTRAINT statement_line_work_ref_trimmed CHECK (((work_ref IS NULL) OR ((work_ref = btrim(work_ref)) AND (work_ref <> ''::text))))
 );
@@ -5981,7 +6835,7 @@ ALTER TABLE ONLY music.statement_line FORCE ROW LEVEL SECURITY;
 -- Name: TABLE statement_line; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON TABLE music.statement_line IS 'One row of an imported statement file, kept for audit. data, amount, work_ref and the usage period never change after import; only the matched song does.';
+COMMENT ON TABLE music.statement_line IS 'One row of an imported statement file, kept for audit. data, amount, work_ref, isrc, upc and the usage period never change after import; only what the line is matched to does: a song on a publishing statement, a recording or release on a master statement.';
 
 --
 -- Name: COLUMN statement_line.row_number; Type: COMMENT; Schema: music; Owner: -
@@ -6005,13 +6859,13 @@ COMMENT ON COLUMN music.statement_line.amount IS 'The row''s amount in the state
 -- Name: COLUMN statement_line.work_ref; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON COLUMN music.statement_line.work_ref IS 'The payer''s own identifier for the work, such as a BMI title number, ASCAP work ID or MLC song code. A line matches the song of an earlier matched line from the same payer with the same work_ref.';
+COMMENT ON COLUMN music.statement_line.work_ref IS 'The payer''s own identifier for the work, such as a BMI title number, ASCAP work ID or MLC song code. A line matches the song of an earlier matched line from the same payer with the same work_ref. Blank when the file gives none, or only zeros, as BMI does for lines that are not one work (cable retransmission, unreported works); the raw row keeps what the file said.';
 
 --
 -- Name: COLUMN statement_line.match_method; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON COLUMN music.statement_line.match_method IS 'How the song was found: iswc, work_ref (an earlier line from the same payer), title_writer, title (no writers on the line) or manual. Blank exactly when song_id is.';
+COMMENT ON COLUMN music.statement_line.match_method IS 'How the line was matched: iswc, isrc, upc, work_ref (an earlier line from the same payer), title_writer, title or manual; or not_in_catalog, income that is on nothing in the catalog, such as cable retransmission. Blank exactly when the line is unmatched.';
 
 --
 -- Name: COLUMN statement_line.usage_start; Type: COMMENT; Schema: music; Owner: -
@@ -6026,6 +6880,30 @@ COMMENT ON COLUMN music.statement_line.usage_start IS 'The first day of the peri
 COMMENT ON COLUMN music.statement_line.usage_end IS 'The last day of the period the line pays for; see usage_start.';
 
 --
+-- Name: COLUMN statement_line.recording_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement_line.recording_id IS 'The recording a master statement line is income for.';
+
+--
+-- Name: COLUMN statement_line.release_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement_line.release_id IS 'The release a master statement line is income for, when the line is on a whole release rather than a track, such as an album download.';
+
+--
+-- Name: COLUMN statement_line.isrc; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement_line.isrc IS 'The ISRC read at import from the headers mapped as isrc, upper case without separators. On a master statement it matches the recording with that ISRC, or an earlier matched line from the same payer with the same ISRC. Blank when the file gives none.';
+
+--
+-- Name: COLUMN statement_line.upc; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.statement_line.upc IS 'The barcode (UPC or EAN) read at import from the headers mapped as upc, digits only. On a master statement, a line with no ISRC matches the release with that barcode.';
+
+--
 -- Name: statement; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -6034,6 +6912,7 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
     s.organization_id,
     o.name AS payer_name,
     s.statement_date,
+    s.side,
     s.currency_code,
     s.payout_amount,
     a.currency_code AS account_currency,
@@ -6041,6 +6920,7 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
     COALESCE(s.payout_amount, t.total) AS total_converted,
     t.line_count,
     t.unmatched_count,
+    t.not_in_catalog_count,
     t.usage_start,
     t.usage_end,
     s.mapping,
@@ -6056,7 +6936,8 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
      JOIN music.account a ON ((a.id = s.account_id)))
      CROSS JOIN LATERAL ( SELECT COALESCE(sum(l.amount), (0)::numeric) AS total,
             count(*) AS line_count,
-            count(*) FILTER (WHERE (l.song_id IS NULL)) AS unmatched_count,
+            count(*) FILTER (WHERE (l.match_method IS NULL)) AS unmatched_count,
+            count(*) FILTER (WHERE (l.match_method = 'not_in_catalog'::text)) AS not_in_catalog_count,
             min(l.usage_start) AS usage_start,
             max(l.usage_end) AS usage_end
            FROM music.statement_line l
@@ -6066,7 +6947,7 @@ CREATE VIEW api.statement WITH (security_invoker='true') AS
 -- Name: VIEW statement; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.statement IS 'Imported statements with their payer, line counts and totals. total is in the statement currency; total_converted is in the account currency. usage_start and usage_end span the lines'' usage periods.';
+COMMENT ON VIEW api.statement IS 'Imported statements with their payer, side, line counts and totals. total is in the statement currency; total_converted is in the account currency. unmatched_count counts lines not yet matched or marked; not_in_catalog_count counts lines marked as income on nothing in the catalog. usage_start and usage_end span the lines'' usage periods.';
 
 --
 -- Name: statement_line; Type: VIEW; Schema: api; Owner: -
@@ -6093,7 +6974,13 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
         END AS amount_converted,
     l.song_id,
     l.match_method,
-    l.data
+    l.data,
+    s.side,
+    l.recording_id,
+    l.release_id,
+    l.isrc,
+    l.upc,
+    music.statement_value(l.data, s.mapping, 'artist'::text) AS artist
    FROM ((music.statement_line l
      JOIN music.statement s ON ((s.id = l.statement_id)))
      JOIN music.organization o ON ((o.id = s.organization_id)));
@@ -6102,7 +6989,7 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
 -- Name: VIEW statement_line; Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, writers and ISWC read from the raw row, the usage period read at import, and the amount converted into the account currency at the statement''s payout. Only song_id can be changed.';
+COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, writers, artist and ISWC read from the raw row, the ISRC, barcode and usage period read at import, and the amount converted into the account currency at the statement''s payout. Only song_id, recording_id, release_id and match_method can be changed.';
 
 --
 -- Name: user_preference; Type: TABLE; Schema: music; Owner: -
@@ -6586,6 +7473,45 @@ ALTER TABLE music.statement_line ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTIT
 );
 
 --
+-- Name: transaction_category_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction_category ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.transaction_category_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: transaction_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.transaction_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: transaction_split_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction_split ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.transaction_split_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
 -- Name: vocal_type_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -6951,6 +7877,20 @@ ALTER TABLE ONLY music.recording
     ADD CONSTRAINT recording_isrc_key UNIQUE (isrc);
 
 --
+-- Name: recording_isrc recording_isrc_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_isrc
+    ADD CONSTRAINT recording_isrc_pkey PRIMARY KEY (recording_id, isrc);
+
+--
+-- Name: recording_isrc recording_isrc_unique; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_isrc
+    ADD CONSTRAINT recording_isrc_unique UNIQUE (isrc);
+
+--
 -- Name: recording_mood recording_mood_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -7187,6 +8127,41 @@ ALTER TABLE ONLY music.statement
 
 ALTER TABLE ONLY music.statement
     ADD CONSTRAINT statement_pkey PRIMARY KEY (id);
+
+--
+-- Name: transaction_category transaction_category_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_category
+    ADD CONSTRAINT transaction_category_pkey PRIMARY KEY (id);
+
+--
+-- Name: transaction_document transaction_document_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_document
+    ADD CONSTRAINT transaction_document_pkey PRIMARY KEY (transaction_id, document_id);
+
+--
+-- Name: transaction transaction_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_pkey PRIMARY KEY (id);
+
+--
+-- Name: transaction_split transaction_split_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_pkey PRIMARY KEY (id);
+
+--
+-- Name: transaction_split transaction_split_unique; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_unique UNIQUE NULLS NOT DISTINCT (transaction_id, song_id, recording_id, release_id);
 
 --
 -- Name: user_invite user_invite_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -7813,6 +8788,24 @@ CREATE INDEX song_writer_pro_code_idx ON music.song_writer USING btree (pro_code
 CREATE INDEX song_writer_song_id_idx ON music.song_writer USING btree (song_id);
 
 --
+-- Name: statement_line_isrc_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_line_isrc_idx ON music.statement_line USING btree (isrc) WHERE (isrc IS NOT NULL);
+
+--
+-- Name: statement_line_recording_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_line_recording_id_idx ON music.statement_line USING btree (recording_id) WHERE (recording_id IS NOT NULL);
+
+--
+-- Name: statement_line_release_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_line_release_id_idx ON music.statement_line USING btree (release_id) WHERE (release_id IS NOT NULL);
+
+--
 -- Name: statement_line_song_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -7829,6 +8822,48 @@ CREATE INDEX statement_line_work_ref_idx ON music.statement_line USING btree (wo
 --
 
 CREATE INDEX statement_organization_id_idx ON music.statement USING btree (organization_id);
+
+--
+-- Name: transaction_account_date_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_account_date_idx ON music.transaction USING btree (account_id, transaction_date);
+
+--
+-- Name: transaction_category_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_category_id_idx ON music.transaction USING btree (category_id);
+
+--
+-- Name: transaction_category_name_unique; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX transaction_category_name_unique ON music.transaction_category USING btree (account_id, lower(name));
+
+--
+-- Name: transaction_document_document_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_document_document_id_idx ON music.transaction_document USING btree (document_id);
+
+--
+-- Name: transaction_split_recording_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_split_recording_id_idx ON music.transaction_split USING btree (recording_id) WHERE (recording_id IS NOT NULL);
+
+--
+-- Name: transaction_split_release_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_split_release_id_idx ON music.transaction_split USING btree (release_id) WHERE (release_id IS NOT NULL);
+
+--
+-- Name: transaction_split_song_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX transaction_split_song_id_idx ON music.transaction_split USING btree (song_id) WHERE (song_id IS NOT NULL);
 
 --
 -- Name: user_invite_one_pending; Type: INDEX; Schema: music; Owner: -
@@ -8093,6 +9128,24 @@ CREATE TRIGGER statement_line_upd INSTEAD OF UPDATE ON api.statement_line FOR EA
 --
 
 CREATE TRIGGER statement_upd INSTEAD OF UPDATE ON api.statement FOR EACH ROW EXECUTE FUNCTION api.statement_write();
+
+--
+-- Name: transaction transaction_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER transaction_del INSTEAD OF DELETE ON api.transaction FOR EACH ROW EXECUTE FUNCTION api.transaction_write();
+
+--
+-- Name: transaction transaction_ins; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER transaction_ins INSTEAD OF INSERT ON api.transaction FOR EACH ROW EXECUTE FUNCTION api.transaction_write();
+
+--
+-- Name: transaction transaction_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER transaction_upd INSTEAD OF UPDATE ON api.transaction FOR EACH ROW EXECUTE FUNCTION api.transaction_write();
 
 --
 -- Name: account account_currency_fixed; Type: TRIGGER; Schema: music; Owner: -
@@ -8389,6 +9442,36 @@ CREATE TRIGGER recording_edit_permission BEFORE INSERT OR UPDATE ON music.record
 CREATE TRIGGER recording_genre_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_genre FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
+-- Name: recording recording_in_statements; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_in_statements BEFORE DELETE ON music.recording FOR EACH ROW EXECUTE FUNCTION music.in_statements();
+
+--
+-- Name: recording recording_in_transactions; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_in_transactions BEFORE DELETE ON music.recording FOR EACH ROW EXECUTE FUNCTION music.in_transactions();
+
+--
+-- Name: recording_isrc recording_isrc_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_isrc_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_isrc FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: recording recording_isrc_once; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_isrc_once BEFORE INSERT OR UPDATE OF isrc ON music.recording FOR EACH ROW EXECUTE FUNCTION music.isrc_once();
+
+--
+-- Name: recording_isrc recording_isrc_once; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_isrc_once BEFORE INSERT OR UPDATE ON music.recording_isrc FOR EACH ROW EXECUTE FUNCTION music.isrc_once();
+
+--
 -- Name: recording_mood recording_mood_edit_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -8455,6 +9538,18 @@ CREATE TRIGGER release_document_edit_permission BEFORE INSERT OR DELETE OR UPDAT
 CREATE TRIGGER release_edit_permission BEFORE INSERT OR UPDATE ON music.release FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
+-- Name: release release_in_statements; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_in_statements BEFORE DELETE ON music.release FOR EACH ROW EXECUTE FUNCTION music.in_statements();
+
+--
+-- Name: release release_in_transactions; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_in_transactions BEFORE DELETE ON music.release FOR EACH ROW EXECUTE FUNCTION music.in_transactions();
+
+--
 -- Name: release_track release_track_edit_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -8495,6 +9590,12 @@ CREATE TRIGGER song_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE O
 --
 
 CREATE TRIGGER song_edit_permission BEFORE INSERT OR UPDATE ON music.song FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song song_in_transactions; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_in_transactions BEFORE DELETE ON music.song FOR EACH ROW EXECUTE FUNCTION music.in_transactions();
 
 --
 -- Name: song song_in_use; Type: TRIGGER; Schema: music; Owner: -
@@ -8551,10 +9652,52 @@ CREATE TRIGGER statement_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON mu
 CREATE TRIGGER statement_line_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.statement_line FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('money.edit');
 
 --
+-- Name: statement_line statement_line_side; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER statement_line_side BEFORE INSERT OR UPDATE OF song_id, recording_id, release_id ON music.statement_line FOR EACH ROW EXECUTE FUNCTION music.statement_line_side();
+
+--
 -- Name: statement statement_payout; Type: TRIGGER; Schema: music; Owner: -
 --
 
 CREATE TRIGGER statement_payout BEFORE INSERT OR UPDATE ON music.statement FOR EACH ROW EXECUTE FUNCTION music.statement_payout();
+
+--
+-- Name: transaction transaction_amount; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_amount BEFORE INSERT OR UPDATE ON music.transaction FOR EACH ROW EXECUTE FUNCTION music.transaction_amount();
+
+--
+-- Name: transaction_category transaction_category_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_category_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.transaction_category FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('money.edit');
+
+--
+-- Name: transaction_document transaction_document_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_document_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.transaction_document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('money.edit');
+
+--
+-- Name: transaction transaction_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.transaction FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('money.edit');
+
+--
+-- Name: transaction_split transaction_split_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_split_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.transaction_split FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('money.edit');
+
+--
+-- Name: transaction transaction_updated_at; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER transaction_updated_at BEFORE UPDATE ON music.transaction FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
 -- Name: user_account user_account_keep_an_owner; Type: TRIGGER; Schema: music; Owner: -
@@ -8907,6 +10050,13 @@ ALTER TABLE ONLY music.recording_genre
 
 ALTER TABLE ONLY music.recording_genre
     ADD CONSTRAINT recording_genre_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id) ON DELETE CASCADE;
+
+--
+-- Name: recording_isrc recording_isrc_recording_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_isrc
+    ADD CONSTRAINT recording_isrc_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id) ON DELETE CASCADE;
 
 --
 -- Name: recording recording_key_signature_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -9273,6 +10423,20 @@ ALTER TABLE ONLY music.statement
     ADD CONSTRAINT statement_imported_by_fkey FOREIGN KEY (imported_by) REFERENCES music.user_account(id) ON DELETE SET NULL;
 
 --
+-- Name: statement_line statement_line_recording_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.statement_line
+    ADD CONSTRAINT statement_line_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id);
+
+--
+-- Name: statement_line statement_line_release_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.statement_line
+    ADD CONSTRAINT statement_line_release_id_fkey FOREIGN KEY (release_id) REFERENCES music.release(id);
+
+--
 -- Name: statement_line statement_line_song_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -9292,6 +10456,97 @@ ALTER TABLE ONLY music.statement_line
 
 ALTER TABLE ONLY music.statement
     ADD CONSTRAINT statement_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES music.organization(id);
+
+--
+-- Name: transaction transaction_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
+
+--
+-- Name: transaction_category transaction_category_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_category
+    ADD CONSTRAINT transaction_category_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
+
+--
+-- Name: transaction transaction_category_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_category_id_fkey FOREIGN KEY (category_id) REFERENCES music.transaction_category(id);
+
+--
+-- Name: transaction transaction_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES music.contact(id);
+
+--
+-- Name: transaction_document transaction_document_document_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_document
+    ADD CONSTRAINT transaction_document_document_id_fkey FOREIGN KEY (document_id) REFERENCES music.document(id) ON DELETE CASCADE;
+
+--
+-- Name: transaction_document transaction_document_transaction_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_document
+    ADD CONSTRAINT transaction_document_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES music.transaction(id) ON DELETE CASCADE;
+
+--
+-- Name: transaction transaction_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES music.organization(id);
+
+--
+-- Name: transaction transaction_recoup_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_recoup_contact_id_fkey FOREIGN KEY (recoup_contact_id) REFERENCES music.contact(id);
+
+--
+-- Name: transaction transaction_recoup_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction
+    ADD CONSTRAINT transaction_recoup_organization_id_fkey FOREIGN KEY (recoup_organization_id) REFERENCES music.organization(id);
+
+--
+-- Name: transaction_split transaction_split_recording_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id);
+
+--
+-- Name: transaction_split transaction_split_release_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_release_id_fkey FOREIGN KEY (release_id) REFERENCES music.release(id);
+
+--
+-- Name: transaction_split transaction_split_song_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_song_id_fkey FOREIGN KEY (song_id) REFERENCES music.song(id);
+
+--
+-- Name: transaction_split transaction_split_transaction_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.transaction_split
+    ADD CONSTRAINT transaction_split_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES music.transaction(id) ON DELETE CASCADE;
 
 --
 -- Name: user_account user_account_role_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -9738,6 +10993,24 @@ CREATE POLICY recording_genre_account ON music.recording_genre USING (music.own_
 COMMENT ON POLICY recording_genre_account ON music.recording_genre IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
+-- Name: recording_isrc; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_isrc ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_isrc recording_isrc_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_isrc_account ON music.recording_isrc USING (music.own_recording(recording_id)) WITH CHECK (music.own_recording(recording_id));
+
+--
+-- Name: POLICY recording_isrc_account ON recording_isrc; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_isrc_account ON music.recording_isrc IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
 -- Name: recording_mood; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -10048,7 +11321,7 @@ ALTER TABLE music.statement_line ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY statement_line_account ON music.statement_line USING ((statement_id IN ( SELECT s.id
-   FROM music.statement s))) WITH CHECK ((music.own_statement(statement_id) AND ((song_id IS NULL) OR music.own_song(song_id))));
+   FROM music.statement s))) WITH CHECK ((music.own_statement(statement_id) AND ((song_id IS NULL) OR music.own_song(song_id)) AND ((recording_id IS NULL) OR music.own_recording(recording_id)) AND ((release_id IS NULL) OR music.own_release(release_id))));
 
 --
 -- Name: POLICY statement_line_account ON statement_line; Type: COMMENT; Schema: music; Owner: -
@@ -10067,6 +11340,78 @@ CREATE POLICY statement_upload ON music.statement FOR SELECT TO mamupload USING 
 --
 
 COMMENT ON POLICY statement_upload ON music.statement IS 'mam-upload has no request token in the database; it filters by account itself, and sweep reads every account.';
+
+--
+-- Name: transaction; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: transaction transaction_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY transaction_account ON music.transaction USING (((account_id = ( SELECT music.current_account() AS current_account)) AND ( SELECT music.can('money.view'::text) AS can))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND music.own_transaction_category(category_id) AND ((contact_id IS NULL) OR music.own_contact(contact_id)) AND ((organization_id IS NULL) OR music.own_organization(organization_id)) AND ((recoup_contact_id IS NULL) OR music.own_contact(recoup_contact_id)) AND ((recoup_organization_id IS NULL) OR music.own_organization(recoup_organization_id))));
+
+--
+-- Name: POLICY transaction_account ON transaction; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY transaction_account ON music.transaction IS 'Rows of the account in the request token, and only for a role with money.view; on write, every linked record must be in the same account.';
+
+--
+-- Name: transaction_category; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction_category ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: transaction_category transaction_category_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY transaction_category_account ON music.transaction_category USING (((account_id = ( SELECT music.current_account() AS current_account)) AND ( SELECT music.can('money.view'::text) AS can))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: POLICY transaction_category_account ON transaction_category; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY transaction_category_account ON music.transaction_category IS 'Rows of the account in the request token, and only for a role with money.view.';
+
+--
+-- Name: transaction_document; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: transaction_document transaction_document_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY transaction_document_account ON music.transaction_document USING (music.own_transaction(transaction_id)) WITH CHECK ((music.own_transaction(transaction_id) AND music.own_document(document_id)));
+
+--
+-- Name: POLICY transaction_document_account ON transaction_document; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY transaction_document_account ON music.transaction_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: transaction_split; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.transaction_split ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: transaction_split transaction_split_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY transaction_split_account ON music.transaction_split USING (music.own_transaction(transaction_id)) WITH CHECK ((music.own_transaction(transaction_id) AND ((song_id IS NULL) OR music.own_song(song_id)) AND ((recording_id IS NULL) OR music.own_recording(recording_id)) AND ((release_id IS NULL) OR music.own_release(release_id))));
+
+--
+-- Name: POLICY transaction_split_account ON transaction_split; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY transaction_split_account ON music.transaction_split IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: user_account; Type: ROW SECURITY; Schema: music; Owner: -
@@ -10237,6 +11582,12 @@ GRANT ALL ON FUNCTION api.me() TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.organization_write() TO app_user;
+
+--
+-- Name: FUNCTION recording_suggestions(line_id integer); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.recording_suggestions(line_id integer) TO app_user;
 
 --
 -- Name: FUNCTION recording_write(); Type: ACL; Schema: api; Owner: -
@@ -10627,6 +11978,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_credit_role TO app_us
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_genre TO app_user;
 
 --
+-- Name: TABLE recording_isrc; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_isrc TO app_user;
+
+--
 -- Name: TABLE recording_mood; Type: ACL; Schema: music; Owner: -
 --
 
@@ -10777,6 +12134,70 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.song TO app_user;
 GRANT ALL ON FUNCTION api.search(api.song) TO app_user;
 
 --
+-- Name: TABLE account; Type: ACL; Schema: music; Owner: -
+--
+
+--
+-- Name: COLUMN account.id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(id) ON TABLE music.account TO app_user;
+
+--
+-- Name: COLUMN account.name; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(name) ON TABLE music.account TO app_user;
+
+--
+-- Name: COLUMN account.currency_code; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(currency_code),UPDATE(currency_code) ON TABLE music.account TO app_user;
+
+--
+-- Name: TABLE transaction; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.transaction TO app_user;
+
+--
+-- Name: TABLE transaction_category; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.transaction_category TO app_user;
+
+--
+-- Name: TABLE transaction_split; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.transaction_split TO app_user;
+
+--
+-- Name: TABLE transaction; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.transaction TO app_user;
+
+--
+-- Name: FUNCTION search(api.transaction); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.transaction) TO app_user;
+
+--
+-- Name: TABLE transaction_category; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.transaction_category TO app_user;
+
+--
+-- Name: FUNCTION search(api.transaction_category); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.transaction_category) TO app_user;
+
+--
 -- Name: TABLE vocal_type; Type: ACL; Schema: music; Owner: -
 --
 
@@ -10813,6 +12234,12 @@ GRANT ALL ON FUNCTION api.site_account_write() TO app_user;
 GRANT ALL ON FUNCTION api.site_setting_write() TO app_user;
 
 --
+-- Name: FUNCTION song_suggestions(line_id integer); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.song_suggestions(line_id integer) TO app_user;
+
+--
 -- Name: FUNCTION song_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -10829,6 +12256,12 @@ GRANT ALL ON FUNCTION api.statement_line_write() TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.statement_write() TO app_user;
+
+--
+-- Name: FUNCTION transaction_write(); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.transaction_write() TO app_user;
 
 --
 -- Name: FUNCTION set_password(p_email text, p_password text); Type: ACL; Schema: auth; Owner: -
@@ -10864,6 +12297,24 @@ REVOKE ALL ON FUNCTION music.delete_account_role(p_role integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION music.delete_account_role(p_role integer) TO app_user;
 
 --
+-- Name: FUNCTION in_statements(); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.in_statements() TO app_user;
+
+--
+-- Name: FUNCTION in_transactions(); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.in_transactions() TO app_user;
+
+--
+-- Name: FUNCTION isrc_once(); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.isrc_once() TO app_user;
+
+--
 -- Name: FUNCTION match_key(p_text text); Type: ACL; Schema: music; Owner: -
 --
 
@@ -10880,6 +12331,18 @@ GRANT ALL ON FUNCTION music.match_statement(p_statement integer) TO app_user;
 --
 
 GRANT ALL ON FUNCTION music.own_statement(p_id integer) TO app_user;
+
+--
+-- Name: FUNCTION own_transaction(p_id integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.own_transaction(p_id integer) TO app_user;
+
+--
+-- Name: FUNCTION own_transaction_category(p_id integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.own_transaction_category(p_id integer) TO app_user;
 
 --
 -- Name: FUNCTION party_name(p_contact_id integer, p_organization_id integer); Type: ACL; Schema: music; Owner: -
@@ -10927,6 +12390,12 @@ GRANT ALL ON FUNCTION music.song_controlled_share(p_song integer) TO app_user;
 GRANT ALL ON FUNCTION music.song_in_use() TO app_user;
 
 --
+-- Name: FUNCTION statement_line_side(); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.statement_line_side() TO app_user;
+
+--
 -- Name: FUNCTION statement_payout(); Type: ACL; Schema: music; Owner: -
 --
 
@@ -10943,6 +12412,18 @@ GRANT ALL ON FUNCTION music.statement_value(p_data jsonb, p_mapping jsonb, p_fie
 --
 
 GRANT ALL ON FUNCTION music.sync_documents(p_table text, p_col text, p_parent integer, p_docs jsonb) TO app_user;
+
+--
+-- Name: FUNCTION title_key(p_title text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.title_key(p_title text) TO app_user;
+
+--
+-- Name: FUNCTION transaction_amount(); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.transaction_amount() TO app_user;
 
 --
 -- Name: FUNCTION update_account(p_account uuid, p_name text, p_owner_email text); Type: ACL; Schema: music; Owner: -
@@ -11040,28 +12521,6 @@ GRANT SELECT,INSERT,DELETE ON TABLE music.account_role_permission TO app_user;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.account_role TO app_user;
-
---
--- Name: TABLE account; Type: ACL; Schema: music; Owner: -
---
-
---
--- Name: COLUMN account.id; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT(id) ON TABLE music.account TO app_user;
-
---
--- Name: COLUMN account.name; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT(name) ON TABLE music.account TO app_user;
-
---
--- Name: COLUMN account.currency_code; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT(currency_code),UPDATE(currency_code) ON TABLE music.account TO app_user;
 
 --
 -- Name: TABLE account_setting; Type: ACL; Schema: api; Owner: -
@@ -11201,6 +12660,12 @@ GRANT SELECT ON TABLE api.document_expiring TO app_user;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.release_document TO app_user;
+
+--
+-- Name: TABLE transaction_document; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.transaction_document TO app_user;
 
 --
 -- Name: TABLE document_orphan; Type: ACL; Schema: api; Owner: -
@@ -11384,6 +12849,12 @@ GRANT UPDATE(notes) ON TABLE music.statement TO app_user;
 GRANT UPDATE(statement_date) ON TABLE music.statement TO app_user;
 
 --
+-- Name: COLUMN statement.side; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT UPDATE(side) ON TABLE music.statement TO app_user;
+
+--
 -- Name: TABLE statement_line; Type: ACL; Schema: music; Owner: -
 --
 
@@ -11400,6 +12871,18 @@ GRANT UPDATE(song_id) ON TABLE music.statement_line TO app_user;
 --
 
 GRANT UPDATE(match_method) ON TABLE music.statement_line TO app_user;
+
+--
+-- Name: COLUMN statement_line.recording_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT UPDATE(recording_id) ON TABLE music.statement_line TO app_user;
+
+--
+-- Name: COLUMN statement_line.release_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT UPDATE(release_id) ON TABLE music.statement_line TO app_user;
 
 --
 -- Name: TABLE statement; Type: ACL; Schema: api; Owner: -
@@ -11514,6 +12997,24 @@ GRANT USAGE ON SEQUENCE music.statement_id_seq TO app_user;
 --
 
 GRANT USAGE ON SEQUENCE music.statement_line_id_seq TO app_user;
+
+--
+-- Name: SEQUENCE transaction_category_id_seq; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT USAGE ON SEQUENCE music.transaction_category_id_seq TO app_user;
+
+--
+-- Name: SEQUENCE transaction_id_seq; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT USAGE ON SEQUENCE music.transaction_id_seq TO app_user;
+
+--
+-- Name: SEQUENCE transaction_split_id_seq; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT USAGE ON SEQUENCE music.transaction_split_id_seq TO app_user;
 
 --
 -- Name: SEQUENCE vocal_type_id_seq; Type: ACL; Schema: music; Owner: -

@@ -53,6 +53,8 @@ export const AppMenu = () => {
       {canMoney && <Heading>Money</Heading>}
       {canMoney && <Menu.ResourceItem name="statement" />}
       {canMoney && <Menu.ResourceItem name="statement_line" />}
+      {canMoney && <Menu.ResourceItem name="transaction" />}
+      {canMoney && <Menu.ResourceItem name="transaction_category" />}
       {canMoney && <Menu.ResourceItem name="account_setting" />}
 
       <Heading>Reports</Heading>

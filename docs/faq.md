@@ -1,0 +1,82 @@
+# Frequently asked questions
+
+Answers for people using the app, written so each one can also be shown in a
+short video. Each answer ends with the steps to show on screen.
+
+## Statements
+
+### Some statement lines are not for anything in the catalog. What do I do with them?
+
+Mark them **Not in catalog**. Payers include income that is not earned by one
+work: BMI's cable retransmission and NCTA annual payments, unreported works,
+additional revenue. They are real income and stay in the statement's total,
+but no song should get the credit.
+
+A line marked Not in catalog leaves the unmatched list and shows "Not in
+catalog" in the Matched to column. Marking one line also marks the payer's other
+unmatched lines for the same work: the same work number, or, when the line has
+none, the same ISRC on a master statement, or the same title. Later statements from that payer mark those lines on their own, so
+"NCTA - ANNUAL" from BMI only has to be marked once.
+
+In reports, this income belongs to the catalog as a whole rather than to a
+song or recording, the same as overhead.
+
+If a line was marked by mistake, open it and choose **Not in catalog: back to
+unmatched**, then match it.
+
+To show it:
+
+1. Open **Money > Statement lines**, which lists the unmatched lines.
+2. Click **Match** on a line such as NCTA - ANNUAL.
+3. Click **Not in catalog**. The message says which other lines were marked too.
+4. Open the statement: its total is unchanged, and **Not in catalog** counts
+   the marked lines.
+5. Open a marked line and click **Not in catalog: back to unmatched** to undo it.
+
+### Why do lines with work number 0 not match each other?
+
+BMI gives work number 0 to lines that are not one work, such as cable
+retransmission. A work number made only of zeros is treated as no work number,
+so matching one of those lines never matches the others. Lines without a work
+number are matched by title instead, and marked Not in catalog by title.
+
+To show it: open a BMI line with TITLE # 0. Its work number is blank, and the
+row as imported, below, still shows 0.
+
+### How do I import a label or distributor statement?
+
+Choose **Master** as the side. Its lines are matched to recordings by ISRC, or
+to a release by barcode when a line is on a whole album, rather than to songs.
+Map the ISRC, Barcode and Artist columns at the Columns step. If the file ends
+with a total row, as Curve's does, set **Rows to leave out at the end** to 1,
+or the total counts as a line and doubles the statement.
+
+A recording with no ISRC yet gets one the first time a line is matched to it
+by hand, so the next statement matches it on its own. A recording that already
+has a different ISRC, such as a reissue's original, keeps the line's under
+**Other ISRCs** on its Details tab instead.
+
+To show it:
+
+1. **Money > Statements > Import a statement**, choose the payer and
+   **Master**, and drop the file.
+2. At Columns, check that Amount is the amount payable to you (Curve's Net
+   Payable) and that ISRC and Barcode are filled in.
+3. Import, open the statement, and click **Match** on an unmatched line.
+4. Pick the recording, or choose **Whole release** for an album line.
+
+### Can an expense be for no song?
+
+Yes. A transaction with nothing on its **For** tab is overhead: it belongs to
+the catalog as a whole, as Not in catalog income does.
+
+To show it: **Money > Transactions > New transaction**, fill in the details,
+leave **For** empty, and save. The list shows Overhead under For.
+
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-11-14 | Initial version: Not a song lines, work number 0, expenses on no song. |
+| 2026-11-15 | Not a song is now Not in catalog; importing master statements; expenses for no song are built. |
+| 2026-11-15 | Other ISRCs for reissues. |

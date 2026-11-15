@@ -22,8 +22,9 @@ Composer Lyricist, Lyricist and Arranger. A new row starts on Composer Lyricist.
 **Publishers** are a company, or a person who holds their own publishing. Each
 carries a share, whether you control it, and which writer's share it
 administers. The publisher's society shows alongside it, read from the company
-or person record. One publisher can administer several writers' shares of the
-same work, one row per writer. Publisher and Sub-Publisher head the role list,
+or person record. A publisher for every writer on the song is one row, with
+For writer left on All writers; one that administers only some writers' shares
+is a row per writer. Publisher and Sub-Publisher head the role list,
 and a new row starts on Publisher.
 
 **Registrations** record each society a work is registered with, its work
@@ -145,10 +146,13 @@ times. Removing it from one record detaches it without deleting it.
 ## Statements
 
 Royalty statements import from CSV, TSV, XLS or XLSX files, from any payer: a
-society, the MLC, a publisher, an administrator or a distributor. The import
-goes step by step: pick the header row and any rows to leave out at the end,
-say which columns hold the amount, work number, ISWC, title, writers, usage
-period and statement date, check the rows that do not read, then import. The
+society, the MLC, a publisher, an administrator, a label or a distributor. Each
+statement is one side: **Publishing**, whose lines are on songs, or **Master**,
+whose lines are on recordings; the payer's last statement sets it. The import
+goes step by step: pick the header row and any rows to leave out at the end
+(such as a total row), say which columns hold the amount, work number, title,
+usage period and statement date, plus ISWC and writers for publishing or ISRC,
+barcode and artist for master, check the rows that do not read, then import. The
 columns chosen are remembered: the next statement from the same payer starts
 from them. Several amount columns can be added together, and amounts are read
 with the decimal mark the file uses, 1,234.56 or 1.234,56.
@@ -164,14 +168,40 @@ same file cannot be imported twice. When a statement from the same payer
 with the same statement date is already imported, the Check step warns, naming
 that file, and the import waits until the user confirms it is a different
 statement. Rows are never deduplicated, since the same plays at the same rate
-in another period are legitimate. Each line is matched to a song by ISWC,
+in another period are legitimate. Each line of a publishing statement is matched to a song by ISWC,
 then by the payer's work number from earlier statements, then by title and a
-writer's name. **Statement lines** lists the lines left unmatched. The
+writer's name. Titles are compared without a leading article, an article
+moved to the end, or a trailing code, so RUMBA ESTA BUENA LA and LA RUMBA
+ESTA BUENA ADM008 match La Rumba esta Buena. A title that fits one song
+matches it; when several fit, a writer on the line decides. **Statement lines** lists the lines left unmatched. The
 **Match** button on an unmatched line, there or on the statement's page, picks
-the song from the catalog, or creates it from the line with the title and ISWC
+the song from the catalog, with up to five suggested songs whose titles look
+alike, or creates it from the line with the title and ISWC
 filled in (with a Title case button for titles sent in capitals). Matching one
 line also matches the payer's other lines with the same work number, now and in
 later statements.
+
+Each line of a master statement, such as one from Curve or a distributor, is
+matched to a recording by its ISRC or one of its other ISRCs, then by the ISRC or work number of the payer's
+earlier matched lines, then by title when exactly one recording has it; a line
+with an ISRC never matches a recording with a different one. A line on a whole
+release, such as an album download, has no ISRC and matches the release by its
+barcode. The Match dialog suggests recordings by title, ranked by artist,
+matches a whole release instead, or creates the recording from the line.
+Matching a line to a recording by hand teaches the recording the line's ISRC:
+as its ISRC when it has none, otherwise among its **Other ISRCs**, so later
+statements from any payer match it on their own. Other ISRCs are for the same
+recording earning under several ISRCs, such as a reissue through a later
+distributor while the original still earns; they are also edited on the
+recording's Details tab and found by search. An ISRC belongs to one recording. Changing a statement's side
+unmatches its lines and matches them again.
+
+Some lines are income on nothing in the catalog, such as BMI's cable
+retransmission and NCTA payments. **Not in catalog** in the Match dialog, or on
+the line's page, marks them: they stay in the statement total, leave the unmatched list, and later
+statements from the payer mark the same work on their own (see
+[faq.md](faq.md)). A work number made only of zeros, as BMI sends for such
+lines, is stored as none.
 
 The account's currency is set under **Money > Currency**, before the first
 statement; it cannot change once statements are imported. A statement in
@@ -180,8 +210,34 @@ are converted at that rate. Seeing statements needs the
 money.view permission and importing or changing them money.edit; the Owner role
 has both.
 
-A song cannot be deleted while a recording records it or a statement line is
-matched to it.
+A song cannot be deleted while a recording records it, a statement line is
+matched to it or a transaction is for it; a recording or release cannot be
+deleted while a statement line is matched to it or a transaction is for it.
+
+## Transactions
+
+**Money > Transactions** holds income and expenses entered by hand: a mastering
+bill, artwork, a sync fee, an advance. Statement income is not entered again;
+imported lines are income already. Each transaction has a kind (income or
+expense), a date, a category, a description, optionally the person or company
+paid or paying, the amount and currency as on the bill, and notes. In another
+currency than the account's it also takes the amount in the account currency,
+at the rate actually paid; reports use that amount. A refund is a negative
+amount of the same kind.
+
+The **For** tab says what it was for: any number of songs, recordings and
+releases, each with a weight (default 1). Each row's share is its weight over
+the total, shown after saving. A transaction with none is overhead, for the
+catalog as a whole. The **Receipts** tab attaches documents the same way songs
+do; uploading one needs catalog.edit, since it creates a document.
+
+An expense can be recoupable, naming the person or company it is recouped
+from. Balances owed come later.
+
+Categories are the account's own list, under **Money > Categories**, and are
+added from the category picker as needed. A category in use cannot be deleted.
+The account currency cannot change once transactions are entered. Seeing
+transactions needs money.view and entering them money.edit.
 
 ## Reports
 
@@ -322,3 +378,8 @@ it shows: names by name and lengths by time.
 | 2026-11-14 | Usage period per line and a statement date, read from the file; account currency setting. |
 | 2026-11-14 | Match button on unmatched lines; create a song from a line. |
 | 2026-11-14 | Warn when a statement from the same payer and date is already imported. |
+| 2026-11-14 | Not a song for income on no song; zero work numbers stored as none. |
+| 2026-11-14 | A publisher row can be for all writers on the song. |
+| 2026-11-14 | Softer title matching; suggested songs in the Match dialog. |
+| 2026-11-15 | Master statements matched to recordings and releases; Not in catalog; transactions with splits, receipts and recoupable expenses. |
+| 2026-11-15 | Recordings have other ISRCs, matched like their own. |

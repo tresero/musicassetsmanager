@@ -21,6 +21,8 @@ const messages = {
 
     statement:         { name: 'Statement |||| Statements' },
     statement_line:    { name: 'Statement line |||| Statement lines' },
+    transaction:       { name: 'Transaction |||| Transactions' },
+    transaction_category: { name: 'Category |||| Categories' },
     account_setting:   { name: 'Currency |||| Currency' },
 
     country:           { name: 'Country |||| Countries' },
