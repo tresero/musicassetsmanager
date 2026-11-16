@@ -11,7 +11,7 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
-import { CatalogDataTable, SharedListPicker, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, CopyrightInputs, searchFilter } from './shared';
 import { ListActions } from './listActions';
 
 const filters = [searchFilter];
@@ -208,6 +208,10 @@ const ReleaseForm = () => (
                      helperText="Anything about this distribution, such as why it was moved" />
         </SimpleFormIterator>
       </ArrayInput>
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Copyright">
+      <CopyrightInputs numberHelp="The release's own registration, such as a US SR number for an album registered as one work" />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Documents">

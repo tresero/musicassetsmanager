@@ -1,22 +1,13 @@
 import {
-  TextInput, NumberInput, DateInput, SelectInput,
-  ReferenceInput, AutocompleteInput,
+  TextInput, SelectInput, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
 import { Box, Stack } from '@mui/material';
 import { derivationTypes } from '../../vocab';
+import { CopyrightInputs } from '../../shared';
 
 const CopyrightFields = () => (
   <Stack spacing={2} sx={{ width: '100%', maxWidth: 1100 }}>
-    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-      <DateInput source="copyright_date" label="Copyright date"
-                 helperText={false} sx={{ width: 190 }} />
-      <TextInput source="copyright_number" label="Copyright number"
-                 helperText={false} sx={{ width: 240 }} />
-      <DateInput source="reversion_date" label="Reversion date"
-                 helperText={false} sx={{ width: 190 }} />
-      <NumberInput source="reversion_lead" label="Lead (years)"
-                   helperText={false} sx={{ width: 140 }} />
-    </Box>
+    <CopyrightInputs numberHelp="The composition's registration, such as a US PA number" />
 
     <TextInput source="based_on" label="Based on" fullWidth
                helperText="A source not in this catalog, e.g. America the Beautiful (Bates/Ward, PD)" />

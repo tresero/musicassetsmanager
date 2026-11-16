@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
-  ReferenceInput, useChoicesContext, ChoicesContextProvider,
+  ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput, NumberInput,
 } from 'react-admin';
+import { Stack } from '@mui/material';
 import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
 import { QuickCreateName } from './quickCreate';
 
@@ -138,3 +139,20 @@ export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
 // The search box at the top of a list. It sends q, which dataProvider turns
 // into a search of the view's search value.
 export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;
+
+// The copyright registration and reversion fields songs, recordings and
+// releases share. numberHelp names the registration each one holds.
+export const CopyrightInputs = ({ numberHelp }) => (
+  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+    <TextInput source="copyright_number" label="Registration number" helperText={numberHelp}
+               sx={{ width: { xs: '100%', md: 300 } }} />
+    <DateInput source="copyright_date" label="Registration date" helperText={false}
+               sx={{ width: { xs: '100%', md: 200 } }} />
+    <DateInput source="reversion_date" label="Reversion date"
+               helperText="When the rights come back"
+               sx={{ width: { xs: '100%', md: 200 } }} />
+    <NumberInput source="reversion_lead" label="Lead (years)"
+                 helperText="Notice before the reversion date"
+                 sx={{ width: { xs: '100%', md: 160 } }} />
+  </Stack>
+);

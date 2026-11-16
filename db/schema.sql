@@ -1278,12 +1278,16 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     INSERT INTO music.release (title, release_type, upc, catalog_number, label_id,
                                release_date, c_line_year, c_line_contact_id,
-                               c_line_organization_id, primary_genre_id, notes)
+                               c_line_organization_id, primary_genre_id, notes,
+                               copyright_number, copyright_date, reversion_date,
+                               reversion_lead)
     VALUES (btrim(NEW.title), coalesce(nullif(NEW.release_type, ''), 'Single'), _upc,
             nullif(btrim(coalesce(NEW.catalog_number, '')), ''), NEW.label_id,
             NEW.release_date, NEW.c_line_year,
             NEW.c_line_contact_id, NEW.c_line_organization_id,
-            NEW.primary_genre_id, NEW.notes)
+            NEW.primary_genre_id, NEW.notes,
+            nullif(btrim(coalesce(NEW.copyright_number, '')), ''), NEW.copyright_date,
+            NEW.reversion_date, NEW.reversion_lead)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.release
@@ -1298,6 +1302,10 @@ BEGIN
            c_line_organization_id = NEW.c_line_organization_id,
            primary_genre_id = NEW.primary_genre_id,
            notes = NEW.notes,
+           copyright_number = nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
+           copyright_date = NEW.copyright_date,
+           reversion_date = NEW.reversion_date,
+           reversion_lead = NEW.reversion_lead,
            updated_at = now()
      WHERE id = OLD.id;
     _id := OLD.id;
@@ -3114,8 +3122,13 @@ CREATE TABLE music.release (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     c_line_contact_id integer,
     c_line_organization_id integer,
+    copyright_number text,
+    copyright_date date,
+    reversion_date date,
+    reversion_lead smallint,
     CONSTRAINT release_c_line_one_owner CHECK ((num_nonnulls(c_line_contact_id, c_line_organization_id) <= 1)),
     CONSTRAINT release_c_line_year CHECK (((c_line_year IS NULL) OR ((c_line_year >= 1900) AND (c_line_year <= 2200)))),
+    CONSTRAINT release_reversion_lead CHECK (((reversion_lead IS NULL) OR (reversion_lead >= 0))),
     CONSTRAINT release_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
     CONSTRAINT release_type_ddex CHECK ((release_type = ANY (ARRAY['Single'::text, 'EP'::text, 'Album'::text]))),
     CONSTRAINT release_upc_valid CHECK (((upc IS NULL) OR music.gtin_valid(upc)))
@@ -3152,6 +3165,30 @@ COMMENT ON COLUMN music.release.c_line_contact_id IS 'Person named in the C line
 --
 
 COMMENT ON COLUMN music.release.c_line_organization_id IS 'Company named in the C line, when a company rather than a person owns it.';
+
+--
+-- Name: COLUMN release.copyright_number; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.copyright_number IS 'Registration number for the release as a whole, such as a US Copyright Office SR number for an album registered as one work, or VA for its artwork. Separate from its recordings'' and songs'' registrations.';
+
+--
+-- Name: COLUMN release.copyright_date; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.copyright_date IS 'The date of the release''s registration.';
+
+--
+-- Name: COLUMN release.reversion_date; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.reversion_date IS 'When rights in the release, such as licensed artwork, revert.';
+
+--
+-- Name: COLUMN release.reversion_lead; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.reversion_lead IS 'Years of notice before the reversion date, for a reminder.';
 
 --
 -- Name: release_artist; Type: TABLE; Schema: music; Owner: -
@@ -3277,7 +3314,11 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
           WHERE (t.release_id = r.id)) AS duration_ms,
     ( SELECT g.name
            FROM music.genre g
-          WHERE (g.id = r.primary_genre_id)) AS primary_genre_name
+          WHERE (g.id = r.primary_genre_id)) AS primary_genre_name,
+    copyright_number,
+    copyright_date,
+    reversion_date,
+    reversion_lead
    FROM music.release r;
 
 --

@@ -100,6 +100,22 @@ each with whether the deal is exclusive, its start and end dates, the agent's
 share of the fee, and the signed agreement. Any number of non-exclusive deals
 can run at once; an exclusive one refuses anything overlapping it.
 
+## Releases
+
+**Details**: title, type (single, EP, album), UPC or EAN with its check digit
+verified, catalog number, label, original release date, primary genre, and the
+© year and owner, which build the C line.
+
+**Artists**, **Tracks** (recordings by disc and track number) and
+**Distribution** (each distributor with its own release ID and UPC, and the
+dates submitted, live and taken down).
+
+**Copyright**: the release's own registration number and date, such as an
+album registered as one work, and a reversion date with a lead time. Songs,
+recordings and releases use the same fields.
+
+**Documents**: files kept with the release.
+
 ## Audio files
 
 Drop a file on a row and its header is read in the browser before anything is
@@ -417,3 +433,4 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | Statements record who they pay (Paid to). |
 | 2026-11-15 | Paid to is required and starts from the payer's last statement. |
 | 2026-11-15 | Album lines match releases by title; amounts can be price times quantity. |
+| 2026-11-15 | Releases section; releases have a Copyright tab like songs and recordings. |

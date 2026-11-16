@@ -1,6 +1,6 @@
 import {
   List, DataTable, TextField, BooleanField, DateField, Edit, Create,
-  TabbedForm, TextInput, NumberInput, BooleanInput, DateInput,
+  TabbedForm, TextInput, NumberInput, BooleanInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
   NullableBooleanInput, useRecordContext, required, TextArrayInput,
@@ -15,7 +15,7 @@ import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
-import { CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, searchFilter } from './shared';
 import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
 
@@ -289,16 +289,7 @@ const RecordingForm = () => (
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Copyright">
-      <TextInput source="copyright_number" label="Registration number"
-                 helperText="The sound recording's own registration, such as a US SR number"
-                 sx={{ width: { xs: '100%', md: 300 } }} />
-      <DateInput source="copyright_date" label="Registration date"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
-      <DateInput source="reversion_date" label="Reversion date"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
-      <NumberInput source="reversion_lead" label="Lead (years)"
-                   helperText="Notice before the reversion date"
-                   sx={{ width: { xs: '100%', md: 160 } }} />
+      <CopyrightInputs numberHelp="The sound recording's own registration, such as a US SR number" />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Signed">
