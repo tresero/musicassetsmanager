@@ -11,8 +11,9 @@ Built because every tool in this space either gets the credits wrong (treating
 particular session) or puts your own catalog behind a subscription.
 
 **Status:** in development, and in daily use on a working catalog.
-Compositions, recordings, audio files, people, companies, artists, and
-documents are done. Releases and tracked share links for supervisors are next.
+Compositions, recordings, releases, audio files, people, companies, artists,
+documents, royalty statement import, and transactions are done. Tracked share
+links for supervisors and profit and loss reporting are next.
 
 [Features](docs/features.md) ·
 [Modeling](docs/modeling.md) ·
@@ -44,6 +45,12 @@ Whether a recording is one stop, computed from who controls the master and the
 publishing, and the pitch comment DISCO carries in the file, generated from the
 catalog.
 
+**Releases.** Singles, EPs, and albums with their UPC, catalog number, label,
+original release date, artists, and track list by disc. Each distributor that
+carried it, with their own release ID and the dates it went live and came
+down. The C line, built from the year and owner. An album registered as one
+work covers each of its tracks, so the number is entered once.
+
 **Audio files.** The master plus its alternates, timed cuts, and stems. Drop a
 file and its format, sample rate, bit depth, and length are read from it. The
 same file is never stored twice.
@@ -52,11 +59,25 @@ same file is never stored twice.
 details, and who works where. A band, a pen name, and a legal name are kept
 apart.
 
-**Documents.** Split sheets, contracts, and track sheets, attachable to any
-song, recording, person, or company, with expiry dates.
+**Documents.** Split sheets, contracts, track sheets, and copyright
+registrations, attachable to any song, recording, release, person, or company,
+with expiry dates. A registration's number is entered once on the document and
+applies to everything it is attached to.
 
-**Reports.** Splits that don't total 100%, songs missing a registration,
-expiring documents, unattached documents, and duplicate email addresses.
+**Royalty statements.** Import any payer's CSV, TSV, or Excel file: a society,
+the MLC, a publisher, a label, or a distributor. Each row is kept exactly as
+received, and lines are matched to songs, recordings, or whole releases by
+ISWC, ISRC, barcode, the payer's own work number, or title. Close titles are
+suggested, never matched on their own, and a line matched by hand teaches the
+payer's later statements.
+
+**Transactions.** Income and expenses entered by hand, with receipts, split
+across songs, recordings, and releases by weight, and recoupable expenses
+marked against whoever they are recouped from.
+
+**Reports.** Splits that don't total 100%, songs and recordings missing a
+registration, expiring documents, unattached documents, and duplicate email
+addresses.
 
 The full list is in [docs/features.md](docs/features.md).
 
@@ -118,3 +139,4 @@ a modified version as a service for other people, publish your changes.
 | Date | Revision |
 |---|---|
 | 2026-09-30 | One stop and pitch comments added to the feature summary. |
+| 2026-11-15 | Releases, royalty statements, and transactions added to the feature summary; status brought up to date. |
