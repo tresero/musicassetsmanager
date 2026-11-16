@@ -18,6 +18,7 @@ import document from './resources/document';
 
 import songSplitCheck from './resources/songSplitCheck';
 import songUnregistered from './resources/songUnregistered';
+import recordingUnregistered from './resources/recordingUnregistered';
 import documentExpiring from './resources/documentExpiring';
 import emailDuplicate from './resources/emailDuplicate';
 
@@ -92,6 +93,7 @@ export default function App() {
 
       <Resource name="song_split_check" {...songSplitCheck} />
       <Resource name="song_unregistered" {...songUnregistered} />
+      <Resource name="recording_unregistered" {...recordingUnregistered} />
       <Resource name="document_expiring" {...documentExpiring} />
       <Resource name="email_duplicate" {...emailDuplicate} />
 

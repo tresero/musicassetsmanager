@@ -15,6 +15,7 @@ const messages = {
 
     song_split_check:  { name: 'Split problem |||| Split problems' },
     song_unregistered: { name: 'Unregistered song |||| Unregistered songs' },
+    recording_unregistered: { name: 'Unregistered recording |||| Unregistered recordings' },
     document_expiring: { name: 'Expiring document |||| Expiring documents' },
     document_orphan:   { name: 'Unattached document |||| Unattached documents' },
     email_duplicate:   { name: 'Duplicate email |||| Duplicate emails' },

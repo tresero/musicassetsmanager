@@ -1,8 +1,10 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput, DateInput,
-  ReferenceInput,
+  ReferenceInput, useGetOne,
   required,
 } from 'react-admin';
+import { useSourceContext } from 'ra-core';
+import { useWatch } from 'react-hook-form';
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
 import { AttachDocumentInput } from './AttachDocumentInput';
@@ -22,6 +24,23 @@ import { SharedListPicker } from './shared';
  * chosen here. The location can still be edited by hand for a file held
  * elsewhere; a web address is recorded as a URL.
  */
+// A Copyright Registration document carries its registration number, kept in
+// the document's external reference. Its Date is the registration date. The
+// number then applies to every song, recording or release the document is
+// attached to, and through a release to its tracks. The type is recognized
+// by its name.
+const RegistrationNumberInput = () => {
+  const ctx = useSourceContext();
+  const typeId = useWatch({ name: ctx.getSource('document_type_id') });
+  const { data: type } = useGetOne('document_type', { id: typeId }, { enabled: !!typeId });
+  if (type?.name !== 'Copyright Registration') return null;
+  return (
+    <TextInput source="external_ref" label="Registration number"
+               helperText="Such as SR 1-234-567. It applies to everything this document is attached to; the Date is the registration date."
+               sx={{ width: { xs: '100%', md: 300 } }} />
+  );
+};
+
 export const DocumentsInput = () => (
   <ArrayInput source="documents" label={false}
               helperText="Removing a row detaches the document. It is not deleted.">
@@ -33,6 +52,7 @@ export const DocumentsInput = () => (
         <SharedListPicker label="Type"
                            sx={{ width: { xs: '100%', md: 300 } }} />
       </ReferenceInput>
+      <RegistrationNumberInput />
 
       <FileUploadInput kind="documents" scoped />
       <FileLink scoped />

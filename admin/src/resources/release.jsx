@@ -11,7 +11,7 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
-import { CatalogDataTable, SharedListPicker, CopyrightInputs, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter } from './shared';
 import { ListActions } from './listActions';
 
 const filters = [searchFilter];
@@ -75,7 +75,7 @@ const TrackNumber = () => {
 };
 
 const hiddenColumns = [
-  'catalog_number', 'label_name', 'primary_genre_name', 'c_line',
+  'catalog_number', 'label_name', 'primary_genre_name', 'c_line', 'copyright_status',
   'created_at', 'updated_at',
 ];
 
@@ -95,6 +95,7 @@ const ReleaseList = () => (
       <DataTable.Col source="duration_ms" label="Length" render={(r) => r.duration_display} />
       <DataTable.Col source="primary_genre_name" label="Genre" />
       <DataTable.Col source="c_line" label="C line" />
+      <DataTable.Col source="copyright_status" label="Registration" disableSort render={registrationText} />
       <DataTable.Col source="created_at" label="Added" field={DateField} />
       <DataTable.Col source="updated_at" label="Changed" field={DateField} />
     </CatalogDataTable>
@@ -225,7 +226,7 @@ const ReleaseForm = () => (
 );
 
 const strip = ({ status, track_count, duration_display, c_line, artist_names,
-                 label_name, duration_ms, primary_genre_name,
+                 label_name, duration_ms, primary_genre_name, copyright_status,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

@@ -60,6 +60,7 @@ export const AppMenu = () => {
       <Heading>Reports</Heading>
       <Menu.ResourceItem name="song_split_check" />
       <Menu.ResourceItem name="song_unregistered" />
+      <Menu.ResourceItem name="recording_unregistered" />
       <Menu.ResourceItem name="document_expiring" />
       <Menu.ResourceItem name="document_orphan" />
       <Menu.ResourceItem name="email_duplicate" />

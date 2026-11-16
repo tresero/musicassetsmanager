@@ -43,6 +43,24 @@ CREATE DOMAIN music.cisac_society_code AS text
 	CONSTRAINT cisac_code_format CHECK ((VALUE ~ '^[0-9]{3}$'::text));
 
 --
+-- Name: copyright_status; Type: TYPE; Schema: music; Owner: -
+--
+
+CREATE TYPE music.copyright_status AS (
+	number text,
+	registered_on date,
+	source text,
+	source_title text,
+	conflict text
+);
+
+--
+-- Name: TYPE copyright_status; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TYPE music.copyright_status IS 'A record''s copyright registration as it applies: number and registered_on; source is own (its Copyright tab), document (an attached Copyright Registration document) or release (a release the recording is on); source_title names that document or release; conflict lists attached registration numbers that differ from the record''s own.';
+
+--
 -- Name: email_address; Type: DOMAIN; Schema: music; Owner: -
 --
 
@@ -1650,7 +1668,8 @@ BEGIN
              'document_date', d.document_date,
              'signed_on', d.signed_on,
              'expires_on', d.expires_on,
-             'notes', d.notes) ORDER BY d.id), '[]'::jsonb)
+             'notes', d.notes,
+             'external_ref', d.external_ref) ORDER BY d.id), '[]'::jsonb)
       FROM music.%I j
       JOIN music.document d ON d.id = j.document_id
      WHERE j.%I = $1 $q$, p_table, p_col)
@@ -1869,6 +1888,12 @@ CREATE TABLE music.document (
 );
 
 ALTER TABLE ONLY music.document FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN document.external_ref; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.document.external_ref IS 'An outside reference for the document. On a Copyright Registration document, the registration number, such as SR 1-234-567, which then applies to every song, recording or release it is attached to.';
 
 --
 -- Name: organization_document; Type: TABLE; Schema: music; Owner: -
@@ -2247,6 +2272,46 @@ $$;
 --
 
 COMMENT ON FUNCTION music.artist_billing(p_recording_id integer, p_release_id integer) IS 'The artists of a recording or a release as billed: main artists, then feat. and the featured ones, each in sequence order.';
+
+--
+-- Name: recording_copyright(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.recording_copyright(p_recording integer) RETURNS music.copyright_status
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+  _out music.copyright_status;
+  _rel record;
+BEGIN
+  _out := (SELECT music.copyright_pick(r.copyright_number, r.copyright_date,
+                                       ARRAY(SELECT j.document_id FROM music.recording_document j WHERE j.recording_id = r.id))
+              FROM music.recording r
+             WHERE r.id = p_recording);
+  IF _out.number IS NOT NULL THEN
+    RETURN _out;
+  END IF;
+
+  SELECT rl.title, (x.c).number, (x.c).registered_on INTO _rel
+    FROM music.release_track t
+    JOIN music.release rl ON rl.id = t.release_id
+   CROSS JOIN LATERAL (SELECT music.release_copyright(rl.id) AS c) x
+   WHERE t.recording_id = p_recording
+     AND (x.c).number IS NOT NULL
+   ORDER BY (x.c).registered_on NULLS LAST, rl.id
+   LIMIT 1;
+  IF FOUND THEN
+    RETURN ROW(_rel.number, _rel.registered_on, 'release', _rel.title, NULL)::music.copyright_status;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION recording_copyright(p_recording integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.recording_copyright(p_recording integer) IS 'The sound recording''s registration as it applies: its own or an attached document''s (see copyright_pick), else the earliest registration of a release it is on, so one album registration covers each of its tracks.';
 
 --
 -- Name: recording_language(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -2954,7 +3019,8 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
           WHERE ((l.code)::text = (music.recording_language(r.id))::text)) AS language_name,
     COALESCE(( SELECT array_agg((ri.isrc)::text ORDER BY (ri.isrc)::text) AS array_agg
            FROM music.recording_isrc ri
-          WHERE (ri.recording_id = r.id)), '{}'::text[]) AS other_isrcs
+          WHERE (ri.recording_id = r.id)), '{}'::text[]) AS other_isrcs,
+    music.recording_copyright(id) AS copyright_status
    FROM music.recording r;
 
 --
@@ -2980,6 +3046,12 @@ COMMENT ON COLUMN api.recording.status_name IS 'The status by name, so the list 
 --
 
 COMMENT ON COLUMN api.recording.language_name IS 'The language used (language_used) by name, so the list sorts by name.';
+
+--
+-- Name: COLUMN recording.copyright_status; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.copyright_status IS 'The registration that applies, its own, an attached document''s or a release''s (music.recording_copyright).';
 
 --
 -- Name: search(api.recording); Type: FUNCTION; Schema: api; Owner: -
@@ -3072,6 +3144,25 @@ $_$;
 --
 
 COMMENT ON FUNCTION music.gtin_valid(p text) IS 'True for a 12-digit UPC or 13-digit EAN whose check digit is correct.';
+
+--
+-- Name: release_copyright(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.release_copyright(p_release integer) RETURNS music.copyright_status
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT music.copyright_pick(r.copyright_number, r.copyright_date,
+                              ARRAY(SELECT j.document_id FROM music.release_document j WHERE j.release_id = r.id))
+    FROM music.release r
+   WHERE r.id = p_release
+$$;
+
+--
+-- Name: FUNCTION release_copyright(p_release integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.release_copyright(p_release integer) IS 'The release''s registration as it applies (see copyright_pick).';
 
 --
 -- Name: release_status(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -3318,7 +3409,8 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
     copyright_number,
     copyright_date,
     reversion_date,
-    reversion_lead
+    reversion_lead,
+    music.release_copyright(id) AS copyright_status
    FROM music.release r;
 
 --
@@ -3346,6 +3438,12 @@ COMMENT ON COLUMN api.release.duration_ms IS 'Total length of the tracks in mill
 COMMENT ON COLUMN api.release.primary_genre_name IS 'The primary genre by name, for the list and its sort.';
 
 --
+-- Name: COLUMN release.copyright_status; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.release.copyright_status IS 'The registration that applies (music.release_copyright).';
+
+--
 -- Name: search(api.release); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -3362,6 +3460,25 @@ $_$;
 --
 
 COMMENT ON FUNCTION api.search(api.release) IS 'Title, UPC, catalog number, label, artist names, and track titles, versions and ISRCs, for search=fts(fold).term:*.';
+
+--
+-- Name: song_copyright(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_copyright(p_song integer) RETURNS music.copyright_status
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT music.copyright_pick(s.copyright_number, s.copyright_date,
+                              ARRAY(SELECT j.document_id FROM music.song_document j WHERE j.song_id = s.id))
+    FROM music.song s
+   WHERE s.id = p_song
+$$;
+
+--
+-- Name: FUNCTION song_copyright(p_song integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.song_copyright(p_song integer) IS 'The composition''s registration as it applies (see copyright_pick).';
 
 --
 -- Name: song_one_stop_reason(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -3524,7 +3641,8 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
           WHERE (p.song_id = s.id)) AS publisher_names,
     ( SELECT l.name
            FROM music.language l
-          WHERE ((l.code)::text = (s.language_code)::text)) AS language_name
+          WHERE ((l.code)::text = (s.language_code)::text)) AS language_name,
+    music.song_copyright(id) AS copyright_status
    FROM music.song s;
 
 --
@@ -3544,6 +3662,12 @@ COMMENT ON COLUMN api.song.publisher_names IS 'Publishers by share, for the list
 --
 
 COMMENT ON COLUMN api.song.language_name IS 'The language by name, so the list sorts by name.';
+
+--
+-- Name: COLUMN song.copyright_status; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.song.copyright_status IS 'The registration that applies (music.song_copyright).';
 
 --
 -- Name: search(api.song); Type: FUNCTION; Schema: api; Owner: -
@@ -4559,6 +4683,70 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+--
+-- Name: copyright_key(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.copyright_key(p_number text) RETURNS text
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT nullif(upper(regexp_replace(coalesce(p_number, ''), '[^A-Za-z0-9]', '', 'g')), '')
+$$;
+
+--
+-- Name: FUNCTION copyright_key(p_number text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.copyright_key(p_number text) IS 'A registration number reduced to letters and digits, upper case, so SR 1-234-567 and sr1234567 compare equal.';
+
+--
+-- Name: copyright_pick(text, date, integer[]); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) RETURNS music.copyright_status
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+  _number text := nullif(btrim(coalesce(p_number, '')), '');
+  _doc    record;
+  _others text;
+BEGIN
+  IF _number IS NOT NULL THEN
+    SELECT string_agg(DISTINCT btrim(d.external_ref), ', ') INTO _others
+      FROM music.document d
+      JOIN music.document_type t ON t.id = d.document_type_id
+     WHERE d.id = ANY (p_documents)
+       AND t.name = 'Copyright Registration'
+       AND music.copyright_key(d.external_ref) IS NOT NULL
+       AND NOT EXISTS (SELECT 1
+                         FROM music.document m
+                        WHERE m.id = ANY (p_documents)
+                          AND m.document_type_id = d.document_type_id
+                          AND music.copyright_key(m.external_ref) = music.copyright_key(_number));
+    RETURN ROW(_number, p_date, 'own', NULL, _others)::music.copyright_status;
+  END IF;
+
+  SELECT d.title, btrim(d.external_ref) AS number, d.document_date INTO _doc
+    FROM music.document d
+    JOIN music.document_type t ON t.id = d.document_type_id
+   WHERE d.id = ANY (p_documents)
+     AND t.name = 'Copyright Registration'
+     AND music.copyright_key(d.external_ref) IS NOT NULL
+   ORDER BY d.document_date NULLS LAST, d.id
+   LIMIT 1;
+  IF FOUND THEN
+    RETURN ROW(_doc.number, _doc.document_date, 'document', _doc.title, NULL)::music.copyright_status;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+--
+-- Name: FUNCTION copyright_pick(p_number text, p_date date, p_documents integer[]); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) IS 'The registration that applies to a record: its own number and date when it has a number, flagging attached Copyright Registration documents whose numbers all differ from it; otherwise the earliest attached Copyright Registration document with a number (its External reference) and its date. The document type is found by its name, Copyright Registration. Null when neither.';
 
 --
 -- Name: create_account(text, text); Type: FUNCTION; Schema: music; Owner: -
@@ -5821,7 +6009,10 @@ BEGIN
              document_date    = nullif(d->>'document_date','')::date,
              signed_on        = nullif(d->>'signed_on','')::date,
              expires_on       = nullif(d->>'expires_on','')::date,
-             notes            = nullif(d->>'notes','')
+             notes            = nullif(d->>'notes',''),
+             external_ref     = CASE WHEN d ? 'external_ref'
+                                     THEN nullif(btrim(coalesce(d->>'external_ref','')), '')
+                                     ELSE external_ref END
        WHERE id = _doc;
     ELSE
       _doc := NULL;
@@ -5834,7 +6025,8 @@ BEGIN
       IF _doc IS NULL THEN
         INSERT INTO music.document
           (title, document_type_id, storage_kind, storage_uri,
-           mime_type, byte_size, document_date, signed_on, expires_on, notes)
+           mime_type, byte_size, document_date, signed_on, expires_on, notes,
+           external_ref)
         VALUES (btrim(d->>'title'),
                 nullif(d->>'document_type_id','')::integer,
                 _kind,
@@ -5844,7 +6036,8 @@ BEGIN
                 nullif(d->>'document_date','')::date,
                 nullif(d->>'signed_on','')::date,
                 nullif(d->>'expires_on','')::date,
-                nullif(d->>'notes',''))
+                nullif(d->>'notes',''),
+                nullif(btrim(coalesce(d->>'external_ref','')), ''))
         RETURNING id INTO _doc;
       ELSE
         UPDATE music.document
@@ -5854,7 +6047,8 @@ BEGIN
                document_date    = coalesce(document_date, nullif(d->>'document_date','')::date),
                signed_on        = coalesce(signed_on, nullif(d->>'signed_on','')::date),
                expires_on       = coalesce(expires_on, nullif(d->>'expires_on','')::date),
-               notes            = coalesce(notes, nullif(d->>'notes',''))
+               notes            = coalesce(notes, nullif(d->>'notes','')),
+               external_ref     = coalesce(external_ref, nullif(btrim(coalesce(d->>'external_ref','')), ''))
          WHERE id = _doc;
       END IF;
     END IF;
@@ -6627,6 +6821,28 @@ CREATE VIEW api.recording_credit_display WITH (security_invoker='true') AS
      LEFT JOIN music.organization o ON ((o.id = c.organization_id)));
 
 --
+-- Name: recording_unregistered; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.recording_unregistered WITH (security_invoker='true') AS
+ SELECT id,
+    title,
+    version_label,
+    music.artist_billing(id, NULL::integer) AS artist_names,
+    ( SELECT string_agg(rl.title, ', '::text ORDER BY rl.title) AS string_agg
+           FROM (music.release_track t
+             JOIN music.release rl ON ((rl.id = t.release_id)))
+          WHERE (t.recording_id = r.id)) AS release_titles
+   FROM music.recording r
+  WHERE ((music.recording_copyright(id)).number IS NULL);
+
+--
+-- Name: VIEW recording_unregistered; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.recording_unregistered IS 'Recordings with no copyright registration of their own, through an attached Copyright Registration document, or through a release they are on.';
+
+--
 -- Name: role; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -6787,7 +7003,7 @@ CREATE VIEW api.song_unregistered WITH (security_invoker='true') AS
     (EXISTS ( SELECT 1
            FROM music.song_registration r
           WHERE ((r.song_id = s.id) AND (r.pro_code <> ALL (ARRAY['MLC'::text, 'HFA'::text]))))) AS on_pro,
-    (copyright_number IS NOT NULL) AS copyright_filed
+    ((music.song_copyright(id)).number IS NOT NULL) AS copyright_filed
    FROM music.song s
   WHERE (public_domain_p = false);
 
@@ -11642,6 +11858,12 @@ GRANT USAGE ON SCHEMA music TO app_user;
 GRANT USAGE ON SCHEMA music TO mamupload;
 
 --
+-- Name: TYPE copyright_status; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON TYPE music.copyright_status TO app_user;
+
+--
 -- Name: FUNCTION accept_invite(token text, pass text); Type: ACL; Schema: api; Owner: -
 --
 
@@ -12058,6 +12280,12 @@ GRANT ALL ON FUNCTION api.search(api.organization) TO app_user;
 GRANT ALL ON FUNCTION music.artist_billing(p_recording_id integer, p_release_id integer) TO app_user;
 
 --
+-- Name: FUNCTION recording_copyright(p_recording integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.recording_copyright(p_recording integer) TO app_user;
+
+--
 -- Name: FUNCTION recording_language(p_recording integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -12198,6 +12426,12 @@ GRANT ALL ON FUNCTION api.search(api.recording_role) TO app_user;
 GRANT ALL ON FUNCTION music.gtin_valid(p text) TO app_user;
 
 --
+-- Name: FUNCTION release_copyright(p_release integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.release_copyright(p_release integer) TO app_user;
+
+--
 -- Name: FUNCTION release_status(p_release integer); Type: ACL; Schema: music; Owner: -
 --
 
@@ -12238,6 +12472,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.release TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.search(api.release) TO app_user;
+
+--
+-- Name: FUNCTION song_copyright(p_song integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.song_copyright(p_song integer) TO app_user;
 
 --
 -- Name: FUNCTION song_one_stop_reason(p_song integer); Type: ACL; Schema: music; Owner: -
@@ -12416,6 +12656,18 @@ GRANT ALL ON FUNCTION api.transaction_write() TO app_user;
 --
 
 REVOKE ALL ON FUNCTION auth.set_password(p_email text, p_password text) FROM PUBLIC;
+
+--
+-- Name: FUNCTION copyright_key(p_number text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.copyright_key(p_number text) TO app_user;
+
+--
+-- Name: FUNCTION copyright_pick(p_number text, p_date date, p_documents integer[]); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) TO app_user;
 
 --
 -- Name: FUNCTION create_account(p_name text, p_owner_email text); Type: ACL; Schema: music; Owner: -
@@ -12892,6 +13144,12 @@ GRANT SELECT ON TABLE api.recording_cover TO app_user;
 --
 
 GRANT SELECT ON TABLE api.recording_credit_display TO app_user;
+
+--
+-- Name: TABLE recording_unregistered; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.recording_unregistered TO app_user;
 
 --
 -- Name: TABLE role; Type: ACL; Schema: api; Owner: -

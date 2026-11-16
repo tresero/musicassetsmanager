@@ -15,7 +15,9 @@ import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
-import { CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, searchFilter } from './shared';
+import {
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter,
+} from './shared';
 import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
 
@@ -82,7 +84,7 @@ const hiddenColumns = [
   'song_titles', 'bpm', 'tempo', 'key_signature', 'language_name',
   'is_instrumental', 'is_cover', 'multitracks_available', 'parental_warning',
   'easy_clear', 'pitch_contact_used', 'p_line', 'owner_total',
-  'recorded_country', 'copyright_number', 'copyright_date', 'reversion_date',
+  'recorded_country', 'reversion_date',
   'created_at', 'updated_at',
 ];
 
@@ -111,8 +113,7 @@ const RecordingList = () => (
       <DataTable.Col source="p_line" label="P line" />
       <DataTable.NumberCol source="owner_total" label="Owner %" />
       <DataTable.Col source="recorded_country" label="Recorded in" />
-      <DataTable.Col source="copyright_number" label="Copyright no." />
-      <DataTable.Col source="copyright_date" label="Copyright date" field={DateField} />
+      <DataTable.Col source="copyright_status" label="Registration" disableSort render={registrationText} />
       <DataTable.Col source="reversion_date" label="Reverts" field={DateField} />
       <DataTable.Col source="created_at" label="Added" field={DateField} />
       <DataTable.Col source="updated_at" label="Changed" field={DateField} />
@@ -309,7 +310,7 @@ const RecordingForm = () => (
 const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_comment_auto,
                  pitch_contact_used, has_pitch_contact,
                  one_stop, one_stop_reason, language_used,
-                 artist_names, song_titles, status_name, language_name,
+                 artist_names, song_titles, status_name, language_name, copyright_status,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

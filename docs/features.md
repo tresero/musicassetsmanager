@@ -114,6 +114,14 @@ dates submitted, live and taken down).
 album registered as one work, and a reversion date with a lead time. Songs,
 recordings and releases use the same fields.
 
+**Registration as it applies**: a song, recording or release is registered by
+its own number, else by an attached Copyright Registration document, and a
+recording also by a release it is on, so one album registration covers each
+track. The Copyright tab says where the registration comes from when it is not
+the record's own, and warns when the record's own number matches none of its
+attached registration documents. The lists' Registration column, and Export,
+show it for every record.
+
 **Documents**: files kept with the release.
 
 ## Audio files
@@ -160,6 +168,10 @@ added from either side: from the document, or from the record it belongs to,
 where a document that already exists can be attached rather than uploaded
 again. A copyright registration covering ten works is one document linked ten
 times. Removing it from one record detaches it without deleting it.
+
+A **Copyright Registration** document has a **Registration number**, and its
+Date is the registration date. Attached to a song, recording or release, it is
+that record's registration, so the number is entered once, on the document.
 
 ## Statements
 
@@ -274,7 +286,10 @@ transactions needs money.view and entering them money.edit.
 
 - **Split problems**: works whose writer or publisher shares do not total 100.
 - **Unregistered songs**: works missing a society, MLC, or copyright
-  registration.
+  registration (their own, or through an attached registration document).
+- **Unregistered recordings**: recordings with no copyright registration of
+  their own, through a document, or through a release, with the releases each
+  is on.
 - **Expiring documents**: anything expiring within 90 days.
 - **Unattached documents**: documents no longer linked to anything.
 - **Duplicate emails**: the same address on more than one person.
@@ -434,3 +449,4 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | Paid to is required and starts from the payer's last statement. |
 | 2026-11-15 | Album lines match releases by title; amounts can be price times quantity. |
 | 2026-11-15 | Releases section; releases have a Copyright tab like songs and recordings. |
+| 2026-11-15 | Copyright Registration documents carry the number; registration as it applies, through documents and releases; Unregistered recordings report. |

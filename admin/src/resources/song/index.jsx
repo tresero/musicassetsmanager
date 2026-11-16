@@ -29,7 +29,7 @@ const SongForm = () => (
 );
 
 const strip = ({ writer_total, publisher_total, one_stop, one_stop_reason,
-                 writer_names, publisher_names, language_name,
+                 writer_names, publisher_names, language_name, copyright_status,
                  created_at, updated_at, ...rest }) => rest;
 
 export default {

@@ -3,8 +3,10 @@ import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput, NumberInput,
+  useRecordContext,
 } from 'react-admin';
-import { Stack } from '@mui/material';
+import { Alert, Button, Stack, TextField as MuiTextField } from '@mui/material';
+import { useWatch } from 'react-hook-form';
 import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
 import { QuickCreateName } from './quickCreate';
 
@@ -140,19 +142,77 @@ export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
 // into a search of the view's search value.
 export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;
 
+// The registration that applies to a song, recording or release, from its
+// computed copyright_status, as one line for lists and exports.
+export const registrationText = (r) => {
+  const c = r?.copyright_status;
+  if (!c?.number) return '';
+  const from = c.source === 'release' ? `, from the release ${c.source_title}`
+    : c.source === 'document' ? ', from its document' : '';
+  const differs = c.conflict ? ` (document says ${c.conflict})` : '';
+  return `${c.number}${c.registered_on ? `, ${c.registered_on}` : ''}${from}${differs}`;
+};
+
+// A warning when the record's own number matches none of its attached
+// Copyright Registration documents. It reflects the last save.
+const CopyrightConflict = () => {
+  const c = useRecordContext()?.copyright_status;
+  if (c?.source !== 'own' || !c.conflict) return null;
+  return (
+    <Alert severity="warning">
+      The attached Copyright Registration document says {c.conflict}, not {c.number}.
+      This record's own number is the one used; correct whichever is wrong.
+    </Alert>
+  );
+};
+
 // The copyright registration and reversion fields songs, recordings and
-// releases share. numberHelp names the registration each one holds.
-export const CopyrightInputs = ({ numberHelp }) => (
-  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
-    <TextInput source="copyright_number" label="Registration number" helperText={numberHelp}
-               sx={{ width: { xs: '100%', md: 300 } }} />
-    <DateInput source="copyright_date" label="Registration date" helperText={false}
-               sx={{ width: { xs: '100%', md: 200 } }} />
-    <DateInput source="reversion_date" label="Reversion date"
-               helperText="When the rights come back"
-               sx={{ width: { xs: '100%', md: 200 } }} />
-    <NumberInput source="reversion_lead" label="Lead (years)"
-                 helperText="Notice before the reversion date"
-                 sx={{ width: { xs: '100%', md: 160 } }} />
-  </Stack>
-);
+// releases share. numberHelp names the registration each one holds. When the
+// record has no number of its own but a registration applies through an
+// attached document or a release, the number and date show that one, read
+// only, as of the last save; nothing is copied onto the record. Giving the
+// record its own registration opens the fields to type one, which then wins.
+export const CopyrightInputs = ({ numberHelp }) => {
+  const c = useRecordContext()?.copyright_status;
+  const own = useWatch({ name: 'copyright_number' });
+  const [ownRegistration, setOwnRegistration] = useState(false);
+  const inherited = !!c?.number && c.source !== 'own' && !own && !ownRegistration;
+  const from = inherited
+    ? `From the ${c.source === 'release' ? 'release' : 'document'} ${c.source_title}`
+    : null;
+  return (
+    <Stack spacing={2} sx={{ width: '100%' }}>
+      <CopyrightConflict />
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+        {inherited ? (
+          <>
+            <MuiTextField variant="filled" label="Registration number" value={c.number}
+                          helperText={from} slotProps={{ input: { readOnly: true } }}
+                          sx={{ width: { xs: '100%', md: 300 } }} />
+            <MuiTextField variant="filled" label="Registration date" value={c.registered_on ?? ''}
+                          helperText=" " slotProps={{ input: { readOnly: true } }}
+                          sx={{ width: { xs: '100%', md: 200 } }} />
+          </>
+        ) : (
+          <>
+            <TextInput source="copyright_number" label="Registration number" helperText={numberHelp}
+                       sx={{ width: { xs: '100%', md: 300 } }} />
+            <DateInput source="copyright_date" label="Registration date" helperText={false}
+                       sx={{ width: { xs: '100%', md: 200 } }} />
+          </>
+        )}
+        <DateInput source="reversion_date" label="Reversion date"
+                   helperText="When the rights come back"
+                   sx={{ width: { xs: '100%', md: 200 } }} />
+        <NumberInput source="reversion_lead" label="Lead (years)"
+                     helperText="Notice before the reversion date"
+                     sx={{ width: { xs: '100%', md: 160 } }} />
+      </Stack>
+      {inherited && (
+        <Button onClick={() => setOwnRegistration(true)} sx={{ alignSelf: 'flex-start' }}>
+          Give it its own registration
+        </Button>
+      )}
+    </Stack>
+  );
+};
