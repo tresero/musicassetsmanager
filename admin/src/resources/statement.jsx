@@ -191,6 +191,11 @@ const ShowActions = () => {
       <OpenFileButton />
       {canEdit && <RematchButton />}
       {canEdit && <EditButton />}
+      {canEdit && (
+        <DeleteButton mutationMode="pessimistic" redirect="list"
+                      confirmTitle="Delete this statement?"
+                      confirmContent="Its lines and their matches are deleted with it. The file can then be imported again." />
+      )}
     </TopToolbar>
   );
 };
@@ -316,7 +321,7 @@ const StatementWizard = () => {
   const lastPaid = earlier?.[0];
   useEffect(() => {
     if (!lastPaid || getValues('recipient_contact_id') || getValues('recipient_organization_id')) return;
-    const opts = { shouldDirty: true, shouldValidate: true };
+    const opts = { shouldDirty: true };
     setValue('recipient_contact_id', lastPaid.recipient_contact_id ?? null, opts);
     setValue('recipient_organization_id', lastPaid.recipient_organization_id ?? null, opts);
   }, [lastPaid, getValues, setValue]);

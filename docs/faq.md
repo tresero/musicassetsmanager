@@ -73,7 +73,8 @@ since CD Baby's price is per unit; Release title is guessed from Album Name, and
 Work number can be Album ID. A CD line has no ISRC or song title, so it matches
 the release with that album's title, or, when the title is not in the catalog,
 is matched once by hand with **Whole release**; later lines with the same Album
-ID then match on their own.
+ID then match on their own. A return has a minus on both Quantity and Price
+(-1 at -3); it imports as -3, and the Check step counts the negative rows.
 
 ### Can an expense be for no song?
 
@@ -91,4 +92,4 @@ leave **For** empty, and save. The list shows Overhead under For.
 | 2026-11-15 | Not a song is now Not in catalog; importing master statements; expenses for no song are built. |
 | 2026-11-15 | Other ISRCs for reissues. |
 | 2026-11-15 | A final totals row is left out on its own. |
-| 2026-11-15 | Importing CD Baby sales. |
+| 2026-11-15 | Importing CD Baby sales, returns included. |

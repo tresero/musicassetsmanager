@@ -52,7 +52,8 @@ export const ArtistInput = ({
  * A party that is either a person or a company. Choosing one clears the
  * other, so a row can't end up with both, which the database refuses.
  * With required, saving is refused until one of the two is chosen, and
- * filling in either one, by hand or by code, clears the error on both.
+ * filling in either one, by hand or by code, checks both again, so the
+ * error clears on both.
  * Works at the top of a form and inside list rows alike.
  */
 export const PersonOrCompanyInput = ({
@@ -61,15 +62,16 @@ export const PersonOrCompanyInput = ({
   personHelperText = false, companyHelperText = false,
   companyFirst = false, w = 260, required = false,
 }) => {
-  const { setValue, getValues, clearErrors } = useFormContext();
+  const { setValue, getValues, trigger } = useFormContext();
   const ctx = useSourceContext();
   const path = (s) => (ctx ? ctx.getSource(s) : s);
   const personPath = path(personSource);
   const companyPath = path(companySource);
-  const chosen = !!useWatch({ name: personPath }) || !!useWatch({ name: companyPath });
+  const [personValue, companyValue] = useWatch({ name: [personPath, companyPath] });
+  const chosen = !!personValue || !!companyValue;
   useEffect(() => {
-    if (required && chosen) clearErrors([personPath, companyPath]);
-  }, [required, chosen, personPath, companyPath, clearErrors]);
+    if (required && chosen) trigger([personPath, companyPath]);
+  }, [required, chosen, personPath, companyPath, trigger]);
   const clear = (s) => (value) => {
     if (value) setValue(path(s), null, { shouldDirty: true, shouldValidate: true });
   };

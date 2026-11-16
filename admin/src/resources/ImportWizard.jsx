@@ -16,7 +16,8 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
  * added together, read with the decimal mark the file uses (see
  * detectDecimal). A quantity field, when a column is chosen, multiplies
  * every amount on its row, for files whose amount is a price per unit; a
- * blank quantity is 1. A period field's columns give each row's own period (see
+ * blank quantity is 1. A return is negative whichever of the two carries
+ * the minus sign, or both, as on CD Baby (-1 at -3 is -3, not 3). A period field's columns give each row's own period (see
  * readPeriod), passed on as <key>_start and <key>_end, null when blank or
  * unreadable. A date field is one date for the whole file: the Check step
  * shows the latest date in its column, or asks for one when no column is
@@ -379,6 +380,8 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
     const problems = [];
     let blanks = 0;
     let total = 0;
+    let negatives = 0;
+    let negativeTotal = 0;
     const rows = dataRows.map((r) => {
       const data = {};
       headers.forEach((h, i) => { data[h] = r.cells[i] ?? ''; });
@@ -398,8 +401,11 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
           else { sum += a.value; if (!a.blank) allBlank = false; }
         });
         if (allBlank) blanks += 1;
-        row[f.key] = sum * quantity;
-        total += sum * quantity;
+        const amount = quantity === 1 ? sum
+          : (sum < 0 || quantity < 0 ? -1 : 1) * Math.abs(sum * quantity);
+        row[f.key] = amount;
+        total += amount;
+        if (amount < 0) { negatives += 1; negativeTotal += amount; }
       });
       periodFields.forEach((f) => {
         const cols = mapping[f.key] || [];
@@ -428,7 +434,7 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
       if (row.problems.length) problems.push(row);
       return row;
     });
-    return { rows, problems, blanks, total, decimal, periods, dates: dateRead };
+    return { rows, problems, blanks, total, negatives, negativeTotal, decimal, periods, dates: dateRead };
   }, [step, dataRows, headers, mapping, fields]);
 
   // Each date starts as read from its column whenever the check runs; the
@@ -601,6 +607,7 @@ export const ImportWizard = ({ fields, initialMapping, onImport, warn, importLab
           <Typography variant="body2">
             {checked.rows.length} rows.
             {fields.some((f) => f.amount) && ` Total ${checked.total.toLocaleString(undefined, { maximumFractionDigits: 6 })}.`}
+            {checked.negatives > 0 && ` ${checked.negatives} rows are negative, such as returns or adjustments, together ${checked.negativeTotal.toLocaleString(undefined, { maximumFractionDigits: 6 })}; they are included in the total.`}
             {checked.blanks > 0 && ` ${checked.blanks} rows have a blank amount, counted as 0.`}
             {checked.decimal === ',' && ' Amounts are read with a decimal comma, as the file writes them (1.234,56).'}
           </Typography>
