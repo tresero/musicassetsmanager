@@ -7018,7 +7018,9 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
     s.currency_code,
         CASE
             WHEN (s.payout_amount IS NULL) THEN l.amount
-            ELSE ((l.amount * s.payout_amount) / NULLIF(sum(l.amount) OVER (PARTITION BY l.statement_id), (0)::numeric))
+            ELSE ((l.amount * s.payout_amount) / NULLIF(( SELECT sum(t.amount) AS sum
+               FROM music.statement_line t
+              WHERE (t.statement_id = l.statement_id)), (0)::numeric))
         END AS amount_converted,
     l.song_id,
     l.match_method,
@@ -8877,6 +8879,18 @@ CREATE INDEX statement_line_release_id_idx ON music.statement_line USING btree (
 --
 
 CREATE INDEX statement_line_song_id_idx ON music.statement_line USING btree (song_id);
+
+--
+-- Name: statement_line_unmatched_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX statement_line_unmatched_idx ON music.statement_line USING btree (id) INCLUDE (statement_id) WHERE (match_method IS NULL);
+
+--
+-- Name: INDEX statement_line_unmatched_idx; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.statement_line_unmatched_idx IS 'The Unmatched lines list and its count, newest first.';
 
 --
 -- Name: statement_line_work_ref_idx; Type: INDEX; Schema: music; Owner: -
