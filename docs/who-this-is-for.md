@@ -30,6 +30,15 @@ credits to say so without retyping his name nine times.
 You get statements from three or four sources and you'd like to know which
 songs actually earn.
 
+You run your own label, and the distributor's statement, the old CD sales, and
+the album download all need to land on the right recording or release.
+
+You've moved distributors and a track now has two ISRCs, or you registered an
+album as one work and don't want to type that number on every track.
+
+You spend money on sessions, mixing, and artwork, and you'd like each cost
+attached to the song, recording, or release it was for.
+
 You're the only person who understands where anything is, and that bothers you.
 
 ## What "indie" means here
@@ -46,14 +55,13 @@ the alternative is data that never gets entered.
 
 ## Multi-user and hosting
 
-Every owned table carries an account id, and the row-level security scaffolding
-is in place. The model supports several accounts in one database, each seeing
-only its own catalog, so a small publisher can have staff, or one install can
-serve several writers.
+One install serves several accounts, each seeing only its own catalog,
+enforced by row security in the database rather than by the screens. So a
+small publisher can have staff, or one install can serve several writers.
 
-The policies themselves aren't written yet. There's one user so far, and
-writing security policies against a case that doesn't exist is how you get
-policies that don't work.
+An account's owner invites their own people by email and gives each a role:
+what they may add, edit, or delete, whether they can change settings, manage
+users, or see the money. Accounts are created by invitation only for now.
 
 Self-hosting is the assumption. You need a server, a PostgreSQL install, and
 enough comfort to run a few commands. Whether there's ever a hosted version
@@ -61,8 +69,11 @@ depends on whether anyone wants one.
 
 ## Royalties and project accounting
 
-Partly built: statements import and match to songs, recordings and releases,
-and income and expenses are entered by hand against them. Profit and loss
+Partly built. Statements from any payer import from their own files, kept
+exactly as received, and match to songs on the publishing side or to
+recordings and releases on the master side. Income and expenses are entered by
+hand, with receipts, against songs, recordings, and releases, and recoupable
+costs are marked against whoever they're recouped from. Profit and loss
 reports are next.
 
 The goal is reporting rather than bookkeeping: which songs earn, which
@@ -73,13 +84,13 @@ spreadsheets.
 
 This is not general ledger accounting. It won't file your taxes, track
 expenses that aren't about the catalog, or replace whatever your accountant
-uses. It's the
-music-specific half: money in, attached to the thing that earned it.
+uses. It's the music-specific half: money in and out, attached to the thing
+that earned it or cost it.
 
-The schema is already shaped for it. Works, recordings, and releases have
-stable identifiers, splits are recorded per party, and society registrations
-carry the work numbers that statements key on. That's most of what statement
-matching needs.
+Matching leans on what the catalog already holds: ISWCs, ISRCs (a reissue's
+too), barcodes, and the payer's own work numbers, so once a line is matched,
+later lines from that payer with the same work number or ISRC match on their
+own.
 
 ## It's not for
 
@@ -102,3 +113,4 @@ of your head and into something that can answer questions.
 | Date | Revision |
 |---|---|
 | 2026-11-15 | Royalties and project accounting partly built. |
+| 2026-11-15 | Labels and releases; accounts, invites, and roles are built; statements and transactions as they stand. |
