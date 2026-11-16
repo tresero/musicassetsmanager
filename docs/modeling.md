@@ -126,6 +126,16 @@ with its own number and date, and it carries its own termination rights. So a
 recording has copyright and reversion fields of its own rather than borrowing
 the song's.
 
+One registration often covers several records: an album registered as one
+work covers each of its tracks, and a group registration covers several songs.
+So the registration that applies to a record is computed, never copied onto
+it: the record's own number when it has one, else a Copyright Registration
+document attached to it (the number is on the document), else, for a
+recording, a registered release it is on. Correcting the number on the
+document or the release corrects every record that relies on it. A record's
+own number wins, and it is flagged when none of its attached registration
+documents agree with it.
+
 ## Signed deals are about the master
 
 A publisher or sync agent holding rights to license a recording is recorded on
@@ -383,3 +393,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-15 | Statements have a side; master lines match recordings or releases; not in catalog; transactions spread by weight. |
 | 2026-11-15 | Recordings have other ISRCs. |
 | 2026-11-15 | Statements record who they pay. |
+| 2026-11-15 | Releases have a copyright of their own; the registration that applies comes through documents and releases. |

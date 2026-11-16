@@ -84,6 +84,49 @@ the catalog as a whole, as Not in catalog income does.
 To show it: **Money > Transactions > New transaction**, fill in the details,
 leave **For** empty, and save. The list shows Overhead under For.
 
+## Copyright
+
+### I registered an album as one work. Do I enter the number on every track?
+
+No. Put it once, on the release: either type it on the release's
+**Copyright** tab, or attach the registration as a document of type
+**Copyright Registration** and fill in its **Registration number** (its Date
+is the registration date). Every track on the release then shows that number
+on its own Copyright tab, read only, with where it comes from, and drops off
+**Reports > Unregistered recordings**. A track registered separately gets its
+own number with **Give it its own registration**, which then takes over.
+
+The same document can be attached to several songs, recordings or releases,
+such as one group registration covering several songs.
+
+To show it:
+
+1. Open a release and go to its **Documents** tab.
+2. Upload the registration, or attach it with **Attach an existing document**,
+   and set its Type to **Copyright Registration**.
+3. Fill in **Registration number** and the **Date** it was registered, then
+   click **Save & continue**.
+4. Open the release's **Copyright** tab: the number shows, from the document.
+5. Open one of its tracks and its **Copyright** tab: the same number shows,
+   from the release.
+6. Open **Reports > Unregistered recordings**: the release's tracks are gone.
+
+### Why does a Copyright tab warn that the document says a different number?
+
+The record has its own registration number, and none of the Copyright
+Registration documents attached to it has that number. Its own number is the
+one used. Correct whichever is wrong, or detach a document that belongs to
+something else, such as a composition's registration attached to a recording.
+
+To show it:
+
+1. Open the record with the warning and go to its **Copyright** tab.
+2. Compare its **Registration number** with the number in the warning.
+3. Correct the wrong one: the number here, or the document's **Registration
+   number** on the **Documents** tab. Or move a number that belongs to the
+   composition to the song's own Copyright tab.
+4. Click **Save & continue**: the warning goes.
+
 ## Revision History
 
 | Date | Revision |
@@ -93,3 +136,4 @@ leave **For** empty, and save. The list shows Overhead under For.
 | 2026-11-15 | Other ISRCs for reissues. |
 | 2026-11-15 | A final totals row is left out on its own. |
 | 2026-11-15 | Importing CD Baby sales, returns included. |
+| 2026-11-15 | Copyright: album registrations and mismatched numbers. |
