@@ -34,7 +34,9 @@ number there, and the date.
 formal, part), each with a language.
 
 **Copyright** holds the registration number and date, and a reversion date with
-a lead time for agreements that return rights.
+a lead time for agreements that return rights. A song with no number of its own
+shows the registration of an attached Copyright Registration document (see
+Registration as it applies, under Releases).
 
 **Derivation** covers arrangements, translations, adaptations, and samples.
 Based on names a source outside the catalog, such as a public domain tune;
@@ -51,7 +53,9 @@ A recording is one master, separate from the composition it records.
 medley. Linking it first lets the title and language default from it.
 
 **Details**: title, which defaults from the composition when left blank;
-version; ISRC; BPM; tempo, described as it feels rather than as a number; key;
+version; ISRC, and other ISRCs the same master earns under, such as a reissue
+through a later distributor; explicit content, which starts from My settings;
+BPM; tempo, described as it feels rather than as a number; key;
 vocals (female, male, mixed, or group); the language of the vocal, which
 defaults from the composition when left blank; whether it is instrumental or a
 cover;
@@ -93,7 +97,9 @@ else, and every composition it records is one stop. When it isn't, it names the
 first thing in the way.
 
 **Copyright**: the sound recording's own registration number and date, separate
-from the composition's, and a reversion date with a lead time.
+from the composition's, and a reversion date with a lead time. With no number
+of its own, it shows the registration of an attached document or of a release
+it is on.
 
 **Signed**: publishers and sync agents holding rights to license the master,
 each with whether the deal is exclusive, its start and end dates, the agent's
@@ -117,10 +123,12 @@ recordings and releases use the same fields.
 **Registration as it applies**: a song, recording or release is registered by
 its own number, else by an attached Copyright Registration document, and a
 recording also by a release it is on, so one album registration covers each
-track. The Copyright tab says where the registration comes from when it is not
-the record's own, and warns when the record's own number matches none of its
-attached registration documents. The lists' Registration column, and Export,
-show it for every record.
+track. Nothing is copied: when the registration is not the record's own, the
+Copyright tab shows its number and date read only, with the document or
+release it comes from, and **Give it its own registration** opens the fields
+to type one, which then takes over. The tab warns when the record's own number
+matches none of its attached registration documents. The lists' Registration
+column, and Export, show it for every record.
 
 **Documents**: files kept with the release.
 
@@ -163,7 +171,8 @@ dates they joined and left.
 
 Split sheets, contracts, track sheets, licenses, and the rest, each with a type,
 the file itself, and dates for when it was made, signed, and expires. A document
-attaches to any number of songs, recordings, people, and companies, and can be
+attaches to any number of songs, recordings, releases, people, and companies,
+and receipts to transactions, and can be
 added from either side: from the document, or from the record it belongs to,
 where a document that already exists can be attached rather than uploaded
 again. A copyright registration covering ten works is one document linked ten
@@ -192,7 +201,10 @@ own, and can be kept), say which columns hold the amount, work number, title,
 usage period and statement date, plus ISWC and writers for publishing or ISRC,
 barcode, release title and artist for master, and a quantity when the amount
 is a price per unit (each line's amount is then price times quantity, as on CD
-Baby sales), check the rows that do not read, then import. The
+Baby sales; a return is negative whether the quantity, the price or both
+carry the minus), check the rows that do not read, then import. The Check step
+gives the total and how many rows are negative, such as returns and
+adjustments. The
 columns chosen are remembered: the next statement from the same payer and Paid
 to starts from them. Several amount columns can be added together, and amounts are read
 with the decimal mark the file uses, 1,234.56 or 1.234,56.
@@ -208,7 +220,8 @@ same file cannot be imported twice. When a statement from the same payer,
 paid to the same, with the same statement date is already imported, the Check step warns, naming
 that file, and the import waits until the user confirms it is a different
 statement. Rows are never deduplicated, since the same plays at the same rate
-in another period are legitimate. Each line of a publishing statement is matched to a song by ISWC,
+in another period are legitimate. A statement imported wrongly is deleted from
+its page with **Delete**, lines and all, and imported again. Each line of a publishing statement is matched to a song by ISWC,
 then by the payer's work number from earlier statements, then by title and a
 writer's name. Titles are compared without a leading article, an article
 moved to the end, or a trailing code, so RUMBA ESTA BUENA LA and LA RUMBA
@@ -376,8 +389,9 @@ confirm. Files in the account's storage are left alone.
 The roles Owners give their users are the same for every account. The site
 admin creates, renames, describes and deletes them from Settings, Account
 roles, and picks what each may do: add and edit catalog data, delete whole
-records, change settings, manage users. Everyone in an account can read all of
-it. The Owner role keeps its name and always manages users. A role cannot be
+records, change settings, manage users, see the money, and edit it. Everyone in
+an account can read its catalog; statements and transactions need the money
+permission. The Owner role keeps its name and always manages users. A role cannot be
 deleted while a user or an open invite in any account has it; the error gives
 the counts. Role names are unique regardless of case.
 
@@ -392,7 +406,8 @@ by title, UPC, catalog number, label, artists and their tracks.
 
 The song, recording and release lists have a Columns button to show, hide and
 reorder columns; the choice is kept in the browser. Every column sorts by what
-it shows: names by name and lengths by time.
+it shows: names by name and lengths by time. Registration, which can come from
+a document or a release, does not sort.
 
 - Save and continue keeps you on the tab you were editing; Save and close
   returns to the list.
@@ -450,3 +465,4 @@ it shows: names by name and lengths by time.
 | 2026-11-15 | Album lines match releases by title; amounts can be price times quantity. |
 | 2026-11-15 | Releases section; releases have a Copyright tab like songs and recordings. |
 | 2026-11-15 | Copyright Registration documents carry the number; registration as it applies, through documents and releases; Unregistered recordings report. |
+| 2026-11-15 | Other ISRCs and explicit content on recordings; returns and Delete on statements; inherited registrations shown in the fields; money permissions on roles. |

@@ -7,7 +7,8 @@ What this implements, and where the edges are.
 | Identifier | What it identifies | Where it lives |
 |---|---|---|
 | ISWC | A composition | `song.iswc` |
-| ISRC | A recording | `recording.isrc` |
+| ISRC | A recording | `recording.isrc`, and `recording_isrc` for the other ISRCs it earns under |
+| UPC or EAN | A release | `release.upc` |
 | IPI name number | A rights holder | `contact`, `organization` |
 | ISNI | A public identity | `contact`, `artist`, `organization` |
 | CISAC society code | A collecting society | `pro.cisac_code` |
@@ -15,6 +16,12 @@ What this implements, and where the edges are.
 All are format-checked by domains. ISWC is `T` plus ten digits. ISRC is a
 two-letter country code, a three-character registrant, and seven digits. IPI is
 nine to eleven digits. ISNI is sixteen characters with a possible trailing X.
+A UPC or EAN has its GTIN check digit verified.
+
+An ISRC identifies one recording, but one recording can earn under several:
+a reissue through a later distributor gets a new ISRC while the original still
+reports. So a recording has one ISRC of its own plus any number of others, and
+no ISRC is on two recordings.
 
 ISO 3166-1 alpha-2 for countries, ISO 639 for languages. The language table
 includes `zxx`, the ISO 639-2 code for "no linguistic content", which is what
@@ -110,6 +117,19 @@ the US you can leave a PRO and register only new material with the new one, so
 back-catalog works stay where they were. The field defaults from the contact
 record when left blank.
 
+### Copyright registration
+
+A copyright office registration (in the US, PA for a work, SR for a sound
+recording, VA for artwork) is a number and a date with no format to check, so
+it is stored as text and compared without spaces, dashes or case. Songs,
+recordings and releases each have their own.
+
+One registration often covers several records: a group registration covers
+several works, and an album registered as one unit covers each of its tracks.
+So the registration that applies is computed rather than copied: the record's
+own, else a Copyright Registration document attached to it, which holds the
+number, else, for a recording, a registered release it is on.
+
 ## Neighboring rights
 
 Not covered, and deliberately separate when it is.
@@ -153,7 +173,10 @@ The formal standards, for reference:
 | CDM (Claim Detail Message) | DDEX | Publishing | Publishers' claims on reported usage |
 
 Small payees rarely receive these as is; they get the payer's export of them.
-A file in one of them imports like any other, through a mapping.
+A file in one of them imports like any other, through a mapping. So do sales
+reports that give a unit price and a quantity rather than a line total, such
+as CD Baby's: the quantity column multiplies the amount, and a return stays
+negative wherever its minus sign is.
 
 Every statement is one side, publishing or master, chosen at import:
 
@@ -161,8 +184,9 @@ Every statement is one side, publishing or master, chosen at import:
   writers. Societies, the MLC and publishers send these. Outside the US,
   societies such as GEMA, SACEM and JASRAC collect performance and mechanical
   income together; both are publishing.
-- Master lines match recordings by ISRC, or releases by barcode when the line
-  is on a whole release, then by title. Labels, distributors and label
+- Master lines match recordings by ISRC (a recording's other ISRCs included),
+  or releases by barcode or release title when the line is on a whole release,
+  then by title. Labels, distributors and label
   accounting systems such as Curve send these, as do neighboring rights bodies
   such as PPL and SoundExchange.
 
@@ -201,3 +225,4 @@ than a CHECK constraint so they can be extended without a migration.
 |---|---|
 | 2026-09-30 | DDEX codes on roles and instruments, allowed value sets version 011. |
 | 2026-11-15 | Royalty statements: no required format, the identifiers that match lines, CRD, DSR and CDM, publishing and master sides. |
+| 2026-11-15 | UPC and other ISRCs among the identifiers; copyright registrations and how they apply; release title matching and unit-price sales reports. |
