@@ -18,6 +18,7 @@ const messages = {
     recording_unregistered: { name: 'Unregistered recording |||| Unregistered recordings' },
     document_expiring: { name: 'Expiring document |||| Expiring documents' },
     document_orphan:   { name: 'Unattached document |||| Unattached documents' },
+    file_unnamed:      { name: 'File without a name |||| Files without names' },
     email_duplicate:   { name: 'Duplicate email |||| Duplicate emails' },
 
     statement:         { name: 'Statement |||| Statements' },

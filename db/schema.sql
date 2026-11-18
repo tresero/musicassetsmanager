@@ -647,12 +647,13 @@ BEGIN
     INSERT INTO music.document (title, document_type_id, storage_kind,
                                 storage_uri, external_ref, mime_type,
                                 byte_size, sha256, document_date,
-                                signed_on, expires_on, notes)
+                                signed_on, expires_on, notes, file_name)
     VALUES (NEW.title, NEW.document_type_id,
             coalesce(NEW.storage_kind, 'url'),
             NEW.storage_uri, NEW.external_ref, NEW.mime_type,
             NEW.byte_size, NEW.sha256, NEW.document_date,
-            NEW.signed_on, NEW.expires_on, NEW.notes)
+            NEW.signed_on, NEW.expires_on, NEW.notes,
+            nullif(btrim(NEW.file_name), ''))
     RETURNING id INTO _id;
   ELSE
     UPDATE music.document
@@ -667,7 +668,8 @@ BEGIN
            document_date    = NEW.document_date,
            signed_on        = NEW.signed_on,
            expires_on       = NEW.expires_on,
-           notes            = NEW.notes
+           notes            = NEW.notes,
+           file_name        = nullif(btrim(NEW.file_name), '')
      WHERE id = OLD.id;
     _id := OLD.id;
   END IF;
@@ -884,6 +886,51 @@ $$;
 --
 
 COMMENT ON FUNCTION api.me() IS 'The signed-in user''s role, permission codes and site admin flag, so the app can hide what the role cannot do; their default country (United States unless set in music.user_preference), the languages listed first in language pickers (English unless set) and the explicit content a new recording starts on (none unless set); and the account currency.';
+
+--
+-- Name: name_files(jsonb); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.name_files(files jsonb) RETURNS jsonb
+    LANGUAGE sql
+    AS $_$
+  WITH f AS (
+    SELECT DISTINCT ON (lower(x->>'sha256'))
+           lower(x->>'sha256') AS sha,
+           btrim(x->>'file_name') AS name
+      FROM jsonb_array_elements(coalesce(files, '[]'::jsonb)) x
+     WHERE x->>'sha256' ~* '^[0-9a-f]{64}$'
+       AND nullif(btrim(x->>'file_name'), '') IS NOT NULL
+  ), a AS (
+    UPDATE music.audio_file a
+       SET file_name = f.name
+      FROM f
+     WHERE a.file_name IS NULL
+       AND a.storage_kind IN ('local', 's3')
+       AND substring(a.storage_uri FROM '([0-9a-f]{64})(\.[^/]*)?$') = f.sha
+    RETURNING f.sha
+  ), d AS (
+    UPDATE music.document d
+       SET file_name = f.name
+      FROM f
+     WHERE d.file_name IS NULL
+       AND d.storage_kind IN ('local', 's3')
+       AND substring(d.storage_uri FROM '([0-9a-f]{64})(\.[^/]*)?$') = f.sha
+    RETURNING f.sha
+  )
+  SELECT jsonb_build_object(
+           'audio', (SELECT count(*) FROM a),
+           'documents', (SELECT count(*) FROM d),
+           'matched', coalesce((SELECT jsonb_agg(DISTINCT s.sha)
+                                  FROM (SELECT sha FROM a UNION SELECT sha FROM d) s),
+                               '[]'::jsonb));
+$_$;
+
+--
+-- Name: FUNCTION name_files(files jsonb); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.name_files(files jsonb) IS 'Names stored files that have no file name yet from the originals: files is an array of {sha256, file_name}, hashed in the browser. A file matches the audio files and documents whose stored object has that hash; rows that already have a name are left alone. Returns how many audio files and documents were named, and which hashes matched.';
 
 --
 -- Name: organization_write(); Type: FUNCTION; Schema: api; Owner: -
@@ -1211,12 +1258,16 @@ BEGIN
          bit_rate_kbps = nullif(y->>'bit_rate_kbps','')::integer,
          channels = nullif(y->>'channels','')::smallint,
          duration_ms = nullif(y->>'duration_ms','')::integer,
-         notes = nullif(y->>'notes','')
+         notes = nullif(y->>'notes',''),
+         file_name = CASE WHEN y ? 'file_name'
+                          THEN nullif(btrim(y->>'file_name'),'')
+                          ELSE f.file_name END
     FROM jsonb_array_elements(coalesce(NEW.audio_files,'[]')) y
    WHERE f.id = (y->>'id')::integer AND f.recording_id = _id;
   INSERT INTO music.audio_file (recording_id, title, file_type_id, storage_kind, storage_uri,
                                 format, is_lossless, sample_rate, bit_depth,
-                                bit_rate_kbps, channels, duration_ms, notes)
+                                bit_rate_kbps, channels, duration_ms, notes,
+                                file_name)
   SELECT _id, nullif(y->>'title',''),
          coalesce(nullif(y->>'file_type_id','')::integer,
                   music.default_audio_file_type(y->>'format')),
@@ -1228,7 +1279,8 @@ BEGIN
          nullif(y->>'bit_rate_kbps','')::integer,
          nullif(y->>'channels','')::smallint,
          nullif(y->>'duration_ms','')::integer,
-         nullif(y->>'notes','')
+         nullif(y->>'notes',''),
+         nullif(btrim(y->>'file_name'),'')
     FROM jsonb_array_elements(coalesce(NEW.audio_files,'[]')) y
    WHERE y->>'id' IS NULL
      AND nullif(btrim(y->>'storage_uri'),'') IS NOT NULL;
@@ -1669,7 +1721,8 @@ BEGIN
              'signed_on', d.signed_on,
              'expires_on', d.expires_on,
              'notes', d.notes,
-             'external_ref', d.external_ref) ORDER BY d.id), '[]'::jsonb)
+             'external_ref', d.external_ref,
+             'file_name', d.file_name) ORDER BY d.id), '[]'::jsonb)
       FROM music.%I j
       JOIN music.document d ON d.id = j.document_id
      WHERE j.%I = $1 $q$, p_table, p_col)
@@ -1882,7 +1935,9 @@ CREATE TABLE music.document (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     signed_on date,
     expires_on date,
+    file_name text,
     CONSTRAINT document_dates CHECK (((expires_on IS NULL) OR (signed_on IS NULL) OR (expires_on >= signed_on))),
+    CONSTRAINT document_file_name_trimmed CHECK (((file_name IS NULL) OR ((file_name = btrim(file_name)) AND (file_name <> ''::text)))),
     CONSTRAINT document_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'paperless'::text, 'url'::text]))),
     CONSTRAINT document_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
@@ -1894,6 +1949,12 @@ ALTER TABLE ONLY music.document FORCE ROW LEVEL SECURITY;
 --
 
 COMMENT ON COLUMN music.document.external_ref IS 'An outside reference for the document. On a Copyright Registration document, the registration number, such as SR 1-234-567, which then applies to every song, recording or release it is attached to.';
+
+--
+-- Name: COLUMN document.file_name; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.document.file_name IS 'The name the file had on the computer it was uploaded from. Storage names objects by their hash, so this is the only record of it. Empty for files uploaded before names were kept and for documents held elsewhere; api.name_files fills in stored ones.';
 
 --
 -- Name: organization_document; Type: TABLE; Schema: music; Owner: -
@@ -1962,7 +2023,8 @@ CREATE VIEW api.document WITH (security_invoker='true') AS
            FROM music.organization_document od
           WHERE (od.document_id = d.id)), '{}'::integer[]) AS organization_ids,
     created_at,
-    updated_at
+    updated_at,
+    file_name
    FROM music.document d;
 
 --
@@ -1971,7 +2033,7 @@ CREATE VIEW api.document WITH (security_invoker='true') AS
 
 CREATE FUNCTION api.search(api.document) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$ SELECT music.search_doc($1.title) $_$;
+    AS $_$ SELECT music.search_doc($1.title, $1.file_name) $_$;
 
 --
 -- Name: FUNCTION search(api.document); Type: COMMENT; Schema: api; Owner: -
@@ -2547,11 +2609,19 @@ CREATE TABLE music.audio_file (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     file_type_id integer NOT NULL,
+    file_name text,
     CONSTRAINT audio_channels CHECK (((channels IS NULL) OR ((channels >= 1) AND (channels <= 32)))),
+    CONSTRAINT audio_file_name_trimmed CHECK (((file_name IS NULL) OR ((file_name = btrim(file_name)) AND (file_name <> ''::text)))),
     CONSTRAINT audio_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'url'::text])))
 );
 
 ALTER TABLE ONLY music.audio_file FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN audio_file.file_name; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.audio_file.file_name IS 'The name the file had on the computer it was uploaded from. It is kept on the row, not with the stored object, because storage names objects by their hash and the same file can be uploaded under several names. Empty for files uploaded before names were kept; api.name_files fills those in.';
 
 --
 -- Name: recording; Type: TABLE; Schema: music; Owner: -
@@ -2985,7 +3055,7 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     ( SELECT sum(c.featured_share) AS sum
            FROM music.recording_credit c
           WHERE (c.recording_id = r.id)) AS featured_total,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes) ORDER BY f.id) AS jsonb_agg
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes, 'file_name', f.file_name) ORDER BY f.id) AS jsonb_agg
            FROM music.audio_file f
           WHERE (f.recording_id = r.id)), '[]'::jsonb) AS audio_files,
     COALESCE(( SELECT array_agg(g.genre_id ORDER BY g.genre_id) AS array_agg
@@ -6012,7 +6082,10 @@ BEGIN
              notes            = nullif(d->>'notes',''),
              external_ref     = CASE WHEN d ? 'external_ref'
                                      THEN nullif(btrim(coalesce(d->>'external_ref','')), '')
-                                     ELSE external_ref END
+                                     ELSE external_ref END,
+             file_name        = CASE WHEN d ? 'file_name'
+                                     THEN nullif(btrim(coalesce(d->>'file_name','')), '')
+                                     ELSE file_name END
        WHERE id = _doc;
     ELSE
       _doc := NULL;
@@ -6026,7 +6099,7 @@ BEGIN
         INSERT INTO music.document
           (title, document_type_id, storage_kind, storage_uri,
            mime_type, byte_size, document_date, signed_on, expires_on, notes,
-           external_ref)
+           external_ref, file_name)
         VALUES (btrim(d->>'title'),
                 nullif(d->>'document_type_id','')::integer,
                 _kind,
@@ -6037,7 +6110,8 @@ BEGIN
                 nullif(d->>'signed_on','')::date,
                 nullif(d->>'expires_on','')::date,
                 nullif(d->>'notes',''),
-                nullif(btrim(coalesce(d->>'external_ref','')), ''))
+                nullif(btrim(coalesce(d->>'external_ref','')), ''),
+                nullif(btrim(coalesce(d->>'file_name','')), ''))
         RETURNING id INTO _doc;
       ELSE
         UPDATE music.document
@@ -6048,7 +6122,8 @@ BEGIN
                signed_on        = coalesce(signed_on, nullif(d->>'signed_on','')::date),
                expires_on       = coalesce(expires_on, nullif(d->>'expires_on','')::date),
                notes            = coalesce(notes, nullif(d->>'notes','')),
-               external_ref     = coalesce(external_ref, nullif(btrim(coalesce(d->>'external_ref','')), ''))
+               external_ref     = coalesce(external_ref, nullif(btrim(coalesce(d->>'external_ref','')), '')),
+               file_name        = coalesce(file_name, nullif(btrim(coalesce(d->>'file_name','')), ''))
          WHERE id = _doc;
       END IF;
     END IF;
@@ -6615,7 +6690,8 @@ CREATE VIEW api.document_orphan WITH (security_invoker='true') AS
     d.storage_kind,
     d.storage_uri,
     d.document_date,
-    d.created_at
+    d.created_at,
+    d.file_name
    FROM (music.document d
      LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
   WHERE ((NOT (EXISTS ( SELECT 1
@@ -6664,6 +6740,46 @@ CREATE VIEW api.email_duplicate WITH (security_invoker='true') AS
   WHERE (retired_at IS NULL)
   GROUP BY (lower((email)::text))
  HAVING (count(*) > 1);
+
+--
+-- Name: file_unnamed; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.file_unnamed WITH (security_invoker='true') AS
+ SELECT ('audio-'::text || f.id) AS id,
+    'Audio'::text AS kind,
+    f.recording_id,
+    NULL::integer AS document_id,
+    r.title,
+    r.version_label,
+    concat_ws(', '::text, t.name, f.title) AS detail,
+    f.storage_uri,
+    f.byte_size,
+    f.created_at
+   FROM ((music.audio_file f
+     JOIN music.recording r ON ((r.id = f.recording_id)))
+     LEFT JOIN music.audio_file_type t ON ((t.id = f.file_type_id)))
+  WHERE ((f.file_name IS NULL) AND (f.storage_kind = ANY (ARRAY['local'::text, 's3'::text])))
+UNION ALL
+ SELECT ('document-'::text || d.id) AS id,
+    'Document'::text AS kind,
+    NULL::integer AS recording_id,
+    d.id AS document_id,
+    d.title,
+    NULL::text AS version_label,
+    t.name AS detail,
+    d.storage_uri,
+    d.byte_size,
+    d.created_at
+   FROM (music.document d
+     LEFT JOIN music.document_type t ON ((t.id = d.document_type_id)))
+  WHERE ((d.file_name IS NULL) AND (d.storage_kind = ANY (ARRAY['local'::text, 's3'::text])));
+
+--
+-- Name: VIEW file_unnamed; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.file_unnamed IS 'Stored audio files and documents with no original file name, uploaded before names were kept. Dropping the original files on the report names them through api.name_files.';
 
 --
 -- Name: permission; Type: TABLE; Schema: music; Owner: -
@@ -11948,6 +12064,12 @@ REVOKE ALL ON FUNCTION api.me() FROM PUBLIC;
 GRANT ALL ON FUNCTION api.me() TO app_user;
 
 --
+-- Name: FUNCTION name_files(files jsonb); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.name_files(files jsonb) TO app_user;
+
+--
 -- Name: FUNCTION organization_write(); Type: ACL; Schema: api; Owner: -
 --
 
@@ -13084,6 +13206,12 @@ GRANT SELECT ON TABLE api.document_usage TO app_user;
 --
 
 GRANT SELECT ON TABLE api.email_duplicate TO app_user;
+
+--
+-- Name: TABLE file_unnamed; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.file_unnamed TO app_user;
 
 --
 -- Name: TABLE permission; Type: ACL; Schema: music; Owner: -

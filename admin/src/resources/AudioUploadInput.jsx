@@ -1,12 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useNotify } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { parseBlob } from 'music-metadata';
 import { uploadFile } from './uploadClient';
 import { useAudioFileTypes } from './AudioPlayer';
-import { Box, LinearProgress, Stack, Typography } from '@mui/material';
-import UploadIcon from '@mui/icons-material/CloudUpload';
+import { DropZone } from './DropZone';
 
 /*
  * Drop an audio file on the row, or click to pick one.
@@ -34,6 +33,11 @@ import UploadIcon from '@mui/icons-material/CloudUpload';
  * this file as well.
  *
  * A zip of stems has no header to read. It uploads anyway, typed as Stem.
+ *
+ * The file's own name is kept in file_name, since the stored key is only
+ * its hash. Dropping a file that another row already has refuses it, but
+ * if that row has no name yet, it takes this file's name: that is how
+ * files uploaded before names were kept get theirs.
  */
 
 const extOf = (name) => (name.split('.').pop() || '').toUpperCase();
@@ -70,7 +74,6 @@ export const AudioUploadInput = ({ scoped = false }) => {
   const notify = useNotify();
   const { setValue, getValues } = useFormContext();
   const sourceCtx = useSourceContext();
-  const inputRef = useRef(null);
 
   const path = (f) => (scoped && sourceCtx ? sourceCtx.getSource(f) : f);
   const storageUri = useWatch({ name: path('storage_uri') });
@@ -79,10 +82,8 @@ export const AudioUploadInput = ({ scoped = false }) => {
 
   const [phase, setPhase] = useState(null);
   const [pct, setPct] = useState(0);
-  const [over, setOver] = useState(false);
 
-  const upload = async (file) => {
-    if (!file) return;
+  const upload = async ([file]) => {
     setPct(0);
     try {
       // 1. read the header; a zip of stems has none, and still uploads
@@ -90,12 +91,20 @@ export const AudioUploadInput = ({ scoped = false }) => {
       let f = {};
       let tagTitle = null;
       if (ext !== 'ZIP') {
+        let why = 'no sample rate in the header';
         try {
           const meta = await parseBlob(file, { duration: true });
-          f = meta.format;
+          f = meta.format || {};
           tagTitle = meta.common?.title?.trim() || null;
-        } catch {
+        } catch (e) {
+          console.error('Reading the audio header failed', file.name, e);
+          why = e?.message || String(e);
           f = {};
+        }
+        if (!f.sampleRate) {
+          notify(`Could not read the audio details of ${file.name} (${why}). `
+                 + 'It still uploads; fill in the details by hand.',
+                 { type: 'warning', autoHideDuration: 15000 });
         }
       }
       const lossless = ext === 'ZIP' ? null : isLossless(f);
@@ -118,22 +127,31 @@ export const AudioUploadInput = ({ scoped = false }) => {
         onUploadProgress: (p) => { setPhase('Uploading'); setPct(Math.round(p * 100)); },
       });
 
-      // 3. refuse a file this recording already has on another row
+      // 3. refuse a file this recording already has on another row, but
+      //    name that row if it has no name yet
+      const opts = { shouldDirty: true };
       const here = path('storage_uri');
       const rows = getValues('audio_files') || [];
       const twin = rows.findIndex((r, i) =>
         r?.storage_uri === plan.key && `audio_files.${i}.storage_uri` !== here);
       if (twin >= 0) {
         const label = rows[twin]?.title ? ` (${rows[twin].title})` : '';
-        notify(`That file is already on this recording, row ${twin + 1}${label}.`,
-               { type: 'warning' });
+        if (!rows[twin]?.file_name) {
+          setValue(`audio_files.${twin}.file_name`, file.name, opts);
+          notify(`Row ${twin + 1}${label} already has that file; it is now named ${file.name}. `
+                 + (getValues(here) ? 'Save to keep it.' : 'Remove this empty row and save.'),
+                 { type: 'info' });
+        } else {
+          notify(`That file is already on this recording, row ${twin + 1}${label}.`,
+                 { type: 'warning' });
+        }
         return;
       }
 
       // 4. fill the row
-      const opts = { shouldDirty: true };
       setValue(path('storage_kind'), plan.backend, opts);
       setValue(path('storage_uri'), plan.key, opts);
+      setValue(path('file_name'), file.name, opts);
       setValue(path('format'), info.format, opts);
       setValue(path('is_lossless'), info.lossless, opts);
       setValue(path('sample_rate'), info.rate, opts);
@@ -161,40 +179,18 @@ export const AudioUploadInput = ({ scoped = false }) => {
       notify(e.message || 'Upload failed', { type: 'error' });
     } finally {
       setPhase(null);
-      setOver(false);
     }
   };
 
-  const busy = !!phase;
-  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
-
   return (
-    <Stack spacing={1} sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0 }}>
-      <Box
-        onClick={() => !busy && inputRef.current?.click()}
-        onDragEnter={(e) => { stop(e); setOver(true); }}
-        onDragOver={stop}
-        onDragLeave={(e) => { stop(e); setOver(false); }}
-        onDrop={(e) => { stop(e); upload(e.dataTransfer.files?.[0]); }}
-        sx={{
-          border: '2px dashed',
-          borderColor: over ? 'primary.main' : 'divider',
-          bgcolor: over ? 'action.hover' : 'transparent',
-          borderRadius: 1,
-          px: 1.5, py: 1,
-          textAlign: 'center',
-          cursor: busy ? 'default' : 'pointer',
-          opacity: busy ? 0.6 : 1,
-        }}
-      >
-        <UploadIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-        <Typography variant="body2" color="text.secondary">
-          {phase ?? (storageUri ? 'Drop to replace' : 'Drop audio or click')}
-        </Typography>
-        <input ref={inputRef} type="file" hidden accept="audio/*,.zip"
-               onChange={(e) => upload(e.target.files?.[0])} />
-      </Box>
-      {busy && <LinearProgress variant="determinate" value={pct} />}
-    </Stack>
+    <DropZone
+      onFiles={upload}
+      busy={!!phase}
+      pct={pct}
+      accept="audio/*,.zip"
+      dense
+      label={phase ?? (storageUri ? 'Drop to replace' : 'Drop audio or click')}
+      sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0 }}
+    />
   );
 };

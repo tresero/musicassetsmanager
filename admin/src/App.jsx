@@ -36,6 +36,7 @@ import vocabulary from './resources/vocabulary';
 import schemaType from './resources/schemaType';
 import accountStorage from './resources/accountStorage';
 import documentOrphan from './resources/documentOrphan';
+import fileUnnamed from './resources/fileUnnamed';
 import accountUser from './resources/accountUser';
 import accountInvite from './resources/accountInvite';
 import siteAccount from './resources/siteAccount';
@@ -123,6 +124,7 @@ export default function App() {
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
       <Resource name="user_preference" {...userPreference} />
       <Resource name="document_orphan" {...documentOrphan} />
+      <Resource name="file_unnamed" {...fileUnnamed} />
       <Resource name="account_user" {...accountUser} />
       <Resource name="account_invite" {...accountInvite} />
       <Resource name="account_role" {...(permissions?.site_admin ? accountRole : { recordRepresentation: 'name' })} />

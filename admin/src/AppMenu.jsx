@@ -63,6 +63,7 @@ export const AppMenu = () => {
       <Menu.ResourceItem name="recording_unregistered" />
       <Menu.ResourceItem name="document_expiring" />
       <Menu.ResourceItem name="document_orphan" />
+      <Menu.ResourceItem name="file_unnamed" />
       <Menu.ResourceItem name="email_duplicate" />
 
       {siteAdmin && <Folded label="Lists">

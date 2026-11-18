@@ -57,6 +57,8 @@ export const DocumentsInput = () => (
       <FileUploadInput kind="documents" scoped />
       <FileLink scoped />
 
+      <TextInput source="file_name" label="File name" fullWidth
+                 helperText="The name the file had when it was uploaded. Set by the upload." />
       <TextInput source="storage_uri" label="Location" fullWidth
                  helperText="Set by the upload. Paste a URL here for a file held elsewhere." />
 

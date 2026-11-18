@@ -27,6 +27,7 @@ const DocumentList = () => (
         perPage={50}>
     <CatalogDatagrid rowClick="edit">
       <TextField source="title" />
+      <TextField source="file_name" label="File name" emptyText="—" />
       <ReferenceField source="document_type_id" reference="document_type"
                       label="Type" emptyText="—" />
       <DateField source="document_date" label="Date" emptyText="—" />
@@ -53,6 +54,9 @@ const DocumentForm = () => (
                  sx={{ width: { xs: '100%', md: 600 } }} />
       <FileLink sx={{}} />
     </Box>
+    <TextInput source="file_name" label="File name"
+               helperText="The name the file had when it was uploaded"
+               sx={{ width: { xs: '100%', md: 600 } }} />
     <TextInput source="external_ref" label="External reference"
                helperText="Document id in Paperless or similar" />
 

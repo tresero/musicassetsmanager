@@ -11,9 +11,10 @@ const extOf = (key) => {
 };
 
 /*
- * Opens a stored file under a readable name: the record's title, then the
- * row's own title when it adds something, then the extension. Stored keys
- * are content hashes, so the name has to come from here.
+ * Opens a stored file under its original name. Stored keys are content
+ * hashes, so the name has to come from here; a file uploaded before names
+ * were kept gets the record's title, then the row's own title when it adds
+ * something, then the extension.
  *
  * The window is opened before the link is fetched; opening it afterwards
  * gets blocked as a popup in Safari.
@@ -27,6 +28,7 @@ export const FileLink = ({ scoped = false, sx = { alignSelf: 'flex-start', mt: 1
   const uri = useWatch({ name: path('storage_uri') });
   const recordTitle = useWatch({ name: 'title' });
   const rowTitle = useWatch({ name: path('title') });
+  const fileName = useWatch({ name: path('file_name') });
 
   if (!uri) return null;
 
@@ -40,6 +42,7 @@ export const FileLink = ({ scoped = false, sx = { alignSelf: 'flex-start', mt: 1
   }
 
   const name = () => {
+    if (fileName) return fileName;
     const parts = [recordTitle];
     if (scoped && rowTitle && rowTitle !== recordTitle) parts.push(rowTitle);
     const base = parts.filter(Boolean).join(' - ').replace(/[/\\]/g, '-').trim();

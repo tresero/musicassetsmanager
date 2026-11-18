@@ -17,6 +17,7 @@ const OrphanList = () => (
     <CatalogDatagrid rowClick={false}
               bulkActionButtons={<BulkDeleteButton mutationMode="pessimistic" />}>
       <TextField source="title" />
+      <TextField source="file_name" label="File name" emptyText="—" />
       <TextField source="document_type" label="Type" emptyText="—" />
       <TextField source="storage_uri" label="Location" />
       <DateField source="document_date" label="Date" emptyText="—" />
