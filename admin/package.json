@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --emptyOutDir false && find dist/assets -type f -mtime +7 -delete",
     "lint": "oxlint",
     "preview": "vite preview"
   },
