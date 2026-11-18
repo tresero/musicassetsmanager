@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { Children, useState } from 'react';
+import { useLocation } from 'react-router';
 import { Menu, Layout, useSidebarState } from 'react-admin';
 import {
   ListSubheader, ListItemButton, ListItemText, Collapse, Divider,
@@ -17,11 +18,13 @@ const Heading = ({ children }) => {
   );
 };
 
-// The shared lists are shown only to the site admin, who edits them, folded
-// until asked for.
+// A section folded until asked for, such as Reports and the shared lists.
+// It starts open when the page shown is one of its own.
 const Folded = ({ label, children }) => {
   const [sidebarOpen] = useSidebarState();
-  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(() => Children.toArray(children)
+    .some((c) => c.props?.name && pathname.startsWith(`/${c.props.name}`)));
   return (
     <>
       <ListItemButton onClick={() => setOpen(!open)} dense sx={{ mt: 1 }}>
@@ -57,14 +60,15 @@ export const AppMenu = () => {
       {canMoney && <Menu.ResourceItem name="transaction_category" />}
       {canMoney && <Menu.ResourceItem name="account_setting" />}
 
-      <Heading>Reports</Heading>
-      <Menu.ResourceItem name="song_split_check" />
-      <Menu.ResourceItem name="song_unregistered" />
-      <Menu.ResourceItem name="recording_unregistered" />
-      <Menu.ResourceItem name="document_expiring" />
-      <Menu.ResourceItem name="document_orphan" />
-      <Menu.ResourceItem name="file_unnamed" />
-      <Menu.ResourceItem name="email_duplicate" />
+      <Folded label="Reports">
+        <Menu.ResourceItem name="song_split_check" />
+        <Menu.ResourceItem name="song_unregistered" />
+        <Menu.ResourceItem name="recording_unregistered" />
+        <Menu.ResourceItem name="document_expiring" />
+        <Menu.ResourceItem name="document_orphan" />
+        <Menu.ResourceItem name="file_unnamed" />
+        <Menu.ResourceItem name="email_duplicate" />
+      </Folded>
 
       {siteAdmin && <Folded label="Lists">
         <Menu.ResourceItem name="audio_file_type" />
