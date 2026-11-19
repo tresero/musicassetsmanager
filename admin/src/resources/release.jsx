@@ -2,7 +2,7 @@ import {
   List, DataTable, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, DateInput, SelectInput, ArrayInput,
   SimpleFormIterator, ReferenceInput, AutocompleteInput, useRecordContext,
-  useSimpleFormIteratorItem, minValue, required,
+  useSimpleFormIteratorItem, useGetOne, minValue, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { Box, Typography, TextField as MuiTextField } from '@mui/material';
@@ -11,6 +11,7 @@ import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
+import { formatDuration } from './DurationInput';
 import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter } from './shared';
 import { ListActions } from './listActions';
 
@@ -71,6 +72,21 @@ const TrackNumber = () => {
   return (
     <MuiTextField label="Track" value={disc > 1 ? `${disc}-${n}` : String(n)}
                   disabled sx={{ width: 90 }} />
+  );
+};
+
+// The track's recording length, read only: it is set on the recording,
+// typed or read from its Full Mix upload. A recording without one shows
+// None in red, so it is easy to find.
+const TrackTime = () => {
+  const { index } = useSimpleFormIteratorItem();
+  const id = useWatch({ name: `tracks.${index}.recording_id` });
+  const { data } = useGetOne('recording', { id }, { enabled: !!id });
+  const time = formatDuration(data?.duration_ms);
+  const missing = !!data && !time;
+  return (
+    <MuiTextField label="Time" value={id && data ? (time || 'None') : ''}
+                  disabled error={missing} sx={{ width: 90 }} />
   );
 };
 
@@ -162,7 +178,7 @@ const ReleaseForm = () => (
 
     <TabbedForm.Tab label="Tracks">
       <ArrayInput source="tracks" label={false}
-                  helperText="Each recording in playing order; use the arrows to reorder. Track numbers follow the order, counting from 1 on each disc, so two tracks can never share one. Disc stays 1 unless it's a multi-disc release. Play uses the recording's Full Mix.">
+                  helperText="Each recording in playing order; use the arrows to reorder. Track numbers follow the order, counting from 1 on each disc, so two tracks can never share one. Disc stays 1 unless it's a multi-disc release. Time is the recording's length, set on the recording; None means it has none yet. Play uses the recording's Full Mix.">
         <SimpleFormIterator inline sx={iteratorSx}
                             removeButton={<RemoveAndPlay player={<RecordingInputPlayer />} />}>
           <TrackNumber />
@@ -173,6 +189,7 @@ const ReleaseForm = () => (
                                helperText={false} validate={required()}
                                sx={{ width: { xs: '100%', md: 420 } }} />
           </ReferenceInput>
+          <TrackTime />
           <NumberInput source="disc_number" label="Disc" defaultValue={1} min={1} step={1}
                        validate={minValue(1, 'Discs are numbered from 1')} helperText={false}
                        sx={{ width: { xs: '100%', md: 90 } }} />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useInput } from 'react-admin';
 import { TextField } from '@mui/material';
 
-const toDisplay = (ms) => {
+export const formatDuration = (ms) => {
   if (ms === null || ms === undefined || ms === '') return '';
   const total = Math.round(Number(ms) / 1000);
   const m = Math.floor(total / 60);
@@ -34,12 +34,12 @@ const toMs = (text) => {
  */
 export const DurationInput = ({ source = 'duration_ms', label = 'Duration', sx }) => {
   const { field, fieldState } = useInput({ source });
-  const [text, setText] = useState(toDisplay(field.value));
+  const [text, setText] = useState(formatDuration(field.value));
   const [bad, setBad] = useState(false);
 
   // follow external changes, e.g. a value filled in by an upload
   useEffect(() => {
-    setText(toDisplay(field.value));
+    setText(formatDuration(field.value));
   }, [field.value]);
 
   const commit = (value) => {
@@ -50,7 +50,7 @@ export const DurationInput = ({ source = 'duration_ms', label = 'Duration', sx }
     }
     setBad(false);
     field.onChange(ms);
-    setText(toDisplay(ms));
+    setText(formatDuration(ms));
   };
 
   return (
