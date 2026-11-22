@@ -4,6 +4,7 @@ import {
 import { useFormState } from 'react-hook-form';
 import { Box, Stack, Typography } from '@mui/material';
 import { LanguageInput } from '../../shared';
+import { IswcInput } from '../../codeInputs';
 
 // Computed by the database from the controlled writer and publisher
 // shares, so it reflects the last save rather than unsaved edits.
@@ -25,7 +26,7 @@ const DetailsFields = () => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
       <TextInput source="title" required helperText={false}
                  sx={{ width: { xs: '100%', md: 420 } }} />
-      <TextInput source="iswc" label="ISWC" helperText={false}
+      <IswcInput helperText={false}
                  sx={{ width: { xs: '100%', md: 200 } }} />
       <LanguageInput sx={{ width: { xs: '100%', md: 240 } }} />
     </Box>

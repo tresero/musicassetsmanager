@@ -10,6 +10,7 @@ import { EditToolbar } from './formToolbar';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonInput, CompanyInput, PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
+import { UpcInput } from './codeInputs';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
 import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter } from './shared';
@@ -27,8 +28,6 @@ const artistRoles = [
   { id: 'main', name: 'Main' },
   { id: 'featured', name: 'Featured' },
 ];
-
-const digitsOnly = (v) => (v || '').replace(/[^0-9]/g, '') || null;
 
 const recordingLabel = (r) =>
   r ? (r.version_label && r.version_label !== 'Release' ? `${r.title} (${r.version_label})` : r.title) : '';
@@ -129,8 +128,8 @@ const ReleaseForm = () => (
                      defaultValue="Single"
                      helperText="As stores count it: a single is 1 to 3 tracks, an EP 4 to 6, an album 7 or more or over 30 minutes"
                      sx={{ width: { xs: '100%', md: 160 } }} />
-        <TextInput source="upc" label="UPC or EAN" parse={digitsOnly}
-                   helperText="The barcode number for the whole release, like 196925431217. Spaces and dashes are fine; the check digit is verified on save."
+        <UpcInput
+                   helperText="The barcode number for the whole release, like 196925431217. Spaces and dashes are fine."
                    sx={{ width: { xs: '100%', md: 240 } }} />
         <TextInput source="catalog_number" label="Catalog number"
                    helperText="Your own reference for the release, like SC-003"
@@ -207,7 +206,7 @@ const ReleaseForm = () => (
             <TextInput source="distributor_release_id" label="Their release ID"
                        helperText="The ID the distributor's dashboard shows for it"
                        sx={{ width: { xs: '100%', md: 200 } }} />
-            <TextInput source="upc" label="Their UPC" parse={digitsOnly}
+            <UpcInput label="Their UPC"
                        helperText="Only if they issued their own, different from the release's"
                        sx={{ width: { xs: '100%', md: 200 } }} />
           </Box>

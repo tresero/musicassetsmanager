@@ -6,7 +6,7 @@ import { useWatch } from 'react-hook-form';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
-import { IsniInput } from './IsniInput';
+import { IsniInput } from './codeInputs';
 import { CatalogDatagrid, searchFilter } from './shared';
 
 const filters = [searchFilter];

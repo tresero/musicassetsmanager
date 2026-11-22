@@ -3,13 +3,14 @@ import {
   TabbedForm, TextInput, NumberInput, BooleanInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
-  NullableBooleanInput, useRecordContext, required, TextArrayInput,
+  NullableBooleanInput, useRecordContext, required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
 import { Typography } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { PersonOrCompanyInput, ArtistInput } from './partyInputs';
+import { IsrcInput, IsrcArrayInput } from './codeInputs';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
 import { RepresentationsInput } from './representationsTab';
@@ -155,10 +156,9 @@ const RecordingForm = () => (
                          onCreate={freeText}
                          helperText="Release is the commercial version"
                          sx={{ width: { xs: '100%', md: 240 } }} />
-      <TextInput source="isrc" label="ISRC"
-                 helperText="Country, registrant, five digits"
+      <IsrcInput helperText="Paste it as written; dashes and spaces are dropped"
                  sx={{ width: { xs: '100%', md: 220 } }} />
-      <TextArrayInput source="other_isrcs" label="Other ISRCs"
+      <IsrcArrayInput source="other_isrcs" label="Other ISRCs"
                       helperText="ISRCs this same recording also earns under, such as a reissue's. Statement lines match these too. Type one and press Enter."
                       sx={{ width: { xs: '100%', md: 520 } }} />
       <NumberInput source="bpm" label="BPM" step={0.01}

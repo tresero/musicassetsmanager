@@ -5,7 +5,7 @@ import {
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { DocumentsInput } from './documentsTab';
-import { IsniInput } from './IsniInput';
+import { IsniInput, IpiInput } from './codeInputs';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { CatalogDatagrid, CountryInput, searchFilter } from './shared';
 
@@ -39,8 +39,7 @@ const OrgForm = () => (
                            filterToQuery={byCode}
                            sx={{ width: { xs: '100%', md: 280 } }} />
       </ReferenceInput>
-      <TextInput source="member_ipi" label="IPI name number"
-                 sx={{ width: { xs: '100%', md: 240 } }} />
+      <IpiInput sx={{ width: { xs: '100%', md: 240 } }} />
       <IsniInput source="isni" label="ISNI"
                  sx={{ width: { xs: '100%', md: 260 } }} />
       <CountryInput source="country" sx={{ width: { xs: '100%', md: 300 } }} />

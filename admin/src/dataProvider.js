@@ -1,5 +1,7 @@
 import { fetchUtils } from 'react-admin';
 import postgrestRestProvider, { defaultSchema } from '@raphiniert/ra-data-postgrest';
+import { searchQuery } from './search';
+import { explainDbError } from './dbErrors';
 
 const httpClient = (url, options = {}) => {
   if (!options.headers) options.headers = new Headers({ Accept: 'application/json' });
@@ -27,12 +29,6 @@ const provider = postgrestRestProvider({
   schema: defaultSchema,
 });
 
-// Search boxes and pickers send React Admin's q filter. Each typed word must
-// start a word in the view's search value; the database folds case and
-// accents on both sides (api.fold), so corazon finds Corazón.
-const searchQuery = (q) =>
-  q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => `${w}:*`).join(' & ');
-
 // Searches and filters saved in the browser under these keys would filter
 // the list invisibly, since no input shows them any more. Unmatched
 // statement lines are now match_method@is, since a line marked not in catalog
@@ -48,9 +44,16 @@ const toSearch = (params) => {
   return { ...params, filter };
 };
 
+// A save the database refuses marks the field it is about (dbErrors.js).
+const explained = (method) => (resource, params) =>
+  provider[method](resource, params).catch((error) => { throw explainDbError(resource, error); });
+
 export default {
   ...provider,
   getList: (resource, params) => provider.getList(resource, toSearch(params)),
   getManyReference: (resource, params) =>
     provider.getManyReference(resource, toSearch(params)),
+  create: explained('create'),
+  update: explained('update'),
+  updateMany: explained('updateMany'),
 };

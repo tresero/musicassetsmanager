@@ -8,7 +8,7 @@ import { EditToolbar } from './formToolbar';
 import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
-import { IsniInput } from './IsniInput';
+import { IsniInput, IpiInput } from './codeInputs';
 import { CatalogDatagrid, searchFilter } from './shared';
 import { useDefaultCallingCode } from '../permissions';
 
@@ -65,8 +65,7 @@ const ContactForm = () => {
                              filterToQuery={byCode}
                              sx={{ width: { xs: '100%', md: 260 } }} />
         </ReferenceInput>
-        <TextInput source="member_ipi" label="IPI name number"
-                   sx={{ width: { xs: '100%', md: 220 } }} />
+        <IpiInput sx={{ width: { xs: '100%', md: 220 } }} />
         <IsniInput source="isni" label="ISNI"
                    sx={{ width: { xs: '100%', md: 260 } }} />
         <RichTextInput source="notes" />

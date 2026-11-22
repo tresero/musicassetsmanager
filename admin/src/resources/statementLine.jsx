@@ -15,6 +15,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import AddIcon from '@mui/icons-material/Add';
 import { useCan } from '../permissions';
 import { rpc } from '../rpc';
+import { compactCode, iswcValid, isrcValid } from '../codes';
 
 const methods = {
   iswc: 'ISWC',
@@ -51,14 +52,14 @@ export const UsageField = ({ emptyText = '', ...props }) => (
 );
 
 // An ISWC as the payer wrote it, such as T-123.456.789-0, in the form the
-// song stores; blank when it isn't one.
+// song stores; blank when it isn't a valid one, check digit included.
 const songIswc = (value) => {
-  const iswc = (value ?? '').toUpperCase().replace(/[^T0-9]/g, '');
-  return /^T[0-9]{10}$/.test(iswc) ? iswc : '';
+  const iswc = compactCode(value);
+  return iswcValid(iswc) ? iswc : '';
 };
 
 // The line's ISRC when it is a well-formed one the recording can store.
-const recordingIsrc = (value) => (/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(value ?? '') ? value : '');
+const recordingIsrc = (value) => (isrcValid(value ?? '') ? value : '');
 
 // Payers often send titles in capitals; this offers a starting point the
 // user can still edit.

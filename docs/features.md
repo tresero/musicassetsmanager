@@ -8,6 +8,14 @@ What the app does today. Anything not yet built is in
 A song is the written work: title, ISWC, lyrics, language, and notes, with
 flags for public domain and easy clear.
 
+ISWCs, ISRCs, UPCs, ISNIs and IPI name numbers can be pasted however they are
+written: spaces, dashes and dots are dropped and letters uppercased as you
+type. On save, a wrong format or check digit (ISWC, UPC or EAN) marks the field
+in red and says what is wrong, before anything is sent. An ISWC typed without
+its T gets one. When the database refuses a save over one of these codes,
+such as an ISRC already on another recording, the same field is marked with a
+plain message.
+
 **One stop** is computed, not set. A song is one stop when the publishing you
 control totals 100: controlled publisher shares, or controlled writer shares
 when there is no publisher, with public domain works passing. The Details tab
@@ -407,7 +415,9 @@ each typed word, in any order: corazon finds Corazón, and smi cora finds
 Corazón by Ann Smith. Songs are found by title, alt titles, ISWC, writers,
 publishers and work numbers; recordings by title, version, ISRC, artists,
 songs, credits, master owners, keywords, sounds like, description and themes; releases
-by title, UPC, catalog number, label, artists and their tracks.
+by title, UPC, catalog number, label, artists and their tracks. A code
+typed or pasted with dashes, dots or spaces, like T-034.524.680-1 or a UPC in
+groups, finds the record that holds it.
 
 The song, recording and release lists have a Columns button to show, hide and
 reorder columns; the choice is kept in the browser. Every column sorts by what
@@ -475,3 +485,4 @@ a document or a release, does not sort.
 | 2026-11-22 | A document's date is its effective date; Same as effective date fills in Signed (#5). |
 | 2026-11-22 | Registrations name a claimant, on the record or on the Copyright Registration document, and inherited ones show it; reversion is off the Copyright tab (#9). |
 | 2026-11-22 | Reversion date and lead dropped from songs, recordings and releases; reversion belongs to deals (#69). |
+| 2026-11-22 | ISWC, ISRC, UPC, ISNI and IPI fields drop separators and mark a wrong format or check digit in red; a refused save marks its field; search finds codes typed with separators (#18). |

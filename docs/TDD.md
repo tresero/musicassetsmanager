@@ -96,6 +96,194 @@ admin's.
 - **Frontend:** Account roles shows only for the site admin. On Owner the name
   is read only, the users box is locked and Delete is hidden.
 
+## Themes in the pitch comment (#67)
+
+- A recording's themes and keywords appear in the pitch comment in the set
+  order, and a comment that would pass 255 characters drops segments from the
+  end until it fits.
+- Every account reads the theme list; only the site admin can add to it.
+
+## Copyright claimant (#9)
+
+- A song, recording, release or document holds at most one claimant, a person
+  or a company; both at once is refused by `<table>_claimant_one`.
+- A claimant in another account is refused on write.
+- `copyright_status.claimant` is the record's own when it has its own number,
+  the Copyright Registration document's when the number comes from one, and
+  for a recording the release's when it inherits from a release.
+- Saving a document through a record's Documents tab keeps its claimant;
+  merging two documents keeps the kept one's claimant, or takes the other's
+  when the kept one has none.
+
+## Codes (#18)
+
+- **Database:** an ISWC with a wrong check digit is refused by
+  `iswc_check_digit`; `music.iswc_valid` and `music.gtin_valid` accept known
+  good codes and refuse a changed last digit.
+- **Frontend, `codeInputs.jsx`:** a pasted `t-034.524.680-1` is saved as
+  `T0345246801`, ten digits get a T, and a bad format or check digit marks the
+  field red with the `CODE_MESSAGES` wording before saving. Other ISRCs names
+  the bad one.
+- **Frontend, a refused save:** a duplicate ISRC saved on a recording comes
+  back red on the ISRC field with "Another recording already has this ISRC",
+  not as a PostgreSQL notification.
+
+## Document dates (#5)
+
+- **Frontend:** Same as effective date copies the effective date into Signed,
+  marks the form dirty, and is disabled while there is no effective date.
+
+## Songs
+
+- **One stop:** a song is one stop when controlled publisher shares total 100,
+  or controlled writer shares when it has no publisher; a public domain work
+  passes. Otherwise the reason names the first thing in the way.
+- **Writer society:** a new writer credit takes the person's society; changing
+  the person's society later leaves the credit's alone.
+- **Role lists:** the writer role picker offers only the five writing roles and
+  starts on Composer Lyricist; the publisher picker starts on Publisher.
+- **Split totals:** the song list's writer and publisher totals, and the Split
+  problems report, show every work whose shares don't total 100.
+
+## Recordings
+
+- **One stop:** a recording is one stop when controlled master shares total
+  100, no exclusive deal is active with anyone else, and every composition it
+  records is one stop; otherwise the reason names the first thing in the way.
+- **Defaults:** a blank title and language take the composition's.
+- **P line:** built from the year and the master owners, never typed.
+- **Featured %:** the Credits tab flags a total that isn't 100.
+- **Signed:** non-exclusive deals can overlap; an exclusive deal refuses any
+  deal overlapping its dates.
+- **Pitch comment:** the contact line is never dropped; it says ONE-STOP only
+  for a one stop recording, Stems Available with a Stem file, Alts Available
+  with any type but Full Mix or Stem, and multitracks when the flag is set. The
+  contact is the recording's, else an active exclusive agent, else the
+  account default. A recording's own text replaces the generated one. The
+  description never appears.
+- **Pitch contact filter:** the Recordings list filtered to no contact shows
+  exactly the recordings that resolve to nobody.
+
+## Releases
+
+- **C line:** built from the © year and owner.
+- **Registration as it applies:** for songs, recordings and releases, the
+  record's own number wins, then an attached Copyright Registration document,
+  then, for a recording, a registered release it is on. The Copyright tab
+  warns when the own number matches none of the attached registration
+  documents. The lists' Registration column and Export show the same.
+
+## Audio files
+
+- **Headers:** WAV and AIFF fixtures, including Pro Tools and Logic 24-bit and
+  uncompressed variants, read the right format, sample rate, bit depth,
+  channels and length.
+- **Same file twice:** the form names the row that already has it, and the
+  database refuses it on save.
+- **Download name:** built from the recording and the file's description.
+
+## People, companies and artists
+
+- **Company names:** unique per account regardless of case; two accounts can
+  each have the same name.
+- **Artist ISNI:** a solo act under its own name shows the member's ISNI; its
+  own ISNI replaces it.
+- **Merge:** `music.merge_contact(keep, drop)` moves every reference to the one
+  kept and deletes the other.
+
+## Documents
+
+- **Attach from either side:** a document attached from a record and a record
+  added from the document give the same link; an existing document is attached,
+  not uploaded again.
+- **Detach:** removing a document from one record leaves it and its other links.
+- **Merge:** merging two documents moves every link to the one kept.
+
+## Statements
+
+- **Import:** the header row and rows left out at the end are honored; a final
+  Total, Totals, Grand total or Subtotal row is left out unless kept. Amounts
+  read 1,234.56 and 1.234,56; several amount columns add up; price times
+  quantity gives the amount, negative when either or both carry the minus.
+  Dates, months, quarters and years read. The Check step's total and negative
+  count match the file.
+- **Columns remembered:** the next statement from the same payer and Paid to
+  starts from the last one's columns and side, else the payer's last.
+- **Duplicates:** the same file is refused; the same payer, Paid to and date
+  warns and waits for confirmation. Rows are never deduplicated.
+- **Publishing matching:** by ISWC, then the payer's earlier work numbers, then
+  title and writer. Titles match without a leading article, with the article
+  moved to the end, or with a trailing code (RUMBA ESTA BUENA LA, LA RUMBA ESTA
+  BUENA ADM008 and La Rumba esta Buena); several fits are decided by a writer.
+  Matching one line by hand matches the payer's other lines with that work
+  number, now and later.
+- **Master matching:** by ISRC or other ISRC, then the payer's earlier ISRCs and
+  work numbers, then a title exactly one recording has; a line with an ISRC
+  never matches a recording with a different one. A release line matches by
+  barcode, else by a release title exactly one release has. Matching by hand
+  teaches the recording the line's ISRC, as its own or among Other ISRCs.
+- **Side change:** changing a statement's side unmatches and rematches its lines.
+- **Not in catalog:** marked lines stay in the total, leave the unmatched list,
+  and the payer's later lines for the same work are marked on their own. A work
+  number of only zeros is stored as none.
+- **Currency:** the account currency cannot change once statements or
+  transactions exist; lines of a statement in another currency convert at its
+  rate.
+- **Permissions:** without money.view statements are not visible; without
+  money.edit importing and changing them is refused.
+- **Delete guards:** a song with a recording, a matched line or a transaction,
+  and a recording or release with a matched line or a transaction, cannot be
+  deleted. Deleting a statement removes its lines.
+
+## Transactions
+
+- **Shares:** each For row's share is its weight over the total; none is
+  overhead.
+- **Currency:** in another currency, reports use the account currency amount.
+- **Categories:** a category in use cannot be deleted.
+- **Receipts:** uploading one needs catalog.edit.
+- **Permissions:** money.view to see, money.edit to enter.
+
+## Reports
+
+- **Unregistered songs** lists works missing a society, MLC or copyright
+  registration, counting one through an attached document.
+- **Unregistered recordings** counts a registration through a document or a
+  release, and lists the releases each is on.
+- **Expiring documents** lists only those expiring within 90 days;
+  **Unattached documents** only those linked to nothing; **Duplicate emails**
+  only addresses on more than one person.
+
+## Shared lists
+
+- Every account reads them; only the site admin inserts, updates or deletes,
+  and the pickers offer Create only to the site admin.
+- Names are unique regardless of case: typing rock picks Rock.
+- A recording's credit roles are only those offered as recording credits.
+
+## Settings
+
+- **My settings:** each user edits only their own row, whatever their role; the
+  defaults are United States, English and explicit content not set.
+- **Country and languages:** the default country is listed first and filled in
+  on a new recording; languages listed first lead every language picker in the
+  chosen order.
+- **New recordings start as:** a new recording takes the setting; saved ones
+  keep theirs.
+
+## Search
+
+- Case and accents are ignored on both sides (corazon finds Corazón), and every
+  typed word must start a word, in any order (smi cora finds Corazón by Ann
+  Smith), for each field listed under Interface in `features.md`.
+
+## Interface
+
+- **Columns:** shown, hidden and reordered columns are kept in the browser, and
+  each column sorts by what it shows.
+- **Save & continue** stays on the tab and reloads computed values; **Save and
+  close** returns to the list.
+
 ## Frontend widgets
 
 - `partyInputs.jsx`: a row needing a person or company cannot be saved without
@@ -115,3 +303,6 @@ admin's.
 | Date | Revision |
 |---|---|
 | 2026-11-12 | Initial version, gathered from #37 and its comments, with the Accounts tests updated for rename, email correction and deleting any account |
+| 2026-11-22 | Themes in the pitch comment, copyright claimant, codes and document dates |
+| 2026-11-22 | Code rules, code search and database error mapping tests written (Vitest) |
+| 2026-11-22 | Tests for every feature in `features.md` not yet listed |

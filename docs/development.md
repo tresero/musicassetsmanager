@@ -103,6 +103,23 @@ Non-`id` primary keys need an entry in the `primaryKeys` map in
 
 Deploy is `npm run build` then a hard reload. There's no server process.
 
+A save the database refuses over a named constraint marks the field it is
+about: add the constraint to `CONSTRAINTS` in `src/dbErrors.js` with the view
+column and a plain message. Code inputs (ISWC, ISRC, UPC, ISNI, IPI) are in
+`resources/codeInputs.jsx` and share their rules and wording with it through
+`src/codes.js`.
+
+## Tests
+
+The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
+
+- **Frontend:** Vitest. `cd admin && npm test` runs every `*.test.js` next to
+  the code it tests. So far: the code rules (`codes.js`), the search query
+  (`search.js`) and the database error mapping (`dbErrors.js`).
+- **Upload service:** `cd upload && go test ./...`.
+- **Database:** not yet. pgTAP against a scratch database Jon creates, never
+  production.
+
 ## Gotchas
 
 | Symptom | Cause |
@@ -112,7 +129,7 @@ Deploy is `npm run build` then a hard reload. There's no server process.
 | RLS returns everything | View missing `security_invoker`, or no `FORCE ROW LEVEL SECURITY` |
 | `cannot change name of view column` | `CREATE OR REPLACE` can't reshape. Drop first, and remember that takes the INSTEAD OF triggers with it. |
 | `null value in column "account_id"` | Running SQL without a JWT. Use `SET LOCAL "request.jwt.claims"` inside the transaction. |
-| Search box or picker matches nothing | Send React Admin's `q` filter (the default); `dataProvider.js` turns it into `search=fts(fold)`. A custom `filterToQuery` or `search@ilike` bypasses it. |
+| Search box or picker matches nothing | Send React Admin's `q` filter (the default); `dataProvider.js` turns it into `search=fts(fold)` with `search.js`. A custom `filterToQuery` or `search@ilike` bypasses it. |
 | Generated column write error | Strip it in the `transform` prop |
 | Logged out on any 403 | The auth provider should only clear the token on 401 |
 
@@ -130,3 +147,8 @@ and licence windows, instead of writing triggers.
 
 `RETURNING OLD` and `RETURNING NEW` replace a lot of what used to need audit
 triggers.
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-11-22 | Tests section; refused saves mark their field (`dbErrors.js`); code inputs |
