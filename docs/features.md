@@ -75,8 +75,10 @@ Two main artists read as a duet.
 **Credits** are who played on it: a person or a company, with any number of
 roles and instruments on one row, the name they are credited under, and a note.
 A person's performing name is used by default and can be overridden for one
-session. Featured % is a band member's cut of the featured-artist royalty on
-this recording, blank for hired players; the tab shows the total and flags one
+session. Performed in is the country the performer played in, left blank when
+it is the country of recording, which the row names. Featured % is a band
+member's cut of the featured-artist royalty on this recording, blank for hired
+players; the tab shows the total and flags one
 that is not 100. Points % is a share of master income agreed in lieu of pay.
 
 **Tags**: genres, moods and themes, the terms supervisors search by, and the pitch
@@ -489,3 +491,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Reversion date and lead dropped from songs, recordings and releases; reversion belongs to deals (#69). |
 | 2026-11-22 | ISWC, ISRC, UPC, ISNI and IPI fields drop separators and mark a wrong format or check digit in red; a refused save marks its field; search finds codes typed with separators (#18). |
 | 2026-11-22 | Every save trims text at both ends (#17). |
+| 2026-11-22 | Country of performance on each credit, defaulting to the country of recording (#42). |

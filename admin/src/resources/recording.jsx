@@ -3,7 +3,7 @@ import {
   TabbedForm, TextInput, NumberInput, BooleanInput,
   SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
-  NullableBooleanInput, useRecordContext, required,
+  NullableBooleanInput, useRecordContext, required, useGetOne,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { useWatch, useFormState } from 'react-hook-form';
@@ -239,6 +239,7 @@ const RecordingForm = () => (
           <NumberInput source="share" label="Points %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />
+          <PerformedCountryInput />
           <TextInput source="notes" label="Note" helperText={false}
                      sx={{ width: { xs: '100%', md: 220 } }} />
         </SimpleFormIterator>
@@ -313,11 +314,28 @@ const RecordingForm = () => (
   </TabbedForm>
 );
 
+// Where a credited performer played. Blank means the country of recording,
+// named in the help text so the default is visible on every row.
+const PerformedCountryInput = () => {
+  const recorded = useWatch({ name: 'recorded_country' });
+  const { data } = useGetOne('country', { id: recorded }, { enabled: !!recorded });
+  return (
+    <CountryInput source="performed_country" label="Performed in"
+                  helperText={data ? `Blank: ${data.name}, the country of recording`
+                                   : 'Blank: the country of recording'}
+                  sx={{ width: { xs: '100%', md: 220 } }} />
+  );
+};
+
+// performed_in on each credit is computed (own country, else the recording's).
+const stripCredit = ({ performed_in, ...credit }) => credit;
+
 const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_comment_auto,
                  pitch_contact_used, has_pitch_contact,
                  one_stop, one_stop_reason, language_used,
                  artist_names, song_titles, status_name, language_name, copyright_status,
-                 theme_names, created_at, updated_at, ...rest }) => rest;
+                 theme_names, created_at, updated_at, ...rest }) =>
+  (rest.credits ? { ...rest, credits: rest.credits.map(stripCredit) } : rest);
 
 export default {
   list: RecordingList,

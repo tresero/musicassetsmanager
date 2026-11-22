@@ -153,6 +153,9 @@ admin's.
 - **Defaults:** a blank title and language take the composition's.
 - **P line:** built from the year and the master owners, never typed.
 - **Featured %:** the Credits tab flags a total that isn't 100.
+- **Country of performance (#42):** a credit left blank reads the recording's
+  country as `performed_in` and follows it when that changes; a credit's own
+  country wins; an unknown code is refused.
 - **Signed:** non-exclusive deals can overlap; an exclusive deal refuses any
   deal overlapping its dates.
 - **Pitch comment:** the contact line is never dropped; it says ONE-STOP only
@@ -306,3 +309,4 @@ admin's.
 | 2026-11-22 | Themes in the pitch comment, copyright claimant, codes and document dates |
 | 2026-11-22 | Code rules, code search and database error mapping tests written (Vitest) |
 | 2026-11-22 | Tests for every feature in `features.md` not yet listed |
+| 2026-11-22 | Country of performance (#42) |

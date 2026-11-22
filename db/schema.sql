@@ -1224,14 +1224,15 @@ BEGIN
     IF x->>'id' IS NULL THEN
       INSERT INTO music.recording_credit
         (recording_id, contact_id, organization_id, credited_as, share,
-         featured_share, notes)
+         featured_share, notes, performed_country)
       VALUES (_id,
               nullif(x->>'contact_id','')::integer,
               nullif(x->>'organization_id','')::integer,
               nullif(btrim(coalesce(x->>'credited_as','')),''),
               nullif(x->>'share','')::numeric,
               nullif(x->>'featured_share','')::numeric,
-              nullif(x->>'notes',''))
+              nullif(x->>'notes',''),
+              nullif(x->>'performed_country',''))
       RETURNING id INTO _cid;
     ELSE
       _cid := (x->>'id')::integer;
@@ -1241,7 +1242,8 @@ BEGIN
              credited_as = nullif(btrim(coalesce(x->>'credited_as','')),''),
              share = nullif(x->>'share','')::numeric,
              featured_share = nullif(x->>'featured_share','')::numeric,
-             notes = nullif(x->>'notes','')
+             notes = nullif(x->>'notes',''),
+             performed_country = nullif(x->>'performed_country','')
        WHERE id = _cid AND recording_id = _id;
     END IF;
 
@@ -2834,6 +2836,7 @@ CREATE TABLE music.recording_credit (
     notes text,
     credited_as text,
     featured_share numeric(7,4),
+    performed_country music.iso_3166_alpha2,
     CONSTRAINT recording_credit_featured_share CHECK (((featured_share IS NULL) OR ((featured_share >= (0)::numeric) AND (featured_share <= (100)::numeric)))),
     CONSTRAINT recording_credit_party CHECK ((num_nonnulls(contact_id, organization_id) = 1)),
     CONSTRAINT recording_credit_share CHECK (((share IS NULL) OR ((share >= (0)::numeric) AND (share <= (100)::numeric))))
@@ -2864,6 +2867,12 @@ COMMENT ON COLUMN music.recording_credit.featured_share IS 'This performer''s pe
 as registered with SoundExchange (its "Effective %"). Blank for hired
 players, which is what makes them non-featured. Set per recording because
 lineups and splits change from one project to the next.';
+
+--
+-- Name: COLUMN recording_credit.performed_country; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording_credit.performed_country IS 'Where this performer played, when not the country of recording (recording.recorded_country), as for basics cut in one country and overdubs in another. Blank means the country of recording; api.recording credits carry the effective value as performed_in, never stored.';
 
 --
 -- Name: recording_credit_instrument; Type: TABLE; Schema: music; Owner: -
@@ -3155,7 +3164,7 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
                    FROM music.recording_credit_role cr
                   WHERE (cr.credit_id = c.id)), '{}'::integer[]), 'instrument_ids', COALESCE(( SELECT array_agg(ci.instrument_id ORDER BY ci.instrument_id) AS array_agg
                    FROM music.recording_credit_instrument ci
-                  WHERE (ci.credit_id = c.id)), '{}'::integer[]), 'share', c.share, 'featured_share', c.featured_share, 'notes', c.notes) ORDER BY c.id) AS jsonb_agg
+                  WHERE (ci.credit_id = c.id)), '{}'::integer[]), 'share', c.share, 'featured_share', c.featured_share, 'notes', c.notes, 'performed_country', c.performed_country, 'performed_in', COALESCE(c.performed_country, r.recorded_country)) ORDER BY c.id) AS jsonb_agg
            FROM music.recording_credit c
           WHERE (c.recording_id = r.id)), '[]'::jsonb) AS credits,
     ( SELECT sum(c.featured_share) AS sum
@@ -10730,6 +10739,13 @@ ALTER TABLE ONLY music.recording_credit_instrument
 
 ALTER TABLE ONLY music.recording_credit
     ADD CONSTRAINT recording_credit_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES music.organization(id);
+
+--
+-- Name: recording_credit recording_credit_performed_country_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_credit
+    ADD CONSTRAINT recording_credit_performed_country_fkey FOREIGN KEY (performed_country) REFERENCES music.country(code) ON UPDATE CASCADE;
 
 --
 -- Name: recording_credit recording_credit_recording_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -

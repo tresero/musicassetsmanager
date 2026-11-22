@@ -167,6 +167,14 @@ manual entry.
 
 Same reasoning. The model supports it; generating the XML is its own project.
 
+Sessions are the one gap. ERN 4.3 models recording location as
+`LocationAndDateOfSession`, any number per sound recording: a session type, a
+date range, venues with a territory code, and the contributors at each. Today
+a recording has a country of recording and each credit a country of
+performance (#42), which is what the societies ask for. A sessions list (a
+child table, its write function and a form tab) waits until an ERN export or
+a RIN import is planned.
+
 ### Similarity search
 
 Audio embeddings and nearest-neighbor search over the catalog. pgvector makes
@@ -227,3 +235,4 @@ sharing layer, not a network.
 | 2026-11-13 | Statement import built; recording matching and earnings reports remain. |
 | 2026-11-15 | Recording matching and transactions built; general ledger excludes expenses no longer. |
 | 2026-11-22 | Contracts: reversion belongs to the deal (#69); reversion fields dropped from songs. |
+| 2026-11-22 | Sessions for ERN and RIN noted under DDEX delivery (#42). |

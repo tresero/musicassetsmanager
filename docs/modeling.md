@@ -107,6 +107,12 @@ their own name on someone else's record because of a contract elsewhere.
 The printed name is resolved when read rather than copied into each credit, so
 changing someone's performing name updates every recording at once.
 
+The country of performance works the same way. A credit holds a country only
+when the performer played somewhere other than the country of recording; the
+effective country (`performed_in` on each credit in `api.recording`) is the
+credit's own, else the recording's, read rather than stored, so changing the
+country of recording moves every credit left blank.
+
 This is separate from the artist table. A performing name is how a person is
 credited; an artist is an identity a record is released under.
 
@@ -402,3 +408,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-15 | Releases have a copyright of their own; the registration that applies comes through documents and releases. |
 | 2026-11-22 | Themes on recordings, apart from moods; themes and keywords in the generated pitch comment. |
 | 2026-11-22 | Registrations carry a claimant, entered with the number and inherited with it. |
+| 2026-11-22 | Country of performance on credits, defaulting to the country of recording (#42). |

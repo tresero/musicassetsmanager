@@ -146,6 +146,11 @@ and other societies use them to decide whether a recording qualifies for
 performance income in their territory. Commissioning is where the master's
 original owner was based, regardless of where the tracks were cut.
 
+The country of performance for each performer, which PPL's performer line-up
+asks for and performer qualification depends on. It is on the credit, blank
+when the performer played in the country of recording, so basics cut in Cuba
+and overdubs in the US show each player where they played.
+
 Featured shares per recording. SoundExchange splits US digital performance
 income 50 percent to the rights owner, 45 percent to featured artists, and 5
 percent to non-featured performers. The featured half is divided among the
@@ -228,3 +233,4 @@ than a CHECK constraint so they can be extended without a migration.
 | 2026-11-15 | Royalty statements: no required format, the identifiers that match lines, CRD, DSR and CDM, publishing and master sides. |
 | 2026-11-15 | UPC and other ISRCs among the identifiers; copyright registrations and how they apply; release title matching and unit-price sales reports. |
 | 2026-11-22 | ISWC check digit verified (#18). |
+| 2026-11-22 | Country of performance per credit (#42). |
