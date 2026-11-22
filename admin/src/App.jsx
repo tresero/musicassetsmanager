@@ -109,6 +109,7 @@ export default function App() {
       <Resource name="pro_territory" {...proTerritory} />
       <Resource name="key_signature" {...shared(keySignature)} />
       <Resource name="mood" {...shared(nameList)} />
+      <Resource name="theme" {...shared(nameList)} />
       <Resource name="instrument" {...shared(nameList)} />
       <Resource name="genre" {...shared(genre)} />
       <Resource name="language" {...shared(language)} />

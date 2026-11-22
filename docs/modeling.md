@@ -237,8 +237,9 @@ own publishing, a person.
 ## The pitch comment is generated
 
 The comment written into a pitched file is built from the catalog rather than
-typed: contact line first, then vocals and language, moods, tempo, genres, and sounds like,
-dropped from the end until it fits. Fixing a mood fixes every comment that
+typed: contact line first, then vocals and language, moods, tempo and themes,
+then genres, keywords and sounds like, dropped from the end until it fits. The
+description stays out. Fixing a mood fixes every comment that
 mentions it. The contact is chosen per recording, because different recordings
 are pitched by different people, with an exclusive agent and then an account
 default as fallbacks. A hand-written comment can still replace the generated
@@ -269,7 +270,7 @@ ISO 3166 country codes, ISO 639 language codes, PRO acronyms, key signature
 names. `country_code = 'CU'` reads better than `country_id = 47` and eliminates
 a join in most queries.
 
-Integers where the vocabulary is yours to rename: moods, genres, instruments,
+Integers where the vocabulary is yours to rename: moods, themes, genres, instruments,
 roles. Those will get edited, and cascading a rename through every referencing
 row is avoidable work.
 
@@ -394,3 +395,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-15 | Recordings have other ISRCs. |
 | 2026-11-15 | Statements record who they pay. |
 | 2026-11-15 | Releases have a copyright of their own; the registration that applies comes through documents and releases. |
+| 2026-11-22 | Themes on recordings, apart from moods; themes and keywords in the generated pitch comment. |

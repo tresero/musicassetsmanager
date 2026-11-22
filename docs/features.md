@@ -72,12 +72,15 @@ session. Featured % is a band member's cut of the featured-artist royalty on
 this recording, blank for hired players; the tab shows the total and flags one
 that is not 100. Points % is a share of master income agreed in lieu of pay.
 
-**Tags**: genres and moods, the terms supervisors search by, and the pitch
+**Tags**: genres, moods and themes, the terms supervisors search by, and the pitch
 comment: the text DISCO writes into a pitched MP3, generated from the catalog.
 It opens with the contact line, never dropped: ONE-STOP when the recording is,
 the pitch contact's name, email, and phone, and whether stems, multitracks,
-and alternates are available. Vocals and language, moods, tempo, genres, and sounds like follow,
-trimmed from the end to fit 255 characters. The pitch contact is chosen per
+and alternates are available. Vocals and language, moods, tempo and themes
+follow on the second line, then genres, keywords and sounds like on the third,
+trimmed from the end to fit 255 characters. The description stays out.
+A mood is how a recording feels (triumphant, melancholy); a theme is what it
+is about or the scene it fits (patriotic, Christmas, road trip). The pitch contact is chosen per
 recording, falling back to an active exclusive agent and then to the default
 contact in Settings. The tab shows the comment with a count and a Copy button,
 and a recording can carry its own text instead.
@@ -311,11 +314,11 @@ transactions needs money.view and entering them money.edit.
 
 The vocabularies behind the pickers are shared by every account: audio file
 types, document types, vocals, statuses, roles, role groups, instruments,
-genres, moods, keys, languages, countries, vocabularies, and societies. Users
+genres, moods, themes, keys, languages, countries, vocabularies, and societies. Users
 pick from them but cannot add or change entries, so made-up values don't creep
 in. The site admin adds, edits and deletes entries from the Lists menu; every
 list but societies and schema types can be edited there. The site admin can
-also add a missing genre, mood, instrument, vocals, status, document type, or
+also add a missing genre, mood, theme, instrument, vocals, status, document type, or
 audio file type from its picker without leaving the form. Names are unique
 regardless of case: typing rock picks Rock rather than offering to add it. A role carries its
 DDEX code and whether it is offered as a recording credit. Anything descriptive that no list covers goes in a recording's
@@ -401,7 +404,7 @@ Every search box and picker ignores case and accents and matches the start of
 each typed word, in any order: corazon finds Corazón, and smi cora finds
 Corazón by Ann Smith. Songs are found by title, alt titles, ISWC, writers,
 publishers and work numbers; recordings by title, version, ISRC, artists,
-songs, credits, master owners, keywords, sounds like and description; releases
+songs, credits, master owners, keywords, sounds like, description and themes; releases
 by title, UPC, catalog number, label, artists and their tracks.
 
 The song, recording and release lists have a Columns button to show, hide and
@@ -466,3 +469,4 @@ a document or a release, does not sort.
 | 2026-11-15 | Releases section; releases have a Copyright tab like songs and recordings. |
 | 2026-11-15 | Copyright Registration documents carry the number; registration as it applies, through documents and releases; Unregistered recordings report. |
 | 2026-11-15 | Other ISRCs and explicit content on recordings; returns and Delete on statements; inherited registrations shown in the fields; money permissions on roles. |
+| 2026-11-22 | Themes on recordings, searchable and a list column; themes and keywords in the pitch comment (#67). |

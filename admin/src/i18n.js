@@ -32,6 +32,7 @@ const messages = {
     pro_territory:     { name: 'Society territory |||| Society territories' },
     key_signature:     { name: 'Key signature |||| Key signatures' },
     mood:              { name: 'Mood |||| Moods' },
+    theme:             { name: 'Theme |||| Themes' },
     instrument:        { name: 'Instrument |||| Instruments' },
     genre:             { name: 'Genre |||| Genres' },
     language:          { name: 'Language |||| Languages' },

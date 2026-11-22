@@ -84,7 +84,7 @@ const hiddenColumns = [
   'song_titles', 'bpm', 'tempo', 'key_signature', 'language_name',
   'is_instrumental', 'is_cover', 'multitracks_available', 'parental_warning',
   'easy_clear', 'pitch_contact_used', 'p_line', 'owner_total',
-  'recorded_country', 'reversion_date',
+  'recorded_country', 'reversion_date', 'theme_names',
   'created_at', 'updated_at',
 ];
 
@@ -100,6 +100,7 @@ const RecordingList = () => (
       <DataTable.Col source="duration_ms" label="Length" render={(r) => r.duration_display} />
       <DataTable.NumberCol source="bpm" label="BPM" />
       <DataTable.Col source="tempo" />
+      <DataTable.Col source="theme_names" label="Themes" disableSort />
       <DataTable.Col source="key_signature" label="Key" />
       <DataTable.Col source="language_name" label="Language" />
       <DataTable.Col source="is_instrumental" label="Instrumental" field={BooleanField} />
@@ -253,7 +254,13 @@ const RecordingForm = () => (
       </ReferenceArrayInput>
       <ReferenceArrayInput source="mood_ids" reference="mood" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
-        <SharedListPicker multiple label="Moods" />
+        <SharedListPicker multiple label="Moods"
+                          helperText="How it feels: triumphant, melancholy, laid back" />
+      </ReferenceArrayInput>
+      <ReferenceArrayInput source="theme_ids" reference="theme" perPage={200}
+                           sort={{ field: 'name', order: 'ASC' }}>
+        <SharedListPicker multiple label="Themes"
+                          helperText="What it is about or the scene it fits, as a music supervisor searches: patriotic, Christmas, road trip. Goes in the pitch comment after the tempo." />
       </ReferenceArrayInput>
       <PitchCommentInput />
     </TabbedForm.Tab>
@@ -311,7 +318,7 @@ const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_co
                  pitch_contact_used, has_pitch_contact,
                  one_stop, one_stop_reason, language_used,
                  artist_names, song_titles, status_name, language_name, copyright_status,
-                 created_at, updated_at, ...rest }) => rest;
+                 theme_names, created_at, updated_at, ...rest }) => rest;
 
 export default {
   list: RecordingList,

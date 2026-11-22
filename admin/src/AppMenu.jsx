@@ -80,6 +80,7 @@ export const AppMenu = () => {
         <Menu.ResourceItem name="instrument" />
         <Menu.ResourceItem name="genre" />
         <Menu.ResourceItem name="mood" />
+        <Menu.ResourceItem name="theme" />
         <Menu.ResourceItem name="key_signature" />
         <Menu.ResourceItem name="language" />
         <Menu.ResourceItem name="country" />

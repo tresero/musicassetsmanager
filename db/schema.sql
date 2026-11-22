@@ -1299,6 +1299,13 @@ BEGIN
   SELECT _id, unnest(coalesce(NEW.mood_ids, '{}'::integer[]))
       ON CONFLICT DO NOTHING;
 
+  DELETE FROM music.recording_theme t
+   WHERE t.recording_id = _id
+     AND t.theme_id <> ALL (coalesce(NEW.theme_ids, '{}'::integer[]));
+  INSERT INTO music.recording_theme (recording_id, theme_id)
+  SELECT _id, unnest(coalesce(NEW.theme_ids, '{}'::integer[]))
+      ON CONFLICT DO NOTHING;
+
   PERFORM music.sync_documents('recording_document', 'recording_id', _id,
                                NEW.documents);
 
@@ -2518,19 +2525,26 @@ BEGIN
     CASE WHEN nullif(btrim(rec.tempo), '') IS NULL THEN NULL
          WHEN rec.tempo ILIKE '%tempo%' THEN btrim(rec.tempo)
          ELSE btrim(rec.tempo) || ' tempo' END,
+    (SELECT string_agg(t.name, ', ' ORDER BY t.name)
+       FROM music.recording_theme rt JOIN music.theme t ON t.id = rt.theme_id
+      WHERE rt.recording_id = p_recording),
     (SELECT string_agg(g.name, ', ' ORDER BY g.name)
        FROM music.recording_genre rg JOIN music.genre g ON g.id = rg.genre_id
       WHERE rg.recording_id = p_recording),
+    nullif(regexp_replace(btrim(coalesce(rec.keywords, '')), '[\s.,;:]+$', ''), ''),
     CASE WHEN nullif(btrim(rec.sounds_like), '') IS NOT NULL THEN 'RIYL ' || btrim(rec.sounds_like) END
   ];
-  seg_line := ARRAY[2, 2, 2, 3, 3];
+  seg_line := ARRAY[2, 2, 2, 2, 3, 3, 3];
 
-  FOR n IN REVERSE 5..0 LOOP
+  FOR n IN REVERSE 7..0 LOOP
     SELECT string_agg(seg_text[i], '. ' ORDER BY i) INTO line2
       FROM generate_series(1, n) i WHERE seg_line[i] = 2 AND seg_text[i] IS NOT NULL;
-    SELECT string_agg(seg_text[i], ' ' ORDER BY i) INTO line3
-      FROM generate_series(1, n) i WHERE seg_line[i] = 3 AND seg_text[i] IS NOT NULL;
-    result := concat_ws(E'\n', nullif(head, ''), line2 || '.', line3);
+    line3 := concat_ws(' ',
+      nullif(concat_ws(', ',
+        CASE WHEN n >= 5 THEN seg_text[5] END,
+        CASE WHEN n >= 6 THEN seg_text[6] END), ''),
+      CASE WHEN n >= 7 THEN seg_text[7] END);
+    result := concat_ws(E'\n', nullif(head, ''), line2 || '.', nullif(line3, ''));
     IF length(result) <= p_limit THEN
       RETURN nullif(result, '');
     END IF;
@@ -2544,10 +2558,7 @@ $_$;
 -- Name: FUNCTION recording_pitch_comment_auto(p_recording integer, p_limit integer); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.recording_pitch_comment_auto(p_recording integer, p_limit integer) IS 'The comment written into a pitched file, built from the catalog: one stop,
-the contact (see music.recording_pitch_contact) and whether stems, multitracks and alternates are available, then vocals and
-language, moods, tempo, genres, and sounds like. Segments are dropped from
-the end until it fits the limit; the contact line never is.';
+COMMENT ON FUNCTION music.recording_pitch_comment_auto(p_recording integer, p_limit integer) IS 'The comment written into a pitched file, built from the catalog: one stop, the contact (see music.recording_pitch_contact) and whether stems, multitracks and alternates are available; then vocals and language, moods, tempo and themes; then genres, keywords and sounds like. Description is left out. Segments are dropped from the end until it fits the limit; the contact line never is.';
 
 --
 -- Name: recording_pitch_contact(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -2942,6 +2953,23 @@ CREATE TABLE music.recording_song (
 ALTER TABLE ONLY music.recording_song FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: recording_theme; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.recording_theme (
+    recording_id integer NOT NULL,
+    theme_id integer NOT NULL
+);
+
+ALTER TABLE ONLY music.recording_theme FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE recording_theme; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.recording_theme IS 'The themes of a recording, any number.';
+
+--
 -- Name: song; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -2987,6 +3015,22 @@ when the source is a real row.';
 
 COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
 stop, which is computed from the controlled shares.';
+
+--
+-- Name: theme; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.theme (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT theme_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
+
+--
+-- Name: TABLE theme; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.theme IS 'What a recording is about or the scene it fits, such as Patriotic, Christmas or Road Trip, as music supervisors search for it. How it feels is a mood. A shared list: every user reads it, only the site admin changes it.';
 
 --
 -- Name: recording; Type: VIEW; Schema: api; Owner: -
@@ -3090,7 +3134,14 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     COALESCE(( SELECT array_agg((ri.isrc)::text ORDER BY (ri.isrc)::text) AS array_agg
            FROM music.recording_isrc ri
           WHERE (ri.recording_id = r.id)), '{}'::text[]) AS other_isrcs,
-    music.recording_copyright(id) AS copyright_status
+    music.recording_copyright(id) AS copyright_status,
+    COALESCE(( SELECT array_agg(rt.theme_id ORDER BY rt.theme_id) AS array_agg
+           FROM music.recording_theme rt
+          WHERE (rt.recording_id = r.id)), '{}'::integer[]) AS theme_ids,
+    ( SELECT string_agg(t.name, ', '::text ORDER BY t.name) AS string_agg
+           FROM (music.recording_theme rt
+             JOIN music.theme t ON ((t.id = rt.theme_id)))
+          WHERE (rt.recording_id = r.id)) AS theme_names
    FROM music.recording r;
 
 --
@@ -3132,7 +3183,7 @@ CREATE FUNCTION api.search(api.recording) RETURNS tsvector
     AS $_$
   SELECT music.search_doc(
     $1.title, $1.version_label, $1.isrc, array_to_string($1.other_isrcs, ' '),
-    $1.keywords, $1.sounds_like, $1.description,
+    $1.keywords, $1.sounds_like, $1.description, $1.theme_names,
     $1.artist_names, $1.song_titles,
     (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ') FROM music.recording_credit c WHERE c.recording_id = $1.id),
     (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ') FROM music.recording_owner o WHERE o.recording_id = $1.id))
@@ -3142,7 +3193,7 @@ $_$;
 -- Name: FUNCTION search(api.recording); Type: COMMENT; Schema: api; Owner: -
 --
 
-COMMENT ON FUNCTION api.search(api.recording) IS 'Title, version, ISRC and other ISRCs, keywords, sounds like, description, artist names, song titles, credit names and credited-as names, and master owner names, for search=fts(fold).term:*.';
+COMMENT ON FUNCTION api.search(api.recording) IS 'Title, version, ISRC and other ISRCs, keywords, sounds like, description, themes, artist names, song titles, credit names and credited-as names, and master owner names, for search=fts(fold).term:*.';
 
 --
 -- Name: role; Type: TABLE; Schema: music; Owner: -
@@ -3758,6 +3809,29 @@ $_$;
 --
 
 COMMENT ON FUNCTION api.search(api.song) IS 'Title, alt titles, ISWC, writer and publisher names and registration work numbers, for search=fts(fold).term:*.';
+
+--
+-- Name: theme; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.theme WITH (security_invoker='true') AS
+ SELECT id,
+    name
+   FROM music.theme;
+
+--
+-- Name: search(api.theme); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.search(api.theme) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $_$ SELECT music.search_doc($1.name) $_$;
+
+--
+-- Name: FUNCTION search(api.theme); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.search(api.theme) IS 'The name, for search=fts(fold).term:*.';
 
 --
 -- Name: current_app_user(); Type: FUNCTION; Schema: music; Owner: -
@@ -7915,6 +7989,19 @@ ALTER TABLE music.statement_line ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTIT
 );
 
 --
+-- Name: theme_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.theme ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.theme_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
 -- Name: transaction_category_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -8375,6 +8462,13 @@ ALTER TABLE ONLY music.recording_song
     ADD CONSTRAINT recording_song_pkey PRIMARY KEY (recording_id, song_id);
 
 --
+-- Name: recording_theme recording_theme_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_theme
+    ADD CONSTRAINT recording_theme_pkey PRIMARY KEY (recording_id, theme_id);
+
+--
 -- Name: release_artist release_artist_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -8569,6 +8663,13 @@ ALTER TABLE ONLY music.statement
 
 ALTER TABLE ONLY music.statement
     ADD CONSTRAINT statement_pkey PRIMARY KEY (id);
+
+--
+-- Name: theme theme_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.theme
+    ADD CONSTRAINT theme_pkey PRIMARY KEY (id);
 
 --
 -- Name: transaction_category transaction_category_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -9086,6 +9187,12 @@ CREATE INDEX recording_song_song_id_idx ON music.recording_song USING btree (son
 CREATE INDEX recording_status_id_idx ON music.recording USING btree (status_id);
 
 --
+-- Name: recording_theme_theme_id_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX recording_theme_theme_id_idx ON music.recording_theme USING btree (theme_id);
+
+--
 -- Name: release_distribution_release_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -9288,6 +9395,18 @@ CREATE INDEX statement_recipient_contact_idx ON music.statement USING btree (rec
 --
 
 CREATE INDEX statement_recipient_organization_idx ON music.statement USING btree (recipient_organization_id) WHERE (recipient_organization_id IS NOT NULL);
+
+--
+-- Name: theme_name_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX theme_name_key ON music.theme USING btree (lower(name));
+
+--
+-- Name: INDEX theme_name_key; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON INDEX music.theme_name_key IS 'Names are unique regardless of case, so Love and love cannot both exist.';
 
 --
 -- Name: transaction_account_date_idx; Type: INDEX; Schema: music; Owner: -
@@ -9968,6 +10087,12 @@ CREATE CONSTRAINT TRIGGER recording_representation_exclusive AFTER INSERT OR UPD
 CREATE TRIGGER recording_song_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_song FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
+-- Name: recording_theme recording_theme_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_theme_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.recording_theme FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
 -- Name: recording recording_touch; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -10128,6 +10253,12 @@ CREATE TRIGGER statement_line_side BEFORE INSERT OR UPDATE OF song_id, recording
 --
 
 CREATE TRIGGER statement_payout BEFORE INSERT OR UPDATE ON music.statement FOR EACH ROW EXECUTE FUNCTION music.statement_payout();
+
+--
+-- Name: theme theme_site_admin; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER theme_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.theme FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
 
 --
 -- Name: transaction transaction_amount; Type: TRIGGER; Schema: music; Owner: -
@@ -10637,6 +10768,20 @@ ALTER TABLE ONLY music.recording
     ADD CONSTRAINT recording_status_id_fkey FOREIGN KEY (status_id) REFERENCES music.asset_status(id) ON DELETE SET NULL;
 
 --
+-- Name: recording_theme recording_theme_recording_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_theme
+    ADD CONSTRAINT recording_theme_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id) ON DELETE CASCADE;
+
+--
+-- Name: recording_theme recording_theme_theme_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording_theme
+    ADD CONSTRAINT recording_theme_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES music.theme(id) ON DELETE CASCADE;
+
+--
 -- Name: recording recording_vocal_type_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -11089,6 +11234,14 @@ CREATE POLICY account_own ON music.account USING ((id = ( SELECT music.current_a
 COMMENT ON POLICY account_own ON music.account IS 'A signed-in user sees only their own account.';
 
 --
+-- Name: account account_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY account_read_all ON account; Type: COMMENT; Schema: music; Owner: -
+--
+
+--
 -- Name: account_storage; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -11153,6 +11306,14 @@ CREATE POLICY artist_member_account ON music.artist_member USING (music.own_arti
 --
 
 COMMENT ON POLICY artist_member_account ON music.artist_member IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: artist artist_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY artist_read_all ON artist; Type: COMMENT; Schema: music; Owner: -
+--
 
 --
 -- Name: audio_file; Type: ROW SECURITY; Schema: music; Owner: -
@@ -11263,6 +11424,14 @@ CREATE POLICY contact_phone_account ON music.contact_phone USING ((((contact_id 
 COMMENT ON POLICY contact_phone_account ON music.contact_phone IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
+-- Name: contact contact_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY contact_read_all ON contact; Type: COMMENT; Schema: music; Owner: -
+--
+
+--
 -- Name: document; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -11279,6 +11448,14 @@ CREATE POLICY document_account ON music.document USING ((account_id = ( SELECT m
 --
 
 COMMENT ON POLICY document_account ON music.document IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: document document_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY document_read_all ON document; Type: COMMENT; Schema: music; Owner: -
+--
 
 --
 -- Name: document document_upload; Type: POLICY; Schema: music; Owner: -
@@ -11329,6 +11506,14 @@ CREATE POLICY organization_document_account ON music.organization_document USING
 COMMENT ON POLICY organization_document_account ON music.organization_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
+-- Name: organization organization_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY organization_read_all ON organization; Type: COMMENT; Schema: music; Owner: -
+--
+
+--
 -- Name: pitch_setting; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -11345,6 +11530,14 @@ CREATE POLICY pitch_setting_account ON music.pitch_setting USING ((account_id = 
 --
 
 COMMENT ON POLICY pitch_setting_account ON music.pitch_setting IS 'Limits every role without its own policy to rows of the account in the request token; on write, every linked record must be in the same account.';
+
+--
+-- Name: pitch_setting pitch_setting_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY pitch_setting_read_all ON pitch_setting; Type: COMMENT; Schema: music; Owner: -
+--
 
 --
 -- Name: recording; Type: ROW SECURITY; Schema: music; Owner: -
@@ -11527,6 +11720,14 @@ CREATE POLICY recording_owner_account ON music.recording_owner USING (music.own_
 COMMENT ON POLICY recording_owner_account ON music.recording_owner IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
+-- Name: recording recording_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY recording_read_all ON recording; Type: COMMENT; Schema: music; Owner: -
+--
+
+--
 -- Name: recording_representation; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -11561,6 +11762,24 @@ CREATE POLICY recording_song_account ON music.recording_song USING (music.own_re
 --
 
 COMMENT ON POLICY recording_song_account ON music.recording_song IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: recording_theme; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.recording_theme ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: recording_theme recording_theme_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY recording_theme_account ON music.recording_theme USING (music.own_recording(recording_id)) WITH CHECK (music.own_recording(recording_id));
+
+--
+-- Name: POLICY recording_theme_account ON recording_theme; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON POLICY recording_theme_account ON music.recording_theme IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
 -- Name: recording recording_upload; Type: POLICY; Schema: music; Owner: -
@@ -11647,6 +11866,14 @@ CREATE POLICY release_document_account ON music.release_document USING (music.ow
 COMMENT ON POLICY release_document_account ON music.release_document IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
 
 --
+-- Name: release release_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY release_read_all ON release; Type: COMMENT; Schema: music; Owner: -
+--
+
+--
 -- Name: release_track; Type: ROW SECURITY; Schema: music; Owner: -
 --
 
@@ -11717,6 +11944,14 @@ CREATE POLICY song_publisher_account ON music.song_publisher USING (music.own_so
 --
 
 COMMENT ON POLICY song_publisher_account ON music.song_publisher IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: song song_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: POLICY song_read_all ON song; Type: COMMENT; Schema: music; Owner: -
+--
 
 --
 -- Name: song_registration; Type: ROW SECURITY; Schema: music; Owner: -
@@ -12506,10 +12741,22 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_representation TO app
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_song TO app_user;
 
 --
+-- Name: TABLE recording_theme; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.recording_theme TO app_user;
+
+--
 -- Name: TABLE song; Type: ACL; Schema: music; Owner: -
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.song TO app_user;
+
+--
+-- Name: TABLE theme; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.theme TO app_user;
 
 --
 -- Name: TABLE recording; Type: ACL; Schema: api; Owner: -
@@ -12642,6 +12889,18 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.song TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.search(api.song) TO app_user;
+
+--
+-- Name: TABLE theme; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.theme TO app_user;
+
+--
+-- Name: FUNCTION search(api.theme); Type: ACL; Schema: api; Owner: -
+--
+
+GRANT ALL ON FUNCTION api.search(api.theme) TO app_user;
 
 --
 -- Name: TABLE account; Type: ACL; Schema: music; Owner: -
@@ -13543,6 +13802,12 @@ GRANT USAGE ON SEQUENCE music.statement_id_seq TO app_user;
 --
 
 GRANT USAGE ON SEQUENCE music.statement_line_id_seq TO app_user;
+
+--
+-- Name: SEQUENCE theme_id_seq; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT USAGE ON SEQUENCE music.theme_id_seq TO app_user;
 
 --
 -- Name: SEQUENCE transaction_category_id_seq; Type: ACL; Schema: music; Owner: -

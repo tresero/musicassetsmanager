@@ -889,6 +889,9 @@ COPY music.instrument (id, name, ddex_code) FROM stdin;
 195	Baby Bass	BabyBass
 196	Clavinet	Clavinet
 197	Percussion	\N
+198	Percussion effects	\N
+199	Synth Strings	\N
+200	Valve Trombone	\N
 \.
 SELECT setval(pg_get_serial_sequence('music.instrument', 'id'), (SELECT max(id) FROM music.instrument));
 
@@ -922,6 +925,8 @@ COPY music.role (id, name, role_group_id, description, ddex_code, credit_role) F
 18	Recording Engineer	4	\N	RecordingEngineer	t
 19	Mix Engineer	4	\N	MixingEngineer	t
 20	Radio/Social Media	5	\N	\N	f
+21	Composer Lyricist	1	\N	ComposerLyricist	t
+22	Composer And/Or Lyricist	1	\N	ComposerAndOrLyricist	t
 \.
 SELECT setval(pg_get_serial_sequence('music.role', 'id'), (SELECT max(id) FROM music.role));
 
@@ -992,6 +997,8 @@ COPY music.genre (id, name, parent_id, schema_class_id, mo_term) FROM stdin;
 128	Ballad	\N	\N	\N
 129	Gaga	\N	\N	\N
 130	Guaracha	\N	\N	\N
+131	Holiday	\N	\N	\N
+132	Country Rock	\N	\N	\N
 \.
 SELECT setval(pg_get_serial_sequence('music.genre', 'id'), (SELECT max(id) FROM music.genre));
 
@@ -1104,6 +1111,77 @@ COPY music.mood (id, name) FROM stdin;
 \.
 SELECT setval(pg_get_serial_sequence('music.mood', 'id'), (SELECT max(id) FROM music.mood));
 
+COPY music.theme (id, name) FROM stdin;
+1	Carnival
+3	Christmas
+4	Faith
+5	Family
+6	Freedom
+7	Friendship
+8	Heartbreak
+9	Holiday Season
+10	Homeland
+11	Love
+12	New Beginnings
+13	Party
+14	Patriotic
+15	Road Trip
+16	Sports
+17	Summer
+18	Wedding
+19	Hanukkah
+20	New Year
+21	Valentine's Day
+22	Easter
+23	Mother's Day
+24	Father's Day
+25	Independence Day
+26	Halloween
+27	Day of the Dead
+28	Thanksgiving
+29	Hispanic Heritage
+30	Spring
+31	Fall
+32	Winter
+33	Back to School
+34	Birthday
+35	Graduation
+36	Quinceañera
+37	Anniversary
+38	New Baby
+39	Coming of Age
+40	Loss & Remembrance
+41	Seduction
+42	Empowerment
+43	Overcoming Adversity
+44	Success
+45	Homecoming
+46	Leaving Home
+47	Immigration
+48	Redemption
+49	Military
+50	Unity
+51	Protest & Social Justice
+52	Working Life
+53	Money
+54	Travel
+55	City Life
+56	Small Town
+57	Countryside
+58	Nature
+59	Beach
+60	Tropical
+61	Nightlife
+62	Drinking
+63	Food & Cooking
+64	Children
+65	Crime
+66	Adventure
+67	Fitness
+68	Victory
+\.
+SELECT setval(pg_get_serial_sequence('music.theme', 'id'), (SELECT max(id) FROM music.theme));
+
 COPY music.vocal_type (id, name) FROM stdin;
 1	Female
 2	Male
@@ -1162,6 +1240,8 @@ COPY music.document_type (id, name) FROM stdin;
 30	Track Sheet
 31	Production Agreement
 32	Cover Art
+33	Lead Sheet
+34	Sheet Music
 \.
 SELECT setval(pg_get_serial_sequence('music.document_type', 'id'), (SELECT max(id) FROM music.document_type));
 
