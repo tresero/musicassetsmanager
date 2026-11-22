@@ -2,6 +2,7 @@ import { fetchUtils } from 'react-admin';
 import postgrestRestProvider, { defaultSchema } from '@raphiniert/ra-data-postgrest';
 import { searchQuery } from './search';
 import { explainDbError } from './dbErrors';
+import { trimText } from './trim';
 
 const httpClient = (url, options = {}) => {
   if (!options.headers) options.headers = new Headers({ Accept: 'application/json' });
@@ -44,9 +45,11 @@ const toSearch = (params) => {
   return { ...params, filter };
 };
 
-// A save the database refuses marks the field it is about (dbErrors.js).
+// Every save trims its text first (trim.js), and a save the database
+// refuses marks the field it is about (dbErrors.js).
 const explained = (method) => (resource, params) =>
-  provider[method](resource, params).catch((error) => { throw explainDbError(resource, error); });
+  provider[method](resource, { ...params, data: trimText(params.data) })
+    .catch((error) => { throw explainDbError(resource, error); });
 
 export default {
   ...provider,

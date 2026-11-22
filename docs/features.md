@@ -426,6 +426,8 @@ a document or a release, does not sort.
 
 - Save and continue keeps you on the tab you were editing; Save and close
   returns to the list.
+- Every save trims spaces and line breaks from both ends of the text typed or
+  pasted, in child rows too; text that is only spaces is saved as empty.
 - Delete names what it deletes.
 - The menu groups the catalog, the reports, and settings.
 - A row missing a field it needs, like a writer without a role or a credit
@@ -486,3 +488,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Registrations name a claimant, on the record or on the Copyright Registration document, and inherited ones show it; reversion is off the Copyright tab (#9). |
 | 2026-11-22 | Reversion date and lead dropped from songs, recordings and releases; reversion belongs to deals (#69). |
 | 2026-11-22 | ISWC, ISRC, UPC, ISNI and IPI fields drop separators and mark a wrong format or check digit in red; a refused save marks its field; search finds codes typed with separators (#18). |
+| 2026-11-22 | Every save trims text at both ends (#17). |

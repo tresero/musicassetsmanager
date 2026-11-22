@@ -103,7 +103,9 @@ Non-`id` primary keys need an entry in the `primaryKeys` map in
 
 Deploy is `npm run build` then a hard reload. There's no server process.
 
-A save the database refuses over a named constraint marks the field it is
+Every create and update trims its text first (`src/trim.js`), so write
+functions need not `btrim` what a form sends; imports and RPCs are not
+trimmed. A save the database refuses over a named constraint marks the field it is
 about: add the constraint to `CONSTRAINTS` in `src/dbErrors.js` with the view
 column and a plain message. Code inputs (ISWC, ISRC, UPC, ISNI, IPI) are in
 `resources/codeInputs.jsx` and share their rules and wording with it through
@@ -115,7 +117,8 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
 
 - **Frontend:** Vitest. `cd admin && npm test` runs every `*.test.js` next to
   the code it tests. So far: the code rules (`codes.js`), the search query
-  (`search.js`) and the database error mapping (`dbErrors.js`).
+  (`search.js`), the database error mapping (`dbErrors.js`) and trimming
+  (`trim.js`).
 - **Upload service:** `cd upload && go test ./...`.
 - **Database:** not yet. pgTAP against a scratch database Jon creates, never
   production.
@@ -152,3 +155,4 @@ triggers.
 | Date | Revision |
 |---|---|
 | 2026-11-22 | Tests section; refused saves mark their field (`dbErrors.js`); code inputs |
+| 2026-11-22 | Saves trim text (`trim.js`) |
