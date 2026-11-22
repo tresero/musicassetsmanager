@@ -1059,7 +1059,7 @@ BEGIN
                                  vocal_type_id, parental_warning, pitch_contact_id, pitch_comment,
                                  recorded_country, commissioned_country, p_line_year,
                                  copyright_number, copyright_date,
-                                 reversion_date, reversion_lead, claimant_contact_id, claimant_organization_id,
+                                 claimant_contact_id, claimant_organization_id,
                                  description, keywords, sounds_like, notes,
                                  status_id, language_code, multitracks_available)
     VALUES (_title, NEW.version_label, NEW.isrc, NEW.duration_ms, NEW.bpm,
@@ -1073,7 +1073,7 @@ BEGIN
             nullif(btrim(coalesce(NEW.pitch_comment, '')), ''),
             NEW.recorded_country, NEW.commissioned_country, NEW.p_line_year,
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
-            NEW.copyright_date, NEW.reversion_date, NEW.reversion_lead,
+            NEW.copyright_date,
             NEW.claimant_contact_id, NEW.claimant_organization_id,
             NEW.description, NEW.keywords, NEW.sounds_like, NEW.notes,
             NEW.status_id, NEW.language_code,
@@ -1096,8 +1096,6 @@ BEGIN
            p_line_year = NEW.p_line_year,
            copyright_number = nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
            copyright_date = NEW.copyright_date,
-           reversion_date = NEW.reversion_date,
-           reversion_lead = NEW.reversion_lead,
            claimant_contact_id = NEW.claimant_contact_id,
            claimant_organization_id = NEW.claimant_organization_id,
            description = NEW.description, keywords = NEW.keywords,
@@ -1364,15 +1362,14 @@ BEGIN
     INSERT INTO music.release (title, release_type, upc, catalog_number, label_id,
                                release_date, c_line_year, c_line_contact_id,
                                c_line_organization_id, primary_genre_id, notes,
-                               copyright_number, copyright_date, reversion_date,
-                               reversion_lead, claimant_contact_id, claimant_organization_id)
+                               copyright_number, copyright_date,
+                               claimant_contact_id, claimant_organization_id)
     VALUES (btrim(NEW.title), coalesce(nullif(NEW.release_type, ''), 'Single'), _upc,
             nullif(btrim(coalesce(NEW.catalog_number, '')), ''), NEW.label_id,
             NEW.release_date, NEW.c_line_year,
             NEW.c_line_contact_id, NEW.c_line_organization_id,
             NEW.primary_genre_id, NEW.notes,
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''), NEW.copyright_date,
-            NEW.reversion_date, NEW.reversion_lead,
             NEW.claimant_contact_id, NEW.claimant_organization_id)
     RETURNING id INTO _id;
   ELSE
@@ -1390,8 +1387,6 @@ BEGIN
            notes = NEW.notes,
            copyright_number = nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
            copyright_date = NEW.copyright_date,
-           reversion_date = NEW.reversion_date,
-           reversion_lead = NEW.reversion_lead,
            claimant_contact_id = NEW.claimant_contact_id,
            claimant_organization_id = NEW.claimant_organization_id,
            updated_at = now()
@@ -2692,8 +2687,6 @@ CREATE TABLE music.recording (
     is_cover boolean DEFAULT false NOT NULL,
     copyright_number text,
     copyright_date date,
-    reversion_date date,
-    reversion_lead integer,
     commissioned_country music.iso_3166_alpha2,
     easy_clear boolean DEFAULT false NOT NULL,
     vocal_type_id integer,
@@ -2709,7 +2702,6 @@ CREATE TABLE music.recording (
     CONSTRAINT recording_duration CHECK (((duration_ms IS NULL) OR (duration_ms > 0))),
     CONSTRAINT recording_parental_warning CHECK ((parental_warning = ANY (ARRAY['Explicit'::text, 'NotExplicit'::text, 'ExplicitContentEdited'::text]))),
     CONSTRAINT recording_pyear CHECK (((p_line_year IS NULL) OR ((p_line_year >= 1900) AND (p_line_year <= 2200)))),
-    CONSTRAINT recording_reversion_lead CHECK (((reversion_lead IS NULL) OR (reversion_lead >= 0))),
     CONSTRAINT recording_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
 
@@ -2729,12 +2721,6 @@ recording qualifies for performance income in their territory.';
 
 COMMENT ON COLUMN music.recording.copyright_number IS 'Registration number for the sound recording, such as a US Copyright Office
 SR number. Separate from the composition''s registration.';
-
---
--- Name: COLUMN recording.reversion_lead; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.recording.reversion_lead IS 'Years of notice before the reversion date, for a reminder.';
 
 --
 -- Name: COLUMN recording.commissioned_country; Type: COMMENT; Schema: music; Owner: -
@@ -3031,8 +3017,6 @@ CREATE TABLE music.song (
     derivation_type text,
     copyright_date date,
     copyright_number text,
-    reversion_date date,
-    reversion_lead smallint,
     language_code music.iso_639_code,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -3044,7 +3028,6 @@ CREATE TABLE music.song (
     CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
     CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
     CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
-    CONSTRAINT song_reversion_lead CHECK (((reversion_lead IS NULL) OR ((reversion_lead >= 0) AND (reversion_lead <= 20)))),
     CONSTRAINT song_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text)))
 );
 
@@ -3123,8 +3106,6 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     p_line_year,
     copyright_number,
     copyright_date,
-    reversion_date,
-    reversion_lead,
     description,
     keywords,
     sounds_like,
@@ -3400,14 +3381,11 @@ CREATE TABLE music.release (
     c_line_organization_id integer,
     copyright_number text,
     copyright_date date,
-    reversion_date date,
-    reversion_lead smallint,
     claimant_contact_id integer,
     claimant_organization_id integer,
     CONSTRAINT release_c_line_one_owner CHECK ((num_nonnulls(c_line_contact_id, c_line_organization_id) <= 1)),
     CONSTRAINT release_c_line_year CHECK (((c_line_year IS NULL) OR ((c_line_year >= 1900) AND (c_line_year <= 2200)))),
     CONSTRAINT release_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
-    CONSTRAINT release_reversion_lead CHECK (((reversion_lead IS NULL) OR (reversion_lead >= 0))),
     CONSTRAINT release_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
     CONSTRAINT release_type_ddex CHECK ((release_type = ANY (ARRAY['Single'::text, 'EP'::text, 'Album'::text]))),
     CONSTRAINT release_upc_valid CHECK (((upc IS NULL) OR music.gtin_valid(upc)))
@@ -3456,18 +3434,6 @@ COMMENT ON COLUMN music.release.copyright_number IS 'Registration number for the
 --
 
 COMMENT ON COLUMN music.release.copyright_date IS 'The date of the release''s registration.';
-
---
--- Name: COLUMN release.reversion_date; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.release.reversion_date IS 'When rights in the release, such as licensed artwork, revert.';
-
---
--- Name: COLUMN release.reversion_lead; Type: COMMENT; Schema: music; Owner: -
---
-
-COMMENT ON COLUMN music.release.reversion_lead IS 'Years of notice before the reversion date, for a reminder.';
 
 --
 -- Name: COLUMN release.claimant_contact_id; Type: COMMENT; Schema: music; Owner: -
@@ -3608,8 +3574,6 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
           WHERE (g.id = r.primary_genre_id)) AS primary_genre_name,
     copyright_number,
     copyright_date,
-    reversion_date,
-    reversion_lead,
     music.release_copyright(id) AS copyright_status,
     claimant_contact_id,
     claimant_organization_id
@@ -3807,8 +3771,6 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
     based_on,
     copyright_date,
     copyright_number,
-    reversion_date,
-    reversion_lead,
     language_code,
     COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', t.id, 'title', t.title, 'title_type', t.title_type, 'language_code', t.language_code) ORDER BY t.id) AS jsonb_agg
            FROM music.song_title t
@@ -4399,7 +4361,7 @@ BEGIN
                             public_domain_p, easy_clear,
                             derived_from_id, derivation_type, based_on,
                             copyright_date, copyright_number,
-                            reversion_date, reversion_lead, language_code,
+                            language_code,
                             claimant_contact_id, claimant_organization_id)
     VALUES (NEW.title, NEW.iswc, NEW.lyrics, NEW.notes,
             coalesce(NEW.public_domain_p, false),
@@ -4407,7 +4369,7 @@ BEGIN
             NEW.derived_from_id, NEW.derivation_type,
             nullif(btrim(coalesce(NEW.based_on,'')), ''),
             NEW.copyright_date, NEW.copyright_number,
-            NEW.reversion_date, NEW.reversion_lead, NEW.language_code,
+            NEW.language_code,
             NEW.claimant_contact_id, NEW.claimant_organization_id)
     RETURNING id INTO _id;
   ELSE
@@ -4421,8 +4383,6 @@ BEGIN
            based_on = nullif(btrim(coalesce(NEW.based_on,'')), ''),
            copyright_date = NEW.copyright_date,
            copyright_number = NEW.copyright_number,
-           reversion_date = NEW.reversion_date,
-           reversion_lead = NEW.reversion_lead,
            claimant_contact_id = NEW.claimant_contact_id,
            claimant_organization_id = NEW.claimant_organization_id,
            language_code = NEW.language_code

@@ -121,8 +121,8 @@ Term, territory, parties, covered works. Distinct from the document that
 evidences it.
 
 Answers questions a PDF cannot: what expires in ninety days, do I control this
-in Germany, which works revert in 2028. Also gives provenance to the
-`exclusive_p` and reversion fields currently floating on `song`.
+in Germany, which works revert in 2028. Reversion belongs here, on the deal
+that granted the rights (#69), not on the song.
 
 ### Metadata embedding
 
@@ -226,3 +226,4 @@ sharing layer, not a network.
 | 2026-09-30 | Conversion writes the pitch comment into the MP3; shared vocabularies for hosted accounts added under Planned. |
 | 2026-11-13 | Statement import built; recording matching and earnings reports remain. |
 | 2026-11-15 | Recording matching and transactions built; general ledger excludes expenses no longer. |
+| 2026-11-22 | Contracts: reversion belongs to the deal (#69); reversion fields dropped from songs. |

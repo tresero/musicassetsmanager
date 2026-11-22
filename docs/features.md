@@ -474,3 +474,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Themes on recordings, searchable and a list column; themes and keywords in the pitch comment (#67). |
 | 2026-11-22 | A document's date is its effective date; Same as effective date fills in Signed (#5). |
 | 2026-11-22 | Registrations name a claimant, on the record or on the Copyright Registration document, and inherited ones show it; reversion is off the Copyright tab (#9). |
+| 2026-11-22 | Reversion date and lead dropped from songs, recordings and releases; reversion belongs to deals (#69). |

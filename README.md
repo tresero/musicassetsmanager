@@ -33,8 +33,8 @@ links for supervisors and profit and loss reporting are next.
 **Compositions.** Title, ISWC, lyrics, and alternate titles. Writer and
 publisher splits with the controlled and uncontrolled distinction that decides
 what you can actually license. Society registrations with work numbers and
-dates. Copyright and reversion dates. Arrangements, translations, and other
-derived works, including arrangements of public domain tunes.
+dates. Copyright registrations and their claimant. Arrangements, translations,
+and other derived works, including arrangements of public domain tunes.
 
 **Recordings.** Separate from the composition they record, because a radio edit
 and an album mix are different masters with different ISRCs. Artists billed as
