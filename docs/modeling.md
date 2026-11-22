@@ -123,8 +123,9 @@ so the notice cannot disagree with the ownership it describes.
 
 A sound recording is registered separately from the composition it records,
 with its own number and date, and it carries its own termination rights. So a
-recording has copyright and reversion fields of its own rather than borrowing
-the song's.
+recording has copyright fields of its own rather than borrowing the song's.
+Reversion belongs to the deal that granted the rights, not to the
+registration.
 
 One registration often covers several records: an album registered as one
 work covers each of its tracks, and a group registration covers several songs.
@@ -134,7 +135,11 @@ document attached to it (the number is on the document), else, for a
 recording, a registered release it is on. Correcting the number on the
 document or the release corrects every record that relies on it. A record's
 own number wins, and it is flagged when none of its attached registration
-documents agree with it.
+documents agree with it. The claimant travels with the number: it is entered
+where the number is, on the record or on the document, and comes along when
+the registration is inherited. The registration type needs no field, since
+the number's prefix (PA, SR, VA) carries it, and a transfer to the claimant
+is a document of its own.
 
 ## Signed deals are about the master
 
@@ -396,3 +401,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-15 | Statements record who they pay. |
 | 2026-11-15 | Releases have a copyright of their own; the registration that applies comes through documents and releases. |
 | 2026-11-22 | Themes on recordings, apart from moods; themes and keywords in the generated pitch comment. |
+| 2026-11-22 | Registrations carry a claimant, entered with the number and inherited with it. |

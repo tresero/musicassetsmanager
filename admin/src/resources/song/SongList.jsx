@@ -13,7 +13,7 @@ const filters = [
 const hiddenColumns = [
   'publisher_names', 'writer_total', 'publisher_total', 'one_stop_reason',
   'public_domain_p', 'derivation_type', 'based_on', 'copyright_status',
-  'reversion_date', 'created_at', 'updated_at',
+  'created_at', 'updated_at',
 ];
 
 const SongList = () => (
@@ -34,7 +34,6 @@ const SongList = () => (
       <DataTable.Col source="derivation_type" label="Derivation" />
       <DataTable.Col source="based_on" label="Based on" />
       <DataTable.Col source="copyright_status" label="Registration" disableSort render={registrationText} />
-      <DataTable.Col source="reversion_date" label="Reverts" field={DateField} />
       <DataTable.Col source="created_at" label="Added" field={DateField} />
       <DataTable.Col source="updated_at" label="Changed" field={DateField} />
     </CatalogDataTable>

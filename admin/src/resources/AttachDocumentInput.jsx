@@ -9,7 +9,7 @@ import { Autocomplete, TextField } from '@mui/material';
 const FIELDS = [
   'id', 'title', 'document_type_id', 'storage_kind', 'storage_uri',
   'mime_type', 'byte_size', 'document_date', 'signed_on', 'expires_on', 'notes',
-  'external_ref', 'file_name',
+  'external_ref', 'file_name', 'claimant_contact_id', 'claimant_organization_id',
 ];
 
 /*

@@ -84,7 +84,7 @@ const hiddenColumns = [
   'song_titles', 'bpm', 'tempo', 'key_signature', 'language_name',
   'is_instrumental', 'is_cover', 'multitracks_available', 'parental_warning',
   'easy_clear', 'pitch_contact_used', 'p_line', 'owner_total',
-  'recorded_country', 'reversion_date', 'theme_names',
+  'recorded_country', 'theme_names',
   'created_at', 'updated_at',
 ];
 
@@ -115,7 +115,6 @@ const RecordingList = () => (
       <DataTable.NumberCol source="owner_total" label="Owner %" />
       <DataTable.Col source="recorded_country" label="Recorded in" />
       <DataTable.Col source="copyright_status" label="Registration" disableSort render={registrationText} />
-      <DataTable.Col source="reversion_date" label="Reverts" field={DateField} />
       <DataTable.Col source="created_at" label="Added" field={DateField} />
       <DataTable.Col source="updated_at" label="Changed" field={DateField} />
     </CatalogDataTable>

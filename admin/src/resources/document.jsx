@@ -9,6 +9,7 @@ import { Box } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { FileLink } from './FileLink';
 import { DocumentDatesInput } from './DocumentDatesInput';
+import { RegistrationInputs } from './documentsTab';
 import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
 const filters = [searchFilter];
@@ -58,8 +59,10 @@ const DocumentForm = () => (
     <TextInput source="file_name" label="File name"
                helperText="The name the file had when it was uploaded"
                sx={{ width: { xs: '100%', md: 600 } }} />
-    <TextInput source="external_ref" label="External reference"
-               helperText="Document id in Paperless or similar" />
+    <RegistrationInputs otherwise={
+      <TextInput source="external_ref" label="External reference"
+                 helperText="Document id in Paperless or similar" />
+    } />
 
     <DocumentDatesInput />
 

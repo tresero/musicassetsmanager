@@ -33,8 +33,7 @@ number there, and the date.
 **Alternate titles** use the CWR title types (alternate, translated, working,
 formal, part), each with a language.
 
-**Copyright** holds the registration number and date, and a reversion date with
-a lead time for agreements that return rights. A song with no number of its own
+**Copyright** holds the registration number, date and claimant. A song with no number of its own
 shows the registration of an attached Copyright Registration document (see
 Registration as it applies, under Releases).
 
@@ -99,10 +98,9 @@ controlled master shares total 100, no exclusive deal is active with anyone
 else, and every composition it records is one stop. When it isn't, it names the
 first thing in the way.
 
-**Copyright**: the sound recording's own registration number and date, separate
-from the composition's, and a reversion date with a lead time. With no number
-of its own, it shows the registration of an attached document or of a release
-it is on.
+**Copyright**: the sound recording's own registration number, date and
+claimant, separate from the composition's. With no number of its own, it shows
+the registration of an attached document or of a release it is on.
 
 **Signed**: publishers and sync agents holding rights to license the master,
 each with whether the deal is exclusive, its start and end dates, the agent's
@@ -119,15 +117,15 @@ verified, catalog number, label, original release date, primary genre, and the
 **Distribution** (each distributor with its own release ID and UPC, and the
 dates submitted, live and taken down).
 
-**Copyright**: the release's own registration number and date, such as an
-album registered as one work, and a reversion date with a lead time. Songs,
-recordings and releases use the same fields.
+**Copyright**: the release's own registration number, date and claimant, such
+as an album registered as one work. Songs, recordings and releases use the same
+fields.
 
 **Registration as it applies**: a song, recording or release is registered by
 its own number, else by an attached Copyright Registration document, and a
 recording also by a release it is on, so one album registration covers each
 track. Nothing is copied: when the registration is not the record's own, the
-Copyright tab shows its number and date read only, with the document or
+Copyright tab shows its number, date and claimant read only, with the document or
 release it comes from, and **Give it its own registration** opens the fields
 to type one, which then takes over. The tab warns when the record's own number
 matches none of its attached registration documents. The lists' Registration
@@ -182,9 +180,12 @@ where a document that already exists can be attached rather than uploaded
 again. A copyright registration covering ten works is one document linked ten
 times. Removing it from one record detaches it without deleting it.
 
-A **Copyright Registration** document has a **Registration number**, and its
-effective date is the date of registration. Attached to a song, recording or release, it is
-that record's registration, so the number is entered once, on the document.
+A **Copyright Registration** document has a **Registration number** and a
+**Claimant** (a person or a company), and its effective date is the date of
+registration. Attached to a song, recording or release, it is that record's
+registration, so the number and claimant are entered once, on the document.
+A transfer to the claimant is its own document, such as an Assignment of
+Copyright or a Work for Hire agreement, attached to the same record.
 
 ## Statements
 
@@ -472,3 +473,4 @@ a document or a release, does not sort.
 | 2026-11-15 | Other ISRCs and explicit content on recordings; returns and Delete on statements; inherited registrations shown in the fields; money permissions on roles. |
 | 2026-11-22 | Themes on recordings, searchable and a list column; themes and keywords in the pitch comment (#67). |
 | 2026-11-22 | A document's date is its effective date; Same as effective date fills in Signed (#5). |
+| 2026-11-22 | Registrations name a claimant, on the record or on the Copyright Registration document, and inherited ones show it; reversion is off the Copyright tab (#9). |

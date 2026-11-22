@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
-  ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput, NumberInput,
+  ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput,
   useRecordContext,
 } from 'react-admin';
 import { Alert, Button, Stack, TextField as MuiTextField } from '@mui/material';
@@ -10,6 +10,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useSourceContext } from 'ra-core';
 import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
 import { QuickCreateName } from './quickCreate';
+import { PersonOrCompanyInput } from './partyInputs';
 
 // Copies one date field into another, such as a document's effective date
 // into Signed. Both sources go through the source context, so inside an
@@ -184,8 +185,8 @@ const CopyrightConflict = () => {
   );
 };
 
-// The copyright registration and reversion fields songs, recordings and
-// releases share. numberHelp names the registration each one holds. When the
+// The copyright registration fields songs, recordings and releases share:
+// number, date and claimant. numberHelp names the registration each one holds. When the
 // record has no number of its own but a registration applies through an
 // attached document or a release, the number and date show that one, read
 // only, as of the last save; nothing is copied onto the record. Giving the
@@ -219,12 +220,19 @@ export const CopyrightInputs = ({ numberHelp }) => {
                        sx={{ width: { xs: '100%', md: 200 } }} />
           </>
         )}
-        <DateInput source="reversion_date" label="Reversion date"
-                   helperText="When the rights come back"
-                   sx={{ width: { xs: '100%', md: 200 } }} />
-        <NumberInput source="reversion_lead" label="Lead (years)"
-                     helperText="Notice before the reversion date"
-                     sx={{ width: { xs: '100%', md: 160 } }} />
+      </Stack>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+        {inherited ? (
+          <MuiTextField variant="filled" label="Claimant" value={c.claimant ?? ''}
+                        helperText={from} slotProps={{ input: { readOnly: true } }}
+                        sx={{ width: { xs: '100%', md: 300 } }} />
+        ) : (
+          <PersonOrCompanyInput personSource="claimant_contact_id"
+                                companySource="claimant_organization_id"
+                                personLabel="Claimant" companyLabel="or Company"
+                                personHelperText="Who the registration is in, as on the certificate"
+                                w={300} />
+        )}
       </Stack>
       {inherited && (
         <Button onClick={() => setOwnRegistration(true)} sx={{ alignSelf: 'flex-start' }}>

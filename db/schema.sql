@@ -51,14 +51,15 @@ CREATE TYPE music.copyright_status AS (
 	registered_on date,
 	source text,
 	source_title text,
-	conflict text
+	conflict text,
+	claimant text
 );
 
 --
 -- Name: TYPE copyright_status; Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON TYPE music.copyright_status IS 'A record''s copyright registration as it applies: number and registered_on; source is own (its Copyright tab), document (an attached Copyright Registration document) or release (a release the recording is on); source_title names that document or release; conflict lists attached registration numbers that differ from the record''s own.';
+COMMENT ON TYPE music.copyright_status IS 'A record''s copyright registration as it applies: number and registered_on; source is own (its Copyright tab), document (an attached Copyright Registration document) or release (a release the recording is on); source_title names that document or release; conflict lists attached registration numbers that differ from the record''s own; claimant names who the registration is in, from the same source as the number.';
 
 --
 -- Name: email_address; Type: DOMAIN; Schema: music; Owner: -
@@ -647,13 +648,15 @@ BEGIN
     INSERT INTO music.document (title, document_type_id, storage_kind,
                                 storage_uri, external_ref, mime_type,
                                 byte_size, sha256, document_date,
-                                signed_on, expires_on, notes, file_name)
+                                signed_on, expires_on, notes, file_name,
+                                claimant_contact_id, claimant_organization_id)
     VALUES (NEW.title, NEW.document_type_id,
             coalesce(NEW.storage_kind, 'url'),
             NEW.storage_uri, NEW.external_ref, NEW.mime_type,
             NEW.byte_size, NEW.sha256, NEW.document_date,
             NEW.signed_on, NEW.expires_on, NEW.notes,
-            nullif(btrim(NEW.file_name), ''))
+            nullif(btrim(NEW.file_name), ''),
+            NEW.claimant_contact_id, NEW.claimant_organization_id)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.document
@@ -669,7 +672,9 @@ BEGIN
            signed_on        = NEW.signed_on,
            expires_on       = NEW.expires_on,
            notes            = NEW.notes,
-           file_name        = nullif(btrim(NEW.file_name), '')
+           file_name        = nullif(btrim(NEW.file_name), ''),
+           claimant_contact_id      = NEW.claimant_contact_id,
+           claimant_organization_id = NEW.claimant_organization_id
      WHERE id = OLD.id;
     _id := OLD.id;
   END IF;
@@ -1054,7 +1059,7 @@ BEGIN
                                  vocal_type_id, parental_warning, pitch_contact_id, pitch_comment,
                                  recorded_country, commissioned_country, p_line_year,
                                  copyright_number, copyright_date,
-                                 reversion_date, reversion_lead,
+                                 reversion_date, reversion_lead, claimant_contact_id, claimant_organization_id,
                                  description, keywords, sounds_like, notes,
                                  status_id, language_code, multitracks_available)
     VALUES (_title, NEW.version_label, NEW.isrc, NEW.duration_ms, NEW.bpm,
@@ -1069,6 +1074,7 @@ BEGIN
             NEW.recorded_country, NEW.commissioned_country, NEW.p_line_year,
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''),
             NEW.copyright_date, NEW.reversion_date, NEW.reversion_lead,
+            NEW.claimant_contact_id, NEW.claimant_organization_id,
             NEW.description, NEW.keywords, NEW.sounds_like, NEW.notes,
             NEW.status_id, NEW.language_code,
             coalesce(NEW.multitracks_available, false))
@@ -1092,6 +1098,8 @@ BEGIN
            copyright_date = NEW.copyright_date,
            reversion_date = NEW.reversion_date,
            reversion_lead = NEW.reversion_lead,
+           claimant_contact_id = NEW.claimant_contact_id,
+           claimant_organization_id = NEW.claimant_organization_id,
            description = NEW.description, keywords = NEW.keywords,
            sounds_like = NEW.sounds_like, notes = NEW.notes,
            status_id = NEW.status_id,
@@ -1357,14 +1365,15 @@ BEGIN
                                release_date, c_line_year, c_line_contact_id,
                                c_line_organization_id, primary_genre_id, notes,
                                copyright_number, copyright_date, reversion_date,
-                               reversion_lead)
+                               reversion_lead, claimant_contact_id, claimant_organization_id)
     VALUES (btrim(NEW.title), coalesce(nullif(NEW.release_type, ''), 'Single'), _upc,
             nullif(btrim(coalesce(NEW.catalog_number, '')), ''), NEW.label_id,
             NEW.release_date, NEW.c_line_year,
             NEW.c_line_contact_id, NEW.c_line_organization_id,
             NEW.primary_genre_id, NEW.notes,
             nullif(btrim(coalesce(NEW.copyright_number, '')), ''), NEW.copyright_date,
-            NEW.reversion_date, NEW.reversion_lead)
+            NEW.reversion_date, NEW.reversion_lead,
+            NEW.claimant_contact_id, NEW.claimant_organization_id)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.release
@@ -1383,6 +1392,8 @@ BEGIN
            copyright_date = NEW.copyright_date,
            reversion_date = NEW.reversion_date,
            reversion_lead = NEW.reversion_lead,
+           claimant_contact_id = NEW.claimant_contact_id,
+           claimant_organization_id = NEW.claimant_organization_id,
            updated_at = now()
      WHERE id = OLD.id;
     _id := OLD.id;
@@ -1729,7 +1740,9 @@ BEGIN
              'expires_on', d.expires_on,
              'notes', d.notes,
              'external_ref', d.external_ref,
-             'file_name', d.file_name) ORDER BY d.id), '[]'::jsonb)
+             'file_name', d.file_name,
+             'claimant_contact_id', d.claimant_contact_id,
+             'claimant_organization_id', d.claimant_organization_id) ORDER BY d.id), '[]'::jsonb)
       FROM music.%I j
       JOIN music.document d ON d.id = j.document_id
      WHERE j.%I = $1 $q$, p_table, p_col)
@@ -1943,6 +1956,9 @@ CREATE TABLE music.document (
     signed_on date,
     expires_on date,
     file_name text,
+    claimant_contact_id integer,
+    claimant_organization_id integer,
+    CONSTRAINT document_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT document_dates CHECK (((expires_on IS NULL) OR (signed_on IS NULL) OR (expires_on >= signed_on))),
     CONSTRAINT document_file_name_trimmed CHECK (((file_name IS NULL) OR ((file_name = btrim(file_name)) AND (file_name <> ''::text)))),
     CONSTRAINT document_kind CHECK ((storage_kind = ANY (ARRAY['local'::text, 's3'::text, 'paperless'::text, 'url'::text]))),
@@ -1962,6 +1978,18 @@ COMMENT ON COLUMN music.document.external_ref IS 'An outside reference for the d
 --
 
 COMMENT ON COLUMN music.document.file_name IS 'The name the file had on the computer it was uploaded from. Storage names objects by their hash, so this is the only record of it. Empty for files uploaded before names were kept and for documents held elsewhere; api.name_files fills in stored ones.';
+
+--
+-- Name: COLUMN document.claimant_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.document.claimant_contact_id IS 'On a Copyright Registration document, the person named as claimant. It applies wherever the document''s registration number does.';
+
+--
+-- Name: COLUMN document.claimant_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.document.claimant_organization_id IS 'On a Copyright Registration document, the company named as claimant, when a company rather than a person holds it.';
 
 --
 -- Name: organization_document; Type: TABLE; Schema: music; Owner: -
@@ -2031,7 +2059,9 @@ CREATE VIEW api.document WITH (security_invoker='true') AS
           WHERE (od.document_id = d.id)), '{}'::integer[]) AS organization_ids,
     created_at,
     updated_at,
-    file_name
+    file_name,
+    claimant_contact_id,
+    claimant_organization_id
    FROM music.document d;
 
 --
@@ -2354,6 +2384,7 @@ DECLARE
   _rel record;
 BEGIN
   _out := (SELECT music.copyright_pick(r.copyright_number, r.copyright_date,
+                                       music.claimant_name(r.claimant_contact_id, r.claimant_organization_id),
                                        ARRAY(SELECT j.document_id FROM music.recording_document j WHERE j.recording_id = r.id))
               FROM music.recording r
              WHERE r.id = p_recording);
@@ -2361,7 +2392,7 @@ BEGIN
     RETURN _out;
   END IF;
 
-  SELECT rl.title, (x.c).number, (x.c).registered_on INTO _rel
+  SELECT rl.title, (x.c).number, (x.c).registered_on, (x.c).claimant INTO _rel
     FROM music.release_track t
     JOIN music.release rl ON rl.id = t.release_id
    CROSS JOIN LATERAL (SELECT music.release_copyright(rl.id) AS c) x
@@ -2370,7 +2401,7 @@ BEGIN
    ORDER BY (x.c).registered_on NULLS LAST, rl.id
    LIMIT 1;
   IF FOUND THEN
-    RETURN ROW(_rel.number, _rel.registered_on, 'release', _rel.title, NULL)::music.copyright_status;
+    RETURN ROW(_rel.number, _rel.registered_on, 'release', _rel.title, NULL, _rel.claimant)::music.copyright_status;
   END IF;
   RETURN NULL;
 END;
@@ -2671,7 +2702,10 @@ CREATE TABLE music.recording (
     parental_warning text,
     language_code music.iso_639_code,
     multitracks_available boolean DEFAULT false NOT NULL,
+    claimant_contact_id integer,
+    claimant_organization_id integer,
     CONSTRAINT recording_bpm CHECK (((bpm IS NULL) OR ((bpm >= (20)::numeric) AND (bpm <= (400)::numeric)))),
+    CONSTRAINT recording_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT recording_duration CHECK (((duration_ms IS NULL) OR (duration_ms > 0))),
     CONSTRAINT recording_parental_warning CHECK ((parental_warning = ANY (ARRAY['Explicit'::text, 'NotExplicit'::text, 'ExplicitContentEdited'::text]))),
     CONSTRAINT recording_pyear CHECK (((p_line_year IS NULL) OR ((p_line_year >= 1900) AND (p_line_year <= 2200)))),
@@ -2754,6 +2788,18 @@ COMMENT ON COLUMN music.recording.language_code IS 'Language of the vocal on thi
 --
 
 COMMENT ON COLUMN music.recording.multitracks_available IS 'Set by hand: the multitrack session can be supplied. Multitracks are not uploaded as audio files; the pitch comment says Multitracks Available when this is set.';
+
+--
+-- Name: COLUMN recording.claimant_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording.claimant_contact_id IS 'Person named as claimant on the sound recording''s own registration.';
+
+--
+-- Name: COLUMN recording.claimant_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording.claimant_organization_id IS 'Company named as claimant on the sound recording''s own registration, when a company rather than a person holds it.';
 
 --
 -- Name: recording_artist; Type: TABLE; Schema: music; Owner: -
@@ -2992,6 +3038,9 @@ CREATE TABLE music.song (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     based_on text,
     easy_clear boolean DEFAULT false NOT NULL,
+    claimant_contact_id integer,
+    claimant_organization_id integer,
+    CONSTRAINT song_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
     CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
     CONSTRAINT song_no_self CHECK (((derived_from_id IS NULL) OR (derived_from_id <> id))),
@@ -3015,6 +3064,18 @@ when the source is a real row.';
 
 COMMENT ON COLUMN music.song.easy_clear IS 'Set by hand: this work can be cleared quickly for sync. Separate from one
 stop, which is computed from the controlled shares.';
+
+--
+-- Name: COLUMN song.claimant_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.claimant_contact_id IS 'Person named as claimant on the composition''s own registration.';
+
+--
+-- Name: COLUMN song.claimant_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.claimant_organization_id IS 'Company named as claimant on the composition''s own registration, when a company rather than a person holds it.';
 
 --
 -- Name: theme; Type: TABLE; Schema: music; Owner: -
@@ -3141,7 +3202,9 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     ( SELECT string_agg(t.name, ', '::text ORDER BY t.name) AS string_agg
            FROM (music.recording_theme rt
              JOIN music.theme t ON ((t.id = rt.theme_id)))
-          WHERE (rt.recording_id = r.id)) AS theme_names
+          WHERE (rt.recording_id = r.id)) AS theme_names,
+    claimant_contact_id,
+    claimant_organization_id
    FROM music.recording r;
 
 --
@@ -3274,6 +3337,7 @@ CREATE FUNCTION music.release_copyright(p_release integer) RETURNS music.copyrig
     LANGUAGE sql STABLE
     AS $$
   SELECT music.copyright_pick(r.copyright_number, r.copyright_date,
+                              music.claimant_name(r.claimant_contact_id, r.claimant_organization_id),
                               ARRAY(SELECT j.document_id FROM music.release_document j WHERE j.release_id = r.id))
     FROM music.release r
    WHERE r.id = p_release
@@ -3338,8 +3402,11 @@ CREATE TABLE music.release (
     copyright_date date,
     reversion_date date,
     reversion_lead smallint,
+    claimant_contact_id integer,
+    claimant_organization_id integer,
     CONSTRAINT release_c_line_one_owner CHECK ((num_nonnulls(c_line_contact_id, c_line_organization_id) <= 1)),
     CONSTRAINT release_c_line_year CHECK (((c_line_year IS NULL) OR ((c_line_year >= 1900) AND (c_line_year <= 2200)))),
+    CONSTRAINT release_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT release_reversion_lead CHECK (((reversion_lead IS NULL) OR (reversion_lead >= 0))),
     CONSTRAINT release_title_trimmed CHECK (((title = btrim(title)) AND (title <> ''::text))),
     CONSTRAINT release_type_ddex CHECK ((release_type = ANY (ARRAY['Single'::text, 'EP'::text, 'Album'::text]))),
@@ -3401,6 +3468,18 @@ COMMENT ON COLUMN music.release.reversion_date IS 'When rights in the release, s
 --
 
 COMMENT ON COLUMN music.release.reversion_lead IS 'Years of notice before the reversion date, for a reminder.';
+
+--
+-- Name: COLUMN release.claimant_contact_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.claimant_contact_id IS 'Person named as claimant on the release''s own registration.';
+
+--
+-- Name: COLUMN release.claimant_organization_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.claimant_organization_id IS 'Company named as claimant on the release''s own registration, when a company rather than a person holds it.';
 
 --
 -- Name: release_artist; Type: TABLE; Schema: music; Owner: -
@@ -3531,7 +3610,9 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
     copyright_date,
     reversion_date,
     reversion_lead,
-    music.release_copyright(id) AS copyright_status
+    music.release_copyright(id) AS copyright_status,
+    claimant_contact_id,
+    claimant_organization_id
    FROM music.release r;
 
 --
@@ -3590,6 +3671,7 @@ CREATE FUNCTION music.song_copyright(p_song integer) RETURNS music.copyright_sta
     LANGUAGE sql STABLE
     AS $$
   SELECT music.copyright_pick(s.copyright_number, s.copyright_date,
+                              music.claimant_name(s.claimant_contact_id, s.claimant_organization_id),
                               ARRAY(SELECT j.document_id FROM music.song_document j WHERE j.song_id = s.id))
     FROM music.song s
    WHERE s.id = p_song
@@ -3763,7 +3845,9 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
     ( SELECT l.name
            FROM music.language l
           WHERE ((l.code)::text = (s.language_code)::text)) AS language_name,
-    music.song_copyright(id) AS copyright_status
+    music.song_copyright(id) AS copyright_status,
+    claimant_contact_id,
+    claimant_organization_id
    FROM music.song s;
 
 --
@@ -4315,14 +4399,16 @@ BEGIN
                             public_domain_p, easy_clear,
                             derived_from_id, derivation_type, based_on,
                             copyright_date, copyright_number,
-                            reversion_date, reversion_lead, language_code)
+                            reversion_date, reversion_lead, language_code,
+                            claimant_contact_id, claimant_organization_id)
     VALUES (NEW.title, NEW.iswc, NEW.lyrics, NEW.notes,
             coalesce(NEW.public_domain_p, false),
             coalesce(NEW.easy_clear, false),
             NEW.derived_from_id, NEW.derivation_type,
             nullif(btrim(coalesce(NEW.based_on,'')), ''),
             NEW.copyright_date, NEW.copyright_number,
-            NEW.reversion_date, NEW.reversion_lead, NEW.language_code)
+            NEW.reversion_date, NEW.reversion_lead, NEW.language_code,
+            NEW.claimant_contact_id, NEW.claimant_organization_id)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.song
@@ -4337,6 +4423,8 @@ BEGIN
            copyright_number = NEW.copyright_number,
            reversion_date = NEW.reversion_date,
            reversion_lead = NEW.reversion_lead,
+           claimant_contact_id = NEW.claimant_contact_id,
+           claimant_organization_id = NEW.claimant_organization_id,
            language_code = NEW.language_code
      WHERE id = OLD.id;
     _id := OLD.id;
@@ -4829,6 +4917,23 @@ END;
 $$;
 
 --
+-- Name: claimant_name(integer, integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.claimant_name(p_contact_id integer, p_organization_id integer) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT coalesce((SELECT o.name FROM music.organization o WHERE o.id = p_organization_id),
+                  (SELECT c.display_name FROM music.contact c WHERE c.id = p_contact_id))
+$$;
+
+--
+-- Name: FUNCTION claimant_name(p_contact_id integer, p_organization_id integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.claimant_name(p_contact_id integer, p_organization_id integer) IS 'The claimant as named on a registration: the company''s name, or the person''s name without a performing name.';
+
+--
 -- Name: copyright_key(text); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -4845,10 +4950,10 @@ $$;
 COMMENT ON FUNCTION music.copyright_key(p_number text) IS 'A registration number reduced to letters and digits, upper case, so SR 1-234-567 and sr1234567 compare equal.';
 
 --
--- Name: copyright_pick(text, date, integer[]); Type: FUNCTION; Schema: music; Owner: -
+-- Name: copyright_pick(text, date, text, integer[]); Type: FUNCTION; Schema: music; Owner: -
 --
 
-CREATE FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) RETURNS music.copyright_status
+CREATE FUNCTION music.copyright_pick(p_number text, p_date date, p_claimant text, p_documents integer[]) RETURNS music.copyright_status
     LANGUAGE plpgsql STABLE
     AS $$
 DECLARE
@@ -4868,10 +4973,11 @@ BEGIN
                         WHERE m.id = ANY (p_documents)
                           AND m.document_type_id = d.document_type_id
                           AND music.copyright_key(m.external_ref) = music.copyright_key(_number));
-    RETURN ROW(_number, p_date, 'own', NULL, _others)::music.copyright_status;
+    RETURN ROW(_number, p_date, 'own', NULL, _others, p_claimant)::music.copyright_status;
   END IF;
 
-  SELECT d.title, btrim(d.external_ref) AS number, d.document_date INTO _doc
+  SELECT d.title, btrim(d.external_ref) AS number, d.document_date,
+         music.claimant_name(d.claimant_contact_id, d.claimant_organization_id) AS claimant INTO _doc
     FROM music.document d
     JOIN music.document_type t ON t.id = d.document_type_id
    WHERE d.id = ANY (p_documents)
@@ -4880,17 +4986,17 @@ BEGIN
    ORDER BY d.document_date NULLS LAST, d.id
    LIMIT 1;
   IF FOUND THEN
-    RETURN ROW(_doc.number, _doc.document_date, 'document', _doc.title, NULL)::music.copyright_status;
+    RETURN ROW(_doc.number, _doc.document_date, 'document', _doc.title, NULL, _doc.claimant)::music.copyright_status;
   END IF;
   RETURN NULL;
 END;
 $$;
 
 --
--- Name: FUNCTION copyright_pick(p_number text, p_date date, p_documents integer[]); Type: COMMENT; Schema: music; Owner: -
+-- Name: FUNCTION copyright_pick(p_number text, p_date date, p_claimant text, p_documents integer[]); Type: COMMENT; Schema: music; Owner: -
 --
 
-COMMENT ON FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) IS 'The registration that applies to a record: its own number and date when it has a number, flagging attached Copyright Registration documents whose numbers all differ from it; otherwise the earliest attached Copyright Registration document with a number (its External reference) and its date. The document type is found by its name, Copyright Registration. Null when neither.';
+COMMENT ON FUNCTION music.copyright_pick(p_number text, p_date date, p_claimant text, p_documents integer[]) IS 'The registration that applies to a record: its own number, date and claimant when it has a number, flagging attached Copyright Registration documents whose numbers all differ from it; otherwise the earliest attached Copyright Registration document with a number (its External reference), with its date and claimant. The document type is found by its name, Copyright Registration. Null when neither.';
 
 --
 -- Name: create_account(text, text); Type: FUNCTION; Schema: music; Owner: -
@@ -5549,6 +5655,10 @@ BEGIN
          document_date    = coalesce(k.document_date, d.document_date),
          signed_on        = coalesce(k.signed_on, d.signed_on),
          expires_on       = coalesce(k.expires_on, d.expires_on),
+         claimant_contact_id      = CASE WHEN num_nonnulls(k.claimant_contact_id, k.claimant_organization_id) = 0
+                                         THEN d.claimant_contact_id ELSE k.claimant_contact_id END,
+         claimant_organization_id = CASE WHEN num_nonnulls(k.claimant_contact_id, k.claimant_organization_id) = 0
+                                         THEN d.claimant_organization_id ELSE k.claimant_organization_id END,
          notes            = CASE WHEN nullif(btrim(d.notes), '') IS NULL OR d.notes = k.notes THEN k.notes
                                  ELSE concat_ws(E'\n', k.notes, d.notes) END
    WHERE k.id = p_keep;
@@ -6159,7 +6269,13 @@ BEGIN
                                      ELSE external_ref END,
              file_name        = CASE WHEN d ? 'file_name'
                                      THEN nullif(btrim(coalesce(d->>'file_name','')), '')
-                                     ELSE file_name END
+                                     ELSE file_name END,
+             claimant_contact_id      = CASE WHEN d ? 'claimant_contact_id'
+                                             THEN nullif(d->>'claimant_contact_id','')::integer
+                                             ELSE claimant_contact_id END,
+             claimant_organization_id = CASE WHEN d ? 'claimant_organization_id'
+                                             THEN nullif(d->>'claimant_organization_id','')::integer
+                                             ELSE claimant_organization_id END
        WHERE id = _doc;
     ELSE
       _doc := NULL;
@@ -6173,7 +6289,7 @@ BEGIN
         INSERT INTO music.document
           (title, document_type_id, storage_kind, storage_uri,
            mime_type, byte_size, document_date, signed_on, expires_on, notes,
-           external_ref, file_name)
+           external_ref, file_name, claimant_contact_id, claimant_organization_id)
         VALUES (btrim(d->>'title'),
                 nullif(d->>'document_type_id','')::integer,
                 _kind,
@@ -6185,7 +6301,9 @@ BEGIN
                 nullif(d->>'expires_on','')::date,
                 nullif(d->>'notes',''),
                 nullif(btrim(coalesce(d->>'external_ref','')), ''),
-                nullif(btrim(coalesce(d->>'file_name','')), ''))
+                nullif(btrim(coalesce(d->>'file_name','')), ''),
+                nullif(d->>'claimant_contact_id','')::integer,
+                nullif(d->>'claimant_organization_id','')::integer)
         RETURNING id INTO _doc;
       ELSE
         UPDATE music.document
@@ -6197,7 +6315,13 @@ BEGIN
                expires_on       = coalesce(expires_on, nullif(d->>'expires_on','')::date),
                notes            = coalesce(notes, nullif(d->>'notes','')),
                external_ref     = coalesce(external_ref, nullif(btrim(coalesce(d->>'external_ref','')), '')),
-               file_name        = coalesce(file_name, nullif(btrim(coalesce(d->>'file_name','')), ''))
+               file_name        = coalesce(file_name, nullif(btrim(coalesce(d->>'file_name','')), '')),
+               claimant_contact_id      = CASE WHEN num_nonnulls(claimant_contact_id, claimant_organization_id) = 0
+                                               THEN nullif(d->>'claimant_contact_id','')::integer
+                                               ELSE claimant_contact_id END,
+               claimant_organization_id = CASE WHEN num_nonnulls(claimant_contact_id, claimant_organization_id) = 0
+                                               THEN nullif(d->>'claimant_organization_id','')::integer
+                                               ELSE claimant_organization_id END
          WHERE id = _doc;
       END IF;
     END IF;
@@ -10453,6 +10577,20 @@ ALTER TABLE ONLY music.document
     ADD CONSTRAINT document_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
 
 --
+-- Name: document document_claimant_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.document
+    ADD CONSTRAINT document_claimant_contact_id_fkey FOREIGN KEY (claimant_contact_id) REFERENCES music.contact(id) ON DELETE SET NULL;
+
+--
+-- Name: document document_claimant_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.document
+    ADD CONSTRAINT document_claimant_organization_id_fkey FOREIGN KEY (claimant_organization_id) REFERENCES music.organization(id) ON DELETE SET NULL;
+
+--
 -- Name: document document_document_type_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -10563,6 +10701,20 @@ ALTER TABLE ONLY music.recording_artist
 
 ALTER TABLE ONLY music.recording_artist
     ADD CONSTRAINT recording_artist_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id) ON DELETE CASCADE;
+
+--
+-- Name: recording recording_claimant_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording
+    ADD CONSTRAINT recording_claimant_contact_id_fkey FOREIGN KEY (claimant_contact_id) REFERENCES music.contact(id) ON DELETE SET NULL;
+
+--
+-- Name: recording recording_claimant_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.recording
+    ADD CONSTRAINT recording_claimant_organization_id_fkey FOREIGN KEY (claimant_organization_id) REFERENCES music.organization(id) ON DELETE SET NULL;
 
 --
 -- Name: recording recording_commissioned_country_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -10824,6 +10976,20 @@ ALTER TABLE ONLY music.release
     ADD CONSTRAINT release_c_line_organization_id_fkey FOREIGN KEY (c_line_organization_id) REFERENCES music.organization(id) ON DELETE SET NULL;
 
 --
+-- Name: release release_claimant_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.release
+    ADD CONSTRAINT release_claimant_contact_id_fkey FOREIGN KEY (claimant_contact_id) REFERENCES music.contact(id) ON DELETE SET NULL;
+
+--
+-- Name: release release_claimant_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.release
+    ADD CONSTRAINT release_claimant_organization_id_fkey FOREIGN KEY (claimant_organization_id) REFERENCES music.organization(id) ON DELETE SET NULL;
+
+--
 -- Name: release_distribution release_distribution_distributor_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -10899,6 +11065,20 @@ ALTER TABLE ONLY music.schema_type
 
 ALTER TABLE ONLY music.song
     ADD CONSTRAINT song_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
+
+--
+-- Name: song song_claimant_contact_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.song
+    ADD CONSTRAINT song_claimant_contact_id_fkey FOREIGN KEY (claimant_contact_id) REFERENCES music.contact(id) ON DELETE SET NULL;
+
+--
+-- Name: song song_claimant_organization_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.song
+    ADD CONSTRAINT song_claimant_organization_id_fkey FOREIGN KEY (claimant_organization_id) REFERENCES music.organization(id) ON DELETE SET NULL;
 
 --
 -- Name: song song_derived_from_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -11441,7 +11621,7 @@ ALTER TABLE music.document ENABLE ROW LEVEL SECURITY;
 -- Name: document document_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY document_account ON music.document USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+CREATE POLICY document_account ON music.document USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((claimant_contact_id IS NULL) OR music.own_contact(claimant_contact_id)) AND ((claimant_organization_id IS NULL) OR music.own_organization(claimant_organization_id))));
 
 --
 -- Name: POLICY document_account ON document; Type: COMMENT; Schema: music; Owner: -
@@ -11549,7 +11729,7 @@ ALTER TABLE music.recording ENABLE ROW LEVEL SECURITY;
 -- Name: recording recording_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY recording_account ON music.recording USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((pitch_contact_id IS NULL) OR music.own_contact(pitch_contact_id))));
+CREATE POLICY recording_account ON music.recording USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((pitch_contact_id IS NULL) OR music.own_contact(pitch_contact_id)) AND ((claimant_contact_id IS NULL) OR music.own_contact(claimant_contact_id)) AND ((claimant_organization_id IS NULL) OR music.own_organization(claimant_organization_id))));
 
 --
 -- Name: POLICY recording_account ON recording; Type: COMMENT; Schema: music; Owner: -
@@ -11803,7 +11983,7 @@ ALTER TABLE music.release ENABLE ROW LEVEL SECURITY;
 -- Name: release release_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY release_account ON music.release USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((c_line_contact_id IS NULL) OR music.own_contact(c_line_contact_id)) AND ((c_line_organization_id IS NULL) OR music.own_organization(c_line_organization_id)) AND ((label_id IS NULL) OR music.own_organization(label_id))));
+CREATE POLICY release_account ON music.release USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((c_line_contact_id IS NULL) OR music.own_contact(c_line_contact_id)) AND ((c_line_organization_id IS NULL) OR music.own_organization(c_line_organization_id)) AND ((label_id IS NULL) OR music.own_organization(label_id)) AND ((claimant_contact_id IS NULL) OR music.own_contact(claimant_contact_id)) AND ((claimant_organization_id IS NULL) OR music.own_organization(claimant_organization_id))));
 
 --
 -- Name: POLICY release_account ON release; Type: COMMENT; Schema: music; Owner: -
@@ -11901,7 +12081,7 @@ ALTER TABLE music.song ENABLE ROW LEVEL SECURITY;
 -- Name: song song_account; Type: POLICY; Schema: music; Owner: -
 --
 
-CREATE POLICY song_account ON music.song USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((derived_from_id IS NULL) OR music.own_song(derived_from_id))));
+CREATE POLICY song_account ON music.song USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK (((account_id = ( SELECT music.current_account() AS current_account)) AND ((derived_from_id IS NULL) OR music.own_song(derived_from_id)) AND ((claimant_contact_id IS NULL) OR music.own_contact(claimant_contact_id)) AND ((claimant_organization_id IS NULL) OR music.own_organization(claimant_organization_id))));
 
 --
 -- Name: POLICY song_account ON song; Type: COMMENT; Schema: music; Owner: -
@@ -13039,16 +13219,22 @@ GRANT ALL ON FUNCTION api.transaction_write() TO app_user;
 REVOKE ALL ON FUNCTION auth.set_password(p_email text, p_password text) FROM PUBLIC;
 
 --
+-- Name: FUNCTION claimant_name(p_contact_id integer, p_organization_id integer); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.claimant_name(p_contact_id integer, p_organization_id integer) TO app_user;
+
+--
 -- Name: FUNCTION copyright_key(p_number text); Type: ACL; Schema: music; Owner: -
 --
 
 GRANT ALL ON FUNCTION music.copyright_key(p_number text) TO app_user;
 
 --
--- Name: FUNCTION copyright_pick(p_number text, p_date date, p_documents integer[]); Type: ACL; Schema: music; Owner: -
+-- Name: FUNCTION copyright_pick(p_number text, p_date date, p_claimant text, p_documents integer[]); Type: ACL; Schema: music; Owner: -
 --
 
-GRANT ALL ON FUNCTION music.copyright_pick(p_number text, p_date date, p_documents integer[]) TO app_user;
+GRANT ALL ON FUNCTION music.copyright_pick(p_number text, p_date date, p_claimant text, p_documents integer[]) TO app_user;
 
 --
 -- Name: FUNCTION create_account(p_name text, p_owner_email text); Type: ACL; Schema: music; Owner: -
