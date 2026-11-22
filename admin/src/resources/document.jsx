@@ -1,6 +1,6 @@
 import {
   List, TextField, DateField, NumberField, ReferenceField, Edit,
-  Create, SimpleForm, TextInput, NumberInput, DateInput, SelectInput,
+  Create, SimpleForm, TextInput, NumberInput, SelectInput,
   ReferenceInput, ReferenceArrayInput,
   AutocompleteArrayInput,
 } from 'react-admin';
@@ -8,6 +8,7 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { Box } from '@mui/material';
 import { EditToolbar } from './formToolbar';
 import { FileLink } from './FileLink';
+import { DocumentDatesInput } from './DocumentDatesInput';
 import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
 
 const filters = [searchFilter];
@@ -30,7 +31,7 @@ const DocumentList = () => (
       <TextField source="file_name" label="File name" emptyText="—" />
       <ReferenceField source="document_type_id" reference="document_type"
                       label="Type" emptyText="—" />
-      <DateField source="document_date" label="Date" emptyText="—" />
+      <DateField source="document_date" label="Effective" emptyText="—" />
       <DateField source="signed_on" label="Signed" emptyText="—" />
       <DateField source="expires_on" label="Expires" emptyText="—" />
       <TextField source="storage_kind" label="Storage" />
@@ -60,9 +61,7 @@ const DocumentForm = () => (
     <TextInput source="external_ref" label="External reference"
                helperText="Document id in Paperless or similar" />
 
-    <DateInput source="document_date" label="Document date" />
-    <DateInput source="signed_on" label="Signed" />
-    <DateInput source="expires_on" label="Expires" />
+    <DocumentDatesInput />
 
     <ReferenceArrayInput source="song_ids" reference="song" perPage={500}
                          sort={{ field: 'title', order: 'ASC' }}>

@@ -1,5 +1,5 @@
 import {
-  ArrayInput, SimpleFormIterator, TextInput, DateInput,
+  ArrayInput, SimpleFormIterator, TextInput,
   ReferenceInput, useGetOne,
   required,
 } from 'react-admin';
@@ -8,6 +8,7 @@ import { useWatch } from 'react-hook-form';
 import { FileUploadInput } from './FileUploadInput';
 import { FileLink } from './FileLink';
 import { AttachDocumentInput } from './AttachDocumentInput';
+import { DocumentDatesInput } from './DocumentDatesInput';
 import { SharedListPicker } from './shared';
 
 /*
@@ -25,7 +26,7 @@ import { SharedListPicker } from './shared';
  * elsewhere; a web address is recorded as a URL.
  */
 // A Copyright Registration document carries its registration number, kept in
-// the document's external reference. Its Date is the registration date. The
+// the document's external reference. Its effective date is the registration date. The
 // number then applies to every song, recording or release the document is
 // attached to, and through a release to its tracks. The type is recognized
 // by its name.
@@ -36,7 +37,7 @@ const RegistrationNumberInput = () => {
   if (type?.name !== 'Copyright Registration') return null;
   return (
     <TextInput source="external_ref" label="Registration number"
-               helperText="Such as SR 1-234-567. It applies to everything this document is attached to; the Date is the registration date."
+               helperText="Such as SR 1-234-567. It applies to everything this document is attached to; the effective date is the date of registration."
                sx={{ width: { xs: '100%', md: 300 } }} />
   );
 };
@@ -62,12 +63,7 @@ export const DocumentsInput = () => (
       <TextInput source="storage_uri" label="Location" fullWidth
                  helperText="Set by the upload. Paste a URL here for a file held elsewhere." />
 
-      <DateInput source="document_date" label="Date"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
-      <DateInput source="signed_on" label="Signed"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
-      <DateInput source="expires_on" label="Expires"
-                 sx={{ width: { xs: '100%', md: 200 } }} />
+      <DocumentDatesInput />
       <TextInput source="notes" label="Note" multiline fullWidth />
     </SimpleFormIterator>
   </ArrayInput>

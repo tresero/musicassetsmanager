@@ -6,9 +6,27 @@ import {
   useRecordContext,
 } from 'react-admin';
 import { Alert, Button, Stack, TextField as MuiTextField } from '@mui/material';
-import { useWatch } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
+import { useSourceContext } from 'ra-core';
 import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
 import { QuickCreateName } from './quickCreate';
+
+// Copies one date field into another, such as a document's effective date
+// into Signed. Both sources go through the source context, so inside an
+// ArrayInput row they are that row's fields; fromRoot reads the date from
+// the record itself instead, such as a release's date for a distribution row.
+export const SameAsDateButton = ({ from, to, label, fromRoot = false }) => {
+  const { getSource } = useSourceContext();
+  const { setValue } = useFormContext();
+  const date = useWatch({ name: fromRoot ? from : getSource(from) });
+  return (
+    <Button size="small" disabled={!date}
+            onClick={() => setValue(getSource(to), date,
+                                    { shouldDirty: true, shouldValidate: true })}>
+      {label}
+    </Button>
+  );
+};
 
 // A shared list. Only the site admin opens rows to edit and bulk deletes; the
 // database refuses everyone else.

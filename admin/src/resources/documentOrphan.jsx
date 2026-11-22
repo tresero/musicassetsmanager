@@ -20,7 +20,7 @@ const OrphanList = () => (
       <TextField source="file_name" label="File name" emptyText="—" />
       <TextField source="document_type" label="Type" emptyText="—" />
       <TextField source="storage_uri" label="Location" />
-      <DateField source="document_date" label="Date" emptyText="—" />
+      <DateField source="document_date" label="Effective" emptyText="—" />
       <DateField source="created_at" label="Added" />
     </CatalogDatagrid>
   </List>

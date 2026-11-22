@@ -173,7 +173,8 @@ dates they joined and left.
 ## Documents
 
 Split sheets, contracts, track sheets, licenses, and the rest, each with a type,
-the file itself, and dates for when it was made, signed, and expires. A document
+the file itself, and dates for when it takes effect, is signed, and expires;
+Same as effective date copies the effective date into Signed. A document
 attaches to any number of songs, recordings, releases, people, and companies,
 and receipts to transactions, and can be
 added from either side: from the document, or from the record it belongs to,
@@ -182,7 +183,7 @@ again. A copyright registration covering ten works is one document linked ten
 times. Removing it from one record detaches it without deleting it.
 
 A **Copyright Registration** document has a **Registration number**, and its
-Date is the registration date. Attached to a song, recording or release, it is
+effective date is the date of registration. Attached to a song, recording or release, it is
 that record's registration, so the number is entered once, on the document.
 
 ## Statements
@@ -470,3 +471,4 @@ a document or a release, does not sort.
 | 2026-11-15 | Copyright Registration documents carry the number; registration as it applies, through documents and releases; Unregistered recordings report. |
 | 2026-11-15 | Other ISRCs and explicit content on recordings; returns and Delete on statements; inherited registrations shown in the fields; money permissions on roles. |
 | 2026-11-22 | Themes on recordings, searchable and a list column; themes and keywords in the pitch comment (#67). |
+| 2026-11-22 | A document's date is its effective date; Same as effective date fills in Signed (#5). |
