@@ -117,10 +117,30 @@ CREATE DOMAIN music.isrc AS text
 	CONSTRAINT isrc_format CHECK ((VALUE ~ '^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$'::text));
 
 --
+-- Name: iswc_valid(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.iswc_valid(p text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $_$
+  SELECT p ~ '^T[0-9]{10}$'
+     AND (10 - (1 + (SELECT sum(i * substr(p, 1 + i, 1)::int)
+                       FROM generate_series(1, 9) i)) % 10) % 10
+         = right(p, 1)::int
+$_$;
+
+--
+-- Name: FUNCTION iswc_valid(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.iswc_valid(p text) IS 'True for T plus nine digits and a correct check digit (ISO 15707: 1 plus each digit times its position, check digit makes the sum a multiple of 10).';
+
+--
 -- Name: iswc; Type: DOMAIN; Schema: music; Owner: -
 --
 
 CREATE DOMAIN music.iswc AS text
+	CONSTRAINT iswc_check_digit CHECK (music.iswc_valid(VALUE))
 	CONSTRAINT iswc_format CHECK ((VALUE ~ '^T[0-9]{10}$'::text));
 
 --
@@ -12353,6 +12373,12 @@ GRANT USAGE ON SCHEMA music TO mamupload;
 --
 
 GRANT ALL ON TYPE music.copyright_status TO app_user;
+
+--
+-- Name: FUNCTION iswc_valid(p text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.iswc_valid(p text) TO app_user;
 
 --
 -- Name: FUNCTION accept_invite(token text, pass text); Type: ACL; Schema: api; Owner: -

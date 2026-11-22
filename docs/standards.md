@@ -16,7 +16,8 @@ What this implements, and where the edges are.
 All are format-checked by domains. ISWC is `T` plus ten digits. ISRC is a
 two-letter country code, a three-character registrant, and seven digits. IPI is
 nine to eleven digits. ISNI is sixteen characters with a possible trailing X.
-A UPC or EAN has its GTIN check digit verified.
+A UPC or EAN has its GTIN check digit verified, and an ISWC its ISO 15707 check
+digit (`music.iswc_valid`).
 
 An ISRC identifies one recording, but one recording can earn under several:
 a reissue through a later distributor gets a new ISRC while the original still
@@ -226,3 +227,4 @@ than a CHECK constraint so they can be extended without a migration.
 | 2026-09-30 | DDEX codes on roles and instruments, allowed value sets version 011. |
 | 2026-11-15 | Royalty statements: no required format, the identifiers that match lines, CRD, DSR and CDM, publishing and master sides. |
 | 2026-11-15 | UPC and other ISRCs among the identifiers; copyright registrations and how they apply; release title matching and unit-price sales reports. |
+| 2026-11-22 | ISWC check digit verified (#18). |
