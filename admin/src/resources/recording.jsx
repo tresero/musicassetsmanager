@@ -17,7 +17,7 @@ import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
-  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, lyricsFilter, RowIterator, StartHere,
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, lyricsFilter, RowIterator, StartHere, CloseLyricsNotice,
 } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { RecordingLyricsInput } from './recordingLyrics';
@@ -81,6 +81,7 @@ const RecordingList = () => (
   <List filters={filters} actions={<ListActions />}
         sort={{ field: 'title', order: 'ASC' }} perPage={50}
         empty={<StartHere />}>
+    <CloseLyricsNotice />
     <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
       <DataTable.Col source="title" />
       <DataTable.Col source="version_label" label="Version" />

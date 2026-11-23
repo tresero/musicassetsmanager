@@ -48,13 +48,15 @@ statuses) are starting points to edit.
 
 ## Extensions
 
-`schema.sql` creates the three extensions it needs:
+`schema.sql` creates the four extensions it needs:
 
 `pgcrypto` provides `crypt()` and `gen_salt()` for password hashing in the
 login function. `unaccent` is used when matching titles against society
 exports, where the same work appears as both "Que Pena" and "Qué Pena".
 `pg_trgm` ranks the songs suggested for an unmatched statement line by how
-alike the titles are. All three ship with PostgreSQL.
+alike the titles are. `fuzzystrmatch` gives `levenshtein()`, which finds the
+close words in the lyrics when Lyrics contain matches nothing as typed. All
+four ship with PostgreSQL.
 
 ## PostgREST
 
@@ -161,3 +163,4 @@ Then log in at the app's root URL. Invite everyone else from Settings, Users.
 | 2026-10-10 | PostgREST db-pre-request; first user is an Owner |
 | 2026-11-14 | pg_trgm for statement line suggestions. |
 | 2026-11-23 | Developed on PostgreSQL 19; pgTAP and pg_prove for the database tests. |
+| 2026-11-23 | fuzzystrmatch for close lyrics matches. |

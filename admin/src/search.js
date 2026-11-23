@@ -34,3 +34,10 @@ export const searchFilters = (filter) => Object.entries(filter).reduce((out, [ke
   const query = typeof value === 'string' ? searchQuery(value.trim()) : '';
   return query ? { ...out, [`${column}@fts(fold)`]: query } : out;
 }, {});
+
+// Lyrics contain found nothing exactly: search again with the close words
+// the database suggested (api.lyrics_close_query) in place of what was typed.
+export const withCloseLyrics = (filter, closeQuery) => {
+  const { lyrics, ...rest } = filter;
+  return { ...searchFilters(rest), 'lyrics_search@fts(fold)': closeQuery };
+};

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { searchQuery, searchFilters } from './search';
+import { searchQuery, searchFilters, withCloseLyrics } from './search';
 
 describe('searchQuery', () => {
   test('plain words each match the start of a word', () => {
@@ -41,5 +41,15 @@ describe('searchFilters', () => {
   test('empty text adds no search', () => {
     expect(searchFilters({ q: '  ', lyrics: '' })).toEqual({});
     expect(searchFilters({})).toEqual({});
+  });
+});
+
+describe('withCloseLyrics', () => {
+  test('searches the close words in place of what was typed, keeping other filters', () => {
+    expect(withCloseLyrics({ q: 'son', lyrics: 'korazon', one_stop: true }, '(corazon | corazones)')).toEqual({
+      'search@fts(fold)': 'son:*',
+      'lyrics_search@fts(fold)': '(corazon | corazones)',
+      one_stop: true,
+    });
   });
 });

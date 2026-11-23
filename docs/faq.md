@@ -148,10 +148,12 @@ The search box looks at names and codes: titles, writers, ISWCs and the like.
 Lyrics are left out on purpose, since a word like "la" or "amor" is in nearly
 every lyric and would bury the song you were looking for. To search lyrics,
 open the Songs or Recordings list, choose **Add filter > Lyrics contain**, and
-type a few words of the line.
+type a few words of the line. A typo or two words run together still finds
+it: when nothing matches as typed, the list shows the closest words in your
+lyrics instead and says so above the results.
 
 To show it: open **Songs**, choose **Add filter > Lyrics contain**, and type
-two words from a chorus.
+two words from a chorus; then type one of them with a letter wrong.
 
 ### What is the difference between one stop and easy clear?
 
@@ -240,3 +242,4 @@ To show it:
 | 2026-11-23 | Songs: public domain source, versions of a tune, Based on, crediting the original writer, one stop and easy clear. |
 | 2026-11-23 | Artists: a featured artist who is already in People. |
 | 2026-11-23 | Searching lyrics. |
+| 2026-11-23 | Close matches when lyrics are typed with a typo. |

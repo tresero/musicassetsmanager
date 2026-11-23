@@ -480,7 +480,11 @@ a document or a release, does not sort.
   filter: every word typed must start a word of the lyrics, accents and
   formatting ignored. A recording is searched by its own lyrics, else its
   songs'. The main search box leaves lyrics out, since common words would
-  match nearly every song (#48).
+  match nearly every song (#48). When nothing matches as typed, it searches
+  the closest words in the lyrics instead and says which: a word of 4 to 6
+  letters may be one letter off and a longer one two, and two words run
+  together count ("agarralo" finds "agarra lo"), so "korazon" finds
+  corazón.
 - An empty Songs, Recordings or Releases list says to set up Storage and
   Pitch settings before adding the catalog, to those who can (#35).
 
@@ -545,3 +549,4 @@ a document or a release, does not sort.
 | 2026-11-23 | A new solo artist is linked to its person when added (#30). |
 | 2026-11-23 | Help text across the forms; what to do when a list value is missing; first steps on an empty catalog (#35). |
 | 2026-11-23 | Lyrics on recordings with Copy from song, and a Lyrics contain filter (#48). |
+| 2026-11-23 | Lyrics contain falls back to close matches. |

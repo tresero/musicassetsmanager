@@ -114,6 +114,9 @@ admin's.
 - Copy from song fills an empty Lyrics tab from the song, copies a medley's
   songs under their titles, and asks before replacing lyrics already entered
   (checked by hand in a browser; the widget test waits on #81).
+- When Lyrics contain matches nothing, the list asks `api.lyrics_close_query`,
+  searches again with its words, and shows the close-match notice (checked
+  by hand in a browser; waits on #81).
 
 ## Help text (#35)
 

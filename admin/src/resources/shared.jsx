@@ -3,7 +3,7 @@ import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput,
-  useRecordContext,
+  useRecordContext, useListContext,
   SimpleFormIterator, CreateButton,
 } from 'react-admin';
 import { Link as RouterLink } from 'react-router';
@@ -180,6 +180,18 @@ export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
 export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;
 // Lyrics contain (#48): every word, matched at the start, in the lyrics only.
 export const lyricsFilter = <TextInput key="lyrics" source="lyrics" label="Lyrics contain" />;
+
+// Above a list whose Lyrics contain search matched nothing exactly and was
+// run again with the closest words in the lyrics (dataProvider.js).
+export const CloseLyricsNotice = () => {
+  const { meta } = useListContext();
+  if (!meta?.closeLyrics) return null;
+  return (
+    <Alert severity="info" sx={{ m: 1 }}>
+      No lyrics match exactly. Showing close matches for <strong>{meta.closeLyrics}</strong>.
+    </Alert>
+  );
+};
 
 // The registration that applies to a song, recording or release, from its
 // computed copyright_status, as one line for lists and exports.

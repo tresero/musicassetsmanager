@@ -16,6 +16,7 @@ SET row_security = off;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS fuzzystrmatch WITH SCHEMA public;
 
 --
 -- Name: api; Type: SCHEMA; Schema: -; Owner: -
@@ -913,6 +914,99 @@ $_$;
 --
 
 COMMENT ON FUNCTION api.login(email text, pass text) IS 'Signs a user in. After 10 failed sign-ins for an email, or 50 from one client address, in 15 minutes it answers 429 without checking the password. An unknown email costs the same bcrypt work as a wrong password, so timing does not reveal which emails have users. Failures are answered with a status rather than an error so the failure record commits.';
+
+--
+-- Name: lyrics_close_query(text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.lyrics_close_query(q text) RETURNS json
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+  _lyrics text[];
+  _words  text[] := '{}';
+  _pairs  text[] := '{}';
+  _phrase text[] := '{}';
+  _parts  text[] := '{}';
+  _shown  text[] := '{}';
+  _typed  text;
+  _max    integer;
+  _best   integer;
+  _pick   text;
+  _show   text;
+BEGIN
+  -- The account's lyrics: songs' and recordings' own. Row security keeps
+  -- them to the signed-in account.
+  SELECT array_agg(x) INTO _lyrics FROM (
+    SELECT lyrics AS x FROM music.song WHERE lyrics IS NOT NULL
+    UNION ALL
+    SELECT lyrics FROM music.recording WHERE lyrics IS NOT NULL) l;
+
+  -- Each lyric split once; a word and the next one run together make a pair.
+  WITH w AS (
+    SELECT l.n, t.word, t.ord
+      FROM unnest(_lyrics) WITH ORDINALITY l(x, n),
+           unnest(music.lyrics_words(l.x)) WITH ORDINALITY t(word, ord))
+  SELECT (SELECT coalesce(array_agg(DISTINCT word), '{}') FROM w),
+         (SELECT coalesce(array_agg(DISTINCT a.word || b.word), '{}')
+            FROM w a JOIN w b ON b.n = a.n AND b.ord = a.ord + 1),
+         (SELECT coalesce(array_agg(DISTINCT a.word || b.word || '|' || a.word || ' <-> ' || b.word), '{}')
+            FROM w a JOIN w b ON b.n = a.n AND b.ord = a.ord + 1)
+    INTO _words, _pairs, _phrase;
+
+  FOREACH _typed IN ARRAY array_remove(regexp_split_to_array(
+                            lower(public.unaccent(coalesce(q, ''))), '[^a-z0-9]+'), '')
+  LOOP
+    IF EXISTS (SELECT 1 FROM unnest(_words) w WHERE w LIKE _typed || '%') THEN
+      _parts := _parts || (_typed || ':*');
+      _shown := _shown || _typed;
+      CONTINUE;
+    END IF;
+
+    _max := CASE WHEN length(_typed) >= 7 THEN 2 WHEN length(_typed) >= 4 THEN 1 ELSE 0 END;
+    IF _max = 0 THEN
+      RETURN NULL;
+    END IF;
+
+    -- The closest words, whole or by their start, and pairs of words run
+    -- together, within _max letters of what was typed.
+    SELECT min(d) INTO _best FROM (
+      SELECT least(public.levenshtein(_typed, w), public.levenshtein(_typed, left(w, length(_typed)))) AS d
+        FROM unnest(_words) w
+      UNION ALL
+      SELECT public.levenshtein(_typed, p) FROM unnest(_pairs) p) c
+     WHERE d <= _max;
+    IF _best IS NULL THEN
+      RETURN NULL;
+    END IF;
+
+    SELECT string_agg(c.term, ' | ' ORDER BY c.term), string_agg(c.label, ' or ' ORDER BY c.term)
+      INTO _pick, _show
+      FROM (SELECT w AS term, w AS label FROM unnest(_words) w
+             WHERE least(public.levenshtein(_typed, w), public.levenshtein(_typed, left(w, length(_typed)))) = _best
+            UNION
+            SELECT '(' || split_part(ph, '|', 2) || ')', replace(split_part(ph, '|', 2), ' <-> ', ' ')
+              FROM unnest(_phrase) ph
+             WHERE public.levenshtein(_typed, split_part(ph, '|', 1)) = _best
+            LIMIT 5) c;
+
+    _parts := _parts || ('(' || _pick || ')');
+    _shown := _shown || _show;
+  END LOOP;
+
+  IF cardinality(_parts) = 0 THEN
+    RETURN NULL;
+  END IF;
+  RETURN json_build_object('query', array_to_string(_parts, ' & '),
+                           'words', array_to_string(_shown, ' '));
+END;
+$$;
+
+--
+-- Name: FUNCTION lyrics_close_query(q text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.lyrics_close_query(q text) IS 'For Lyrics contain when nothing matches exactly (#48): rewrites the typed words to the closest words in the account''s lyrics. A word of 4 to 6 letters may be 1 letter off, 7 or more 2, at the whole word or its start; two words run together match the pair ("agarralo" for "agarra lo"). Returns the search to run and the words it stands for, or null when any typed word has nothing close.';
 
 --
 -- Name: artist_billing(integer, integer); Type: FUNCTION; Schema: music; Owner: -
@@ -5612,6 +5706,23 @@ $$;
 --
 
 COMMENT ON FUNCTION music.lyrics_text(p text) IS 'Lyrics as plain text: the formatting the editor saves (tags and entities) removed, null when nothing is left.';
+
+--
+-- Name: lyrics_words(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.lyrics_words(p text) RETURNS text[]
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$
+  SELECT array_remove(regexp_split_to_array(
+           lower(public.unaccent(coalesce(music.lyrics_text(p), ''))), '[^a-z0-9]+'), '')
+$$;
+
+--
+-- Name: FUNCTION lyrics_words(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.lyrics_words(p text) IS 'The words of lyrics, lowercase and without accents, as the lyrics search splits them.';
 
 --
 -- Name: match_key(text); Type: FUNCTION; Schema: music; Owner: -
