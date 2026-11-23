@@ -30,7 +30,7 @@ const SongList = () => (
       <DataTable.Col source="one_stop" label="One stop" field={BooleanField} />
       <DataTable.Col source="one_stop_reason" label="Not one stop because" />
       <DataTable.Col source="easy_clear" label="Easy clear" field={BooleanField} />
-      <DataTable.Col source="public_domain_p" label="Public domain" field={BooleanField} />
+      <DataTable.Col source="public_domain_p" label="PD source" field={BooleanField} />
       <DataTable.Col source="derivation_type" label="Derivation" />
       <DataTable.Col source="based_on" label="Based on" />
       <DataTable.Col source="copyright_status" label="Registration" disableSort render={registrationText} />

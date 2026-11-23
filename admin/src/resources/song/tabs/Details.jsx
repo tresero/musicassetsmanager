@@ -32,7 +32,8 @@ const DetailsFields = () => (
     </Box>
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
       <BooleanInput source="easy_clear" label="Easy clear" helperText={false} />
-      <BooleanInput source="public_domain_p" label="Public domain" helperText={false} />
+      <BooleanInput source="public_domain_p" label="Public domain source"
+                    helperText="The tune is public domain. With no shares it is free to use; with shares the writers are its arrangers, and one stop follows their shares." />
     </Box>
   </Stack>
 );

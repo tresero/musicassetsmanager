@@ -6,7 +6,7 @@ What the app does today. Anything not yet built is in
 ## Compositions
 
 A song is the written work: title, ISWC, lyrics, language, and notes, with
-flags for public domain and easy clear.
+flags for a public domain source and easy clear.
 
 ISWCs, ISRCs, UPCs, ISNIs and IPI name numbers can be pasted however they are
 written: spaces, dashes and dots are dropped and letters uppercased as you
@@ -19,8 +19,10 @@ plain message.
 
 **One stop** is computed, not set. A song is one stop when the publishing you
 control totals 100: controlled publisher shares, or controlled writer shares
-when there is no publisher, with public domain works passing. The Details tab
-says so, or names the first thing in the way.
+when there is no publisher. A song marked **Public domain source** with no
+share above 0 is free to use and passes; one with shares is an arrangement, and
+its arrangers' shares must total 100 like any other song's (#11). The Details
+tab says so, or names the first thing in the way.
 
 **Writers** carry a role, a share, and whether you control that share. Each
 writer's society is recorded on the credit and defaults from the person's own
@@ -519,3 +521,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Pages fit the window down to phone width. |
 | 2026-11-22 | ISNI and IPI check digits; IPIs saved as 11 digits (#74). |
 | 2026-11-23 | Change history on every record, and the Deleted records report (#78). |
+| 2026-11-23 | Public domain source: one stop checks an arrangement's shares (#11). |

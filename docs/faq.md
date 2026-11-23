@@ -84,6 +84,70 @@ the catalog as a whole, as Not in catalog income does.
 To show it: **Money > Transactions > New transaction**, fill in the details,
 leave **For** empty, and save. The list shows Overhead under For.
 
+## Songs
+
+### What does Public domain source mean?
+
+The tune the song is built on is in the public domain. Tick it on the song's
+**Details** tab. A song ticked with no writer or publisher holding a share is
+the tune itself: free to use, and one stop. A song ticked with shares is your
+arrangement of it, a copyright of its own, and it is one stop only when the
+shares you control total 100, the same as any other song.
+
+To show it:
+
+1. Open a public domain arrangement and its **Details** tab: **Public domain
+   source** is ticked, and Derivation is Arrangement.
+2. Open **Writers**: the arrangers hold the shares, as Arranger.
+3. Back on **Details**, the song says it is one stop.
+
+### I have a salsa and a swing version of the same carol. One song or two?
+
+Two. Each arrangement is its own work, with its own arrangers, shares,
+registrations and copyright. The same arrangement recorded twice, say with and
+without vocals, is one song with two recordings.
+
+To show it: search **Songs** for the carol's name to see each version, then
+search **Recordings** for it to see which recordings use which version.
+
+### What is Based on, and do I have to fill it in?
+
+Based on names the work a song comes from when that work is not in the
+catalog, such as the public domain tune an arrangement is of, in your own
+words: "Deck the Halls (traditional)". It is for your records: finding every
+version of a tune, or answering a licensee who asks what the underlying work
+is. Societies and the MLC don't ask for it, so it is optional.
+
+**Derived from** does the same job when the source is a song in the catalog:
+it links to that song instead of naming it.
+
+To show it: open an arrangement's **Details** tab, choose Arrangement as the
+Derivation, and type the tune's name in **Based on**.
+
+### Do I have to credit the original writer of a public domain tune?
+
+No. The law doesn't require it, so the original writer is optional. If you
+enter them, add them on **Writers** as Composer at 0%, so they are credited
+without taking a share.
+
+### Why isn't my song one stop?
+
+One stop means you can license the whole composition yourself: the publishing
+you control totals 100. The song's **Details** tab names the first thing in the
+way, such as "Publishing controlled 50%, not 100". Check the shares on
+**Publishers**, or on **Writers** when there is no publisher, and tick
+**Controlled** on each share you can license, by owning it or by agreement.
+
+A recording is one stop when its controlled master shares total 100, no
+exclusive deal is active with anyone else, and every song it records is one
+stop. Its **Master** tab says which of these is missing.
+
+### What is the difference between one stop and easy clear?
+
+One stop is worked out from the shares; you can't set it. Easy clear is a box
+you tick yourself, for a track you know can be cleared quickly even when it is
+not one stop, such as one whose co-owner always says yes.
+
 ## Copyright
 
 ### I registered an album as one work. Do I enter the number on every track?
@@ -137,3 +201,4 @@ To show it:
 | 2026-11-15 | A final totals row is left out on its own. |
 | 2026-11-15 | Importing CD Baby sales, returns included. |
 | 2026-11-15 | Copyright: album registrations and mismatched numbers. |
+| 2026-11-23 | Songs: public domain source, versions of a tune, Based on, crediting the original writer, one stop and easy clear. |

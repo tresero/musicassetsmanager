@@ -3113,6 +3113,12 @@ CREATE TABLE music.song (
 ALTER TABLE ONLY music.song FORCE ROW LEVEL SECURITY;
 
 --
+-- Name: COLUMN song.public_domain_p; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.public_domain_p IS 'The source tune is in the public domain. With no shares claimed the song is free to use; with shares it is an arrangement, and one stop follows the arrangers'' shares (#11).';
+
+--
 -- Name: COLUMN song.based_on; Type: COMMENT; Schema: music; Owner: -
 --
 
@@ -3734,7 +3740,7 @@ CREATE FUNCTION music.song_one_stop_reason(p_song integer) RETURNS text
     LANGUAGE sql STABLE
     AS $$
   SELECT CASE
-    WHEN s.public_domain_p THEN NULL
+    WHEN s.public_domain_p AND NOT music.song_has_shares(s.id) THEN NULL
     WHEN NOT EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
      AND NOT EXISTS (SELECT 1 FROM music.song_writer w WHERE w.song_id = s.id)
       THEN 'No writers or publishers entered'
@@ -6346,7 +6352,7 @@ CREATE FUNCTION music.song_controlled_share(p_song integer) RETURNS numeric
     LANGUAGE sql STABLE
     AS $$
   SELECT CASE
-    WHEN s.public_domain_p THEN 100
+    WHEN s.public_domain_p AND NOT music.song_has_shares(s.id) THEN 100
     WHEN EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = s.id)
       THEN coalesce((SELECT sum(p.share) FROM music.song_publisher p
                       WHERE p.song_id = s.id AND p.controlled), 0)
@@ -6363,6 +6369,23 @@ $$;
 COMMENT ON FUNCTION music.song_controlled_share(p_song integer) IS 'Percent of a composition''s publishing you can license: controlled publisher
 shares, or controlled writer shares when the song has no publisher. A public
 domain work counts as 100.';
+
+--
+-- Name: song_has_shares(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_has_shares(p_song integer) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT EXISTS (SELECT 1 FROM music.song_writer w WHERE w.song_id = p_song AND w.share > 0)
+      OR EXISTS (SELECT 1 FROM music.song_publisher p WHERE p.song_id = p_song AND p.share > 0)
+$$;
+
+--
+-- Name: FUNCTION song_has_shares(p_song integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.song_has_shares(p_song integer) IS 'Whether any writer or publisher holds a share above 0. A public domain song with none is free to use; one with shares is an arrangement, judged by its shares like any song (#11).';
 
 --
 -- Name: song_in_use(); Type: FUNCTION; Schema: music; Owner: -

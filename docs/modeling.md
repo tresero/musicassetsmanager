@@ -62,6 +62,13 @@ An arrangement of a public domain tune is its own copyrightable work. The claim
 covers what you added, not the underlying melody, and societies generally pay a
 reduced arranger share on it.
 
+Such a song is marked **Public domain source** (`public_domain_p`), with
+derivation `arrangement` and its writers as Arranger. Crediting the original
+author is optional; when entered, they are Composer at 0%. One stop treats it
+like any other song: its controlled shares must total 100. Only a public domain
+song with no share above 0, the tune itself with no arrangement claimed, is one
+stop on the flag alone (`music.song_has_shares`).
+
 ### Two ways to record a source
 
 `derived_from_id` is a foreign key, so it only works when the source
@@ -409,3 +416,4 @@ contract does it, it is settled outside the catalog.
 | 2026-11-22 | Themes on recordings, apart from moods; themes and keywords in the generated pitch comment. |
 | 2026-11-22 | Registrations carry a claimant, entered with the number and inherited with it. |
 | 2026-11-22 | Country of performance on credits, defaulting to the country of recording (#42). |
+| 2026-11-23 | Public domain arrangements: flag, derivation, Arranger role and one stop (#11). |

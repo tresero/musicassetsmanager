@@ -115,6 +115,14 @@ admin's.
   merging two documents keeps the kept one's claimant, or takes the other's
   when the kept one has none.
 
+## Public domain arrangements (#11), `music.song_one_stop_reason`
+
+- A song marked Public domain source with no share above 0 is one stop, and
+  its controlled share is 100.
+- One marked Public domain source with a 50% uncontrolled arranger is not one
+  stop ("Publishing controlled 50%, not 100"), and a recording of it is not one
+  stop either.
+
 ## Change history (#78), `music.log_change` and `api.change_log`
 
 - An edit through a form leaves one entry per changed row, holding only the
@@ -341,3 +349,4 @@ admin's.
 | 2026-11-22 | Tests for every feature in `features.md` not yet listed |
 | 2026-11-22 | Country of performance (#42) |
 | 2026-11-23 | Change history (#78) |
+| 2026-11-23 | Public domain arrangements (#11) |
