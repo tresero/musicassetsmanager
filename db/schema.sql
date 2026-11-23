@@ -1936,13 +1936,7 @@ COMMENT ON COLUMN api.recording.copyright_status IS 'The registration that appli
 
 CREATE FUNCTION api.lyrics_search(api.recording) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$
-  SELECT music.search_doc(coalesce(
-    music.lyrics_text($1.lyrics),
-    (SELECT string_agg(music.lyrics_text(s.lyrics), ' ')
-       FROM music.recording_song rs JOIN music.song s ON s.id = rs.song_id
-      WHERE rs.recording_id = $1.id)))
-$_$;
+    AS $_$ SELECT music.recording_lyrics_doc($1.id) $_$;
 
 --
 -- Name: FUNCTION lyrics_search(api.recording); Type: COMMENT; Schema: api; Owner: -
@@ -3562,14 +3556,7 @@ COMMENT ON FUNCTION api.search(api.organization) IS 'The name, for search=fts(fo
 
 CREATE FUNCTION api.search(api.recording) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$
-  SELECT music.search_doc(
-    $1.title, $1.version_label, $1.isrc, array_to_string($1.other_isrcs, ' '),
-    $1.keywords, $1.sounds_like, $1.description, $1.theme_names,
-    $1.artist_names, $1.song_titles,
-    (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ') FROM music.recording_credit c WHERE c.recording_id = $1.id),
-    (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ') FROM music.recording_owner o WHERE o.recording_id = $1.id))
-$_$;
+    AS $_$ SELECT music.recording_search_doc($1.id) $_$;
 
 --
 -- Name: FUNCTION search(api.recording); Type: COMMENT; Schema: api; Owner: -
@@ -3971,13 +3958,7 @@ COMMENT ON FUNCTION api.search(api.release) IS 'Title, UPC, catalog number, labe
 
 CREATE FUNCTION api.search(api.song) RETURNS tsvector
     LANGUAGE sql STABLE
-    AS $_$
-  SELECT music.search_doc(
-    $1.title, $1.iswc, $1.writer_names, $1.publisher_names,
-    (SELECT string_agg(t.title, ' ') FROM music.song_title t WHERE t.song_id = $1.id),
-    (SELECT string_agg(c.credit_name, ' ') FROM music.song_writer w JOIN music.contact c ON c.id = w.contact_id WHERE w.song_id = $1.id),
-    (SELECT string_agg(r.work_number, ' ') FROM music.song_registration r WHERE r.song_id = $1.id))
-$_$;
+    AS $_$ SELECT music.song_search_doc($1.id) $_$;
 
 --
 -- Name: FUNCTION search(api.song); Type: COMMENT; Schema: api; Owner: -
@@ -6221,6 +6202,55 @@ $$;
 COMMENT ON FUNCTION music.protect_owner_role() IS 'Keeps the Owner role, which the database finds by name, from being renamed or deleted, and keeps its users.manage permission.';
 
 --
+-- Name: recording_lyrics_doc(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.recording_lyrics_doc(p_recording integer) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT music.search_doc(coalesce(
+    music.lyrics_text(r.lyrics),
+    (SELECT string_agg(music.lyrics_text(s.lyrics), ' ')
+       FROM music.recording_song rs JOIN music.song s ON s.id = rs.song_id
+      WHERE rs.recording_id = r.id)))
+  FROM music.recording r WHERE r.id = p_recording
+$$;
+
+--
+-- Name: FUNCTION recording_lyrics_doc(p_recording integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.recording_lyrics_doc(p_recording integer) IS 'The recording''s own lyrics, else its songs'', for the Lyrics contain filter (#48), read from the tables.';
+
+--
+-- Name: recording_search_doc(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.recording_search_doc(p_recording integer) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT music.search_doc(
+    r.title, r.version_label, r.isrc, r.keywords, r.sounds_like, r.description,
+    (SELECT string_agg(ri.isrc::text, ' ') FROM music.recording_isrc ri WHERE ri.recording_id = r.id),
+    (SELECT string_agg(t.name, ' ') FROM music.recording_theme rt JOIN music.theme t ON t.id = rt.theme_id
+      WHERE rt.recording_id = r.id),
+    music.artist_billing(r.id, NULL),
+    (SELECT string_agg(s.title, ' ') FROM music.recording_song rs JOIN music.song s ON s.id = rs.song_id
+      WHERE rs.recording_id = r.id),
+    (SELECT string_agg(concat_ws(' ', music.party_name(c.contact_id, c.organization_id), c.credited_as), ' ')
+       FROM music.recording_credit c WHERE c.recording_id = r.id),
+    (SELECT string_agg(music.party_name(o.contact_id, o.organization_id), ' ')
+       FROM music.recording_owner o WHERE o.recording_id = r.id))
+  FROM music.recording r WHERE r.id = p_recording
+$$;
+
+--
+-- Name: FUNCTION recording_search_doc(p_recording integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.recording_search_doc(p_recording integer) IS 'What the recording search box matches: title, version, ISRCs, keywords, sounds like, description, themes, artists, songs, credits and master owners, read from the tables rather than the api.recording view, so a search does not compute every column of every recording.';
+
+--
 -- Name: require_permission(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -6475,6 +6505,33 @@ $$;
 --
 
 COMMENT ON FUNCTION music.song_in_use() IS 'Refuses deleting a song that a recording records or a statement line is matched to, naming which. The foreign keys refuse it too, including lines the caller''s role cannot see.';
+
+--
+-- Name: song_search_doc(integer); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.song_search_doc(p_song integer) RETURNS tsvector
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT music.search_doc(
+    s.title, s.iswc,
+    (SELECT string_agg(concat_ws(' ', c.display_name, c.credit_name), ' ')
+       FROM music.song_writer w JOIN music.contact c ON c.id = w.contact_id WHERE w.song_id = s.id),
+    (SELECT string_agg(coalesce(o.name, c.display_name), ' ')
+       FROM music.song_publisher p
+       LEFT JOIN music.organization o ON o.id = p.organization_id
+       LEFT JOIN music.contact c ON c.id = p.contact_id
+      WHERE p.song_id = s.id),
+    (SELECT string_agg(t.title, ' ') FROM music.song_title t WHERE t.song_id = s.id),
+    (SELECT string_agg(r.work_number, ' ') FROM music.song_registration r WHERE r.song_id = s.id))
+  FROM music.song s WHERE s.id = p_song
+$$;
+
+--
+-- Name: FUNCTION song_search_doc(p_song integer); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.song_search_doc(p_song integer) IS 'What the song search box matches: title, ISWC, writers and their credit names, publishers, alt titles and work numbers, read from the tables rather than the api.song view, so a search does not compute every column of every song.';
 
 --
 -- Name: song_writer_default_pro(); Type: FUNCTION; Schema: music; Owner: -

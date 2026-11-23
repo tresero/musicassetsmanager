@@ -174,6 +174,7 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
 | RLS returns everything | View missing `security_invoker`, or no `FORCE ROW LEVEL SECURITY` |
 | `cannot change name of view column` | `CREATE OR REPLACE` can't reshape. Drop first, and remember that takes the INSTEAD OF triggers with it. |
 | `null value in column "account_id"` | Running SQL without a JWT. Use `SET LOCAL "request.jwt.claims"` inside the transaction. |
+| A search is slow | A computed column that takes the whole view row (`api.search(api.song)`) makes the view compute every column of every row. Keep the function a one-line call on `$1.id`, so it is inlined, and read the words from the tables, as `music.song_search_doc` does |
 | Search box or picker matches nothing | Send React Admin's `q` filter (the default); `dataProvider.js` turns it into `search=fts(fold)` with `search.js`. A custom `filterToQuery` or `search@ilike` bypasses it. |
 | Generated column write error | Strip it in the `transform` prop |
 | Logged out on any 403 | The auth provider should only clear the token on 401 |
@@ -209,3 +210,4 @@ written by row triggers.
 | 2026-11-23 | Change history triggers for child tables (#78) |
 | 2026-11-23 | Database tests: pgTAP in `db/tests/`, run with `db/tests/run.sh` |
 | 2026-11-23 | The server runs PostgreSQL 19 |
+| 2026-11-23 | Searches read from the tables, not the whole view row |
