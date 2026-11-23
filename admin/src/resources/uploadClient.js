@@ -90,3 +90,17 @@ export const zipUrl = async (recordingId, kind) => {
   const { url } = await res.json();
   return url;
 };
+
+// Sends the signed-in user a test email through their own mail settings
+// (#70); the error says what the mail server answered.
+export const sendTestMail = async () => {
+  const res = await fetch('/upload/mail/test', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || 'The test email could not be sent');
+  }
+  return res.json();
+};

@@ -118,6 +118,16 @@ admin's.
   searches again with its words, and shows the close-match notice (checked
   by hand in a browser; waits on #81).
 
+## Email from the user's own account (#70)
+
+- A real send through a provider: settings saved, test email arrives, a send
+  with a document attached arrives with it, and a wrong password says the
+  server refused it (by hand with a real mailbox; needs a test mail account).
+- The upload service refuses a mail server on this machine or a private
+  network, a missing password, no recipients and a malformed address, and
+  logs each attempt that reached a mail server (checked by hand against a
+  test copy of the service; an automated test waits on #82).
+
 ## Stems and multitracks (#43)
 
 - Dropping several files on the Stems tab adds a named row for each, with
@@ -385,3 +395,4 @@ admin's.
 | 2026-11-23 | Recording lyrics (#48) |
 | 2026-11-23 | Addresses by name (#60) |
 | 2026-11-23 | Stems and multitracks (#43) |
+| 2026-11-23 | Email from the user's own account (#70) |

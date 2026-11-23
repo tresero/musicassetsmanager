@@ -150,6 +150,7 @@ export default function App() {
       <Resource name="account_storage" {...settings(accountStorage)} />
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
       <Resource name="user_preference" {...userPreference} />
+      <Resource name="user_mail" />
       <Resource name="document_orphan" {...documentOrphan} />
       <Resource name="file_unnamed" {...fileUnnamed} />
       <Resource name="account_user" {...accountUser} />

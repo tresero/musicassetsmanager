@@ -6,6 +6,8 @@
 //	GET  /upload/file?...            local backend: serves a signed link
 //	POST /upload/zip-link            a signed link to a zip of a recording's stems or multitracks
 //	GET  /upload/zip?...             that zip, built as it is sent (zip.go)
+//	POST /upload/mail/test           a test email from the user's own mail settings (mail.go)
+//	POST /upload/mail/send           an email from the user, through their own provider
 //	GET  /upload/health
 //
 // It also emails invites: see invite.go.
@@ -127,6 +129,8 @@ func main() {
 	mux.HandleFunc("/upload/file", s.serveSigned)
 	mux.HandleFunc("/upload/zip-link", s.zipLink)
 	mux.HandleFunc("/upload/zip", s.serveZip)
+	mux.HandleFunc("/upload/mail/test", s.mailTest)
+	mux.HandleFunc("/upload/mail/send", s.mailSend)
 
 	log.Printf("listening on %s", cfg.Listen)
 	log.Fatal(http.ListenAndServe(cfg.Listen, mux))
@@ -146,10 +150,12 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 // ---------------------------------------------------------------- auth
 
-func (s *server) account(r *http.Request) (string, error) {
+// identity is the account and user of a signed-in request; a user removed
+// from the account is refused.
+func (s *server) identity(r *http.Request) (string, string, error) {
 	h := r.Header.Get("Authorization")
 	if !strings.HasPrefix(h, "Bearer ") {
-		return "", errors.New("missing bearer token")
+		return "", "", errors.New("missing bearer token")
 	}
 	tok, err := jwt.Parse(strings.TrimPrefix(h, "Bearer "),
 		func(t *jwt.Token) (any, error) {
@@ -159,15 +165,15 @@ func (s *server) account(r *http.Request) (string, error) {
 			return []byte(s.cfg.JWTSecret), nil
 		})
 	if err != nil || !tok.Valid {
-		return "", errors.New("invalid token")
+		return "", "", errors.New("invalid token")
 	}
 	claims, ok := tok.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("invalid claims")
+		return "", "", errors.New("invalid claims")
 	}
 	acct, _ := claims["account_id"].(string)
 	if acct == "" {
-		return "", errors.New("no account_id claim")
+		return "", "", errors.New("no account_id claim")
 	}
 	// A user removed from the account loses access at once, not when the
 	// token expires; PostgREST does the same in api.check_session.
@@ -178,12 +184,17 @@ func (s *server) account(r *http.Request) (string, error) {
 		                WHERE id::text = $1 AND account_id::text = $2)`,
 		sub, acct).Scan(&member)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !member {
-		return "", errors.New("no longer a user of this account")
+		return "", "", errors.New("no longer a user of this account")
 	}
-	return acct, nil
+	return acct, sub, nil
+}
+
+func (s *server) account(r *http.Request) (string, error) {
+	acct, _, err := s.identity(r)
+	return acct, err
 }
 
 // ------------------------------------------------------------- storage

@@ -28,6 +28,13 @@ describe('explainDbError', () => {
     expect(explainDbError('contact', refused(msg)).body.errors).toEqual({ isni: M.isniShape });
   });
 
+  test('mail settings mark the field that is wrong', () => {
+    expect(explainDbError('user_mail', refused('new row for relation "user_mail" violates check constraint "user_mail_port_check"')).body.errors)
+      .toEqual({ smtp_port: 'A port is a number from 1 to 65535, usually 587 or 465' });
+    expect(explainDbError('user_mail', refused('value for domain music.email_address violates check constraint "email_format"')).body.errors)
+      .toEqual({ from_address: 'This is not an email address' });
+  });
+
   test('a constraint with no field gets the plain message only', () => {
     const e = explainDbError('release',
       refused('new row for relation "release_distribution" violates check constraint "release_distribution_upc_valid"'));

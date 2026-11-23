@@ -4533,6 +4533,30 @@ CREATE FUNCTION api.search(api.vocal_type) RETURNS tsvector
 COMMENT ON FUNCTION api.search(api.vocal_type) IS 'The name, for search=fts(fold).term:*.';
 
 --
+-- Name: set_mail_password(text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.set_mail_password(password text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  UPDATE music.user_mail
+     SET smtp_password = nullif(password, '')
+   WHERE user_id = music.current_app_user();
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Save your mail settings first, then the password.'
+      USING ERRCODE = 'no_data_found';
+  END IF;
+END;
+$$;
+
+--
+-- Name: FUNCTION set_mail_password(password text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.set_mail_password(password text) IS 'Saves or, with an empty string, clears the signed-in user''s mail password (#70). It is never returned by the API.';
+
+--
 -- Name: set_storage_secret(text); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -5025,6 +5049,44 @@ $$;
 --
 
 COMMENT ON FUNCTION api.transaction_write() IS 'Saves a transaction through api.transaction: its own fields, then splits (replaced by the list sent; each row''s target says which of song_id, recording_id or release_id it uses) and documents (as on songs). Deleting a transaction deletes its splits and detaches its documents.';
+
+--
+-- Name: user_mail_write(); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.user_mail_write() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM music.user_mail WHERE user_id = OLD.id;
+    RETURN OLD;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO music.user_mail (user_id, from_name, from_address, smtp_host, smtp_port, smtp_security, smtp_username)
+    VALUES (music.current_app_user(), nullif(btrim(NEW.from_name), ''), NEW.from_address, btrim(NEW.smtp_host),
+            coalesce(NEW.smtp_port, 587), coalesce(NEW.smtp_security, 'starttls'), btrim(NEW.smtp_username));
+    NEW.id := music.current_app_user();
+    NEW.password_set := false;
+    RETURN NEW;
+  END IF;
+  UPDATE music.user_mail
+     SET from_name = nullif(btrim(NEW.from_name), ''),
+         from_address = NEW.from_address,
+         smtp_host = btrim(NEW.smtp_host),
+         smtp_port = coalesce(NEW.smtp_port, 587),
+         smtp_security = coalesce(NEW.smtp_security, 'starttls'),
+         smtp_username = btrim(NEW.smtp_username)
+   WHERE user_id = OLD.id;
+  RETURN NEW;
+END;
+$$;
+
+--
+-- Name: FUNCTION user_mail_write(); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.user_mail_write() IS 'Saves the signed-in user''s own mail settings; the row is always theirs (music.current_app_user()).';
 
 --
 -- Name: b64url(bytea); Type: FUNCTION; Schema: auth; Owner: -
@@ -7844,6 +7906,57 @@ UNION ALL
 COMMENT ON VIEW api.file_unnamed IS 'Stored audio files and documents with no original file name, uploaded before names were kept. Dropping the original files on the report names them through api.name_files.';
 
 --
+-- Name: mail_sent; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.mail_sent (
+    id bigint NOT NULL,
+    account_id uuid NOT NULL,
+    user_id uuid,
+    from_address text NOT NULL,
+    to_addresses text[] NOT NULL,
+    cc_addresses text[] DEFAULT '{}'::text[] NOT NULL,
+    subject text NOT NULL,
+    record_type text,
+    record_id integer,
+    attachments jsonb DEFAULT '[]'::jsonb NOT NULL,
+    sent_at timestamp with time zone DEFAULT now() NOT NULL,
+    error text
+);
+
+ALTER TABLE ONLY music.mail_sent FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE mail_sent; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.mail_sent IS 'Every email the app sent, or tried to send, for a user (#70): from, to, subject, what it was about and its attachments. error is null when the provider accepted it. Written by the upload service.';
+
+--
+-- Name: mail_sent; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.mail_sent WITH (security_invoker='true') AS
+ SELECT id,
+    sent_at,
+    user_id,
+    from_address,
+    to_addresses,
+    cc_addresses,
+    subject,
+    record_type,
+    record_id,
+    attachments,
+    error
+   FROM music.mail_sent s;
+
+--
+-- Name: VIEW mail_sent; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.mail_sent IS 'Email sent from the app in the signed-in account (#70), newest first by id. Read only.';
+
+--
 -- Name: permission; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -8478,6 +8591,61 @@ CREATE VIEW api.statement_line WITH (security_invoker='true') AS
 COMMENT ON VIEW api.statement_line IS 'Statement lines with the mapped title, writers, artist, release title and ISWC read from the raw row, the ISRC, barcode and usage period read at import, and the amount converted into the account currency at the statement''s payout. Only song_id, recording_id, release_id and match_method can be changed.';
 
 --
+-- Name: user_mail; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.user_mail (
+    user_id uuid NOT NULL,
+    from_name text,
+    from_address music.email_address NOT NULL,
+    smtp_host text NOT NULL,
+    smtp_port integer DEFAULT 587 NOT NULL,
+    smtp_security text DEFAULT 'starttls'::text NOT NULL,
+    smtp_username text NOT NULL,
+    smtp_password text,
+    password_set boolean GENERATED ALWAYS AS ((smtp_password IS NOT NULL)) STORED,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT user_mail_port_check CHECK (((smtp_port >= 1) AND (smtp_port <= 65535))),
+    CONSTRAINT user_mail_security_check CHECK ((smtp_security = ANY (ARRAY['starttls'::text, 'tls'::text])))
+);
+
+ALTER TABLE ONLY music.user_mail FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE user_mail; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.user_mail IS 'Each user''s own mail account, for email sent from the app (#70): the app sends as them, through their provider, never through the site''s mail server. Visible only to that user; the password is written with api.set_mail_password and read only by the upload service, which sends.';
+
+--
+-- Name: COLUMN user_mail.smtp_security; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.user_mail.smtp_security IS 'starttls (usually port 587) or tls (usually 465). Mail is never sent unencrypted.';
+
+--
+-- Name: user_mail; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.user_mail WITH (security_invoker='true') AS
+ SELECT user_id AS id,
+    from_name,
+    from_address,
+    smtp_host,
+    smtp_port,
+    smtp_security,
+    smtp_username,
+    password_set,
+    updated_at
+   FROM music.user_mail m;
+
+--
+-- Name: VIEW user_mail; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.user_mail IS 'The signed-in user''s mail settings (#70), without the password: password_set says whether one is saved. Set it with api.set_mail_password.';
+
+--
 -- Name: user_preference; Type: TABLE; Schema: music; Owner: -
 --
 
@@ -8722,6 +8890,19 @@ ALTER TABLE music.genre ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 ALTER TABLE music.instrument ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME music.instrument_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
+-- Name: mail_sent_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.mail_sent ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.mail_sent_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -9288,6 +9469,13 @@ ALTER TABLE ONLY music.language
     ADD CONSTRAINT language_pkey PRIMARY KEY (code);
 
 --
+-- Name: mail_sent mail_sent_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.mail_sent
+    ADD CONSTRAINT mail_sent_pkey PRIMARY KEY (id);
+
+--
 -- Name: mood mood_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -9755,6 +9943,13 @@ ALTER TABLE ONLY music.user_invite
     ADD CONSTRAINT user_invite_token_hash_key UNIQUE (token_hash);
 
 --
+-- Name: user_mail user_mail_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_mail
+    ADD CONSTRAINT user_mail_pkey PRIMARY KEY (user_id);
+
+--
 -- Name: user_preference user_preference_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -10057,6 +10252,12 @@ CREATE UNIQUE INDEX language_name_key ON music.language USING btree (lower(name)
 --
 
 COMMENT ON INDEX music.language_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: mail_sent_record_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX mail_sent_record_idx ON music.mail_sent USING btree (account_id, record_type, record_id, sent_at DESC);
 
 --
 -- Name: mood_name_key; Type: INDEX; Schema: music; Owner: -
@@ -10819,6 +11020,24 @@ CREATE TRIGGER transaction_ins INSTEAD OF INSERT ON api.transaction FOR EACH ROW
 --
 
 CREATE TRIGGER transaction_upd INSTEAD OF UPDATE ON api.transaction FOR EACH ROW EXECUTE FUNCTION api.transaction_write();
+
+--
+-- Name: user_mail user_mail_del; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER user_mail_del INSTEAD OF DELETE ON api.user_mail FOR EACH ROW EXECUTE FUNCTION api.user_mail_write();
+
+--
+-- Name: user_mail user_mail_ins; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER user_mail_ins INSTEAD OF INSERT ON api.user_mail FOR EACH ROW EXECUTE FUNCTION api.user_mail_write();
+
+--
+-- Name: user_mail user_mail_upd; Type: TRIGGER; Schema: api; Owner: -
+--
+
+CREATE TRIGGER user_mail_upd INSTEAD OF UPDATE ON api.user_mail FOR EACH ROW EXECUTE FUNCTION api.user_mail_write();
 
 --
 -- Name: account account_currency_fixed; Type: TRIGGER; Schema: music; Owner: -
@@ -12063,6 +12282,12 @@ CREATE TRIGGER user_account_users_permission BEFORE DELETE OR UPDATE ON music.us
 CREATE TRIGGER user_invite_users_permission BEFORE INSERT OR DELETE OR UPDATE ON music.user_invite FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('users.manage');
 
 --
+-- Name: user_mail user_mail_touch; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER user_mail_touch BEFORE UPDATE ON music.user_mail FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
+
+--
 -- Name: vocabulary vocabulary_site_admin; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -12241,6 +12466,13 @@ ALTER TABLE ONLY music.genre
 
 ALTER TABLE ONLY music.genre
     ADD CONSTRAINT genre_schema_class_id_fkey FOREIGN KEY (schema_class_id) REFERENCES music.schema_type(id);
+
+--
+-- Name: mail_sent mail_sent_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.mail_sent
+    ADD CONSTRAINT mail_sent_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
 
 --
 -- Name: organization organization_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -13027,6 +13259,13 @@ ALTER TABLE ONLY music.user_invite
     ADD CONSTRAINT user_invite_role_id_fkey FOREIGN KEY (role_id) REFERENCES music.account_role(id);
 
 --
+-- Name: user_mail user_mail_user_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.user_mail
+    ADD CONSTRAINT user_mail_user_id_fkey FOREIGN KEY (user_id) REFERENCES music.user_account(id) ON DELETE CASCADE;
+
+--
 -- Name: user_preference user_preference_country_code_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -13309,6 +13548,28 @@ CREATE POLICY document_upload ON music.document FOR SELECT TO mamupload USING (t
 --
 
 COMMENT ON POLICY document_upload ON music.document IS 'mam-upload has no request token in the database; it filters by account itself, and sweep reads every account.';
+
+--
+-- Name: mail_sent; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.mail_sent ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: mail_sent mail_sent_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY mail_sent_account ON music.mail_sent FOR SELECT USING ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: mail_sent mail_sent_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: mail_sent mail_sent_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY mail_sent_upload ON music.mail_sent TO mamupload USING (true) WITH CHECK (true);
 
 --
 -- Name: organization; Type: ROW SECURITY; Schema: music; Owner: -
@@ -14032,6 +14293,28 @@ CREATE POLICY user_invite_account ON music.user_invite USING ((account_id = ( SE
 --
 
 COMMENT ON POLICY user_invite_account ON music.user_invite IS 'Limits every role without its own policy to rows of the account in the request token.';
+
+--
+-- Name: user_mail; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.user_mail ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_mail user_mail_own; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_mail_own ON music.user_mail USING ((user_id = ( SELECT music.current_app_user() AS current_app_user))) WITH CHECK ((user_id = ( SELECT music.current_app_user() AS current_app_user)));
+
+--
+-- Name: user_mail user_mail_read_all; Type: POLICY; Schema: music; Owner: -
+--
+
+--
+-- Name: user_mail user_mail_upload; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY user_mail_upload ON music.user_mail FOR SELECT TO mamupload USING (true);
 
 --
 -- Name: user_preference; Type: ROW SECURITY; Schema: music; Owner: -
@@ -15373,6 +15656,19 @@ GRANT SELECT ON TABLE api.email_duplicate TO app_user;
 GRANT SELECT ON TABLE api.file_unnamed TO app_user;
 
 --
+-- Name: TABLE mail_sent; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.mail_sent TO app_user;
+GRANT SELECT,INSERT ON TABLE music.mail_sent TO mamupload;
+
+--
+-- Name: TABLE mail_sent; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.mail_sent TO app_user;
+
+--
 -- Name: TABLE permission; Type: ACL; Schema: music; Owner: -
 --
 
@@ -15600,6 +15896,73 @@ GRANT SELECT,DELETE,UPDATE ON TABLE api.statement TO app_user;
 --
 
 GRANT SELECT,UPDATE ON TABLE api.statement_line TO app_user;
+
+--
+-- Name: TABLE user_mail; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT INSERT,DELETE,UPDATE ON TABLE music.user_mail TO app_user;
+GRANT SELECT ON TABLE music.user_mail TO mamupload;
+
+--
+-- Name: COLUMN user_mail.user_id; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(user_id) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.from_name; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(from_name) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.from_address; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(from_address) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.smtp_host; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(smtp_host) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.smtp_port; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(smtp_port) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.smtp_security; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(smtp_security) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.smtp_username; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(smtp_username) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.password_set; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(password_set) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: COLUMN user_mail.updated_at; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT(updated_at) ON TABLE music.user_mail TO app_user;
+
+--
+-- Name: TABLE user_mail; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.user_mail TO app_user;
 
 --
 -- Name: TABLE user_preference; Type: ACL; Schema: music; Owner: -

@@ -399,6 +399,21 @@ has no contact of its own. A new person can be added from the picker.
 Storage and pitch settings belong to the account. The Recordings list can be filtered to recordings
 that resolve to nobody, which would go out with nobody to call.
 
+## Email
+
+Each user connects their own mail account under **My settings > Email
+sending**: their address and name, their provider's outgoing (SMTP) server,
+with one click for Gmail or Google Workspace, Microsoft 365, iCloud and
+Fastmail, and their password or app password. Email sent from the app goes
+out as them, through their provider, never through the site's own mail
+server, which only sends invites. The password is saved on its own, never
+shown again, and read only by the upload service when it sends. Mail is
+always encrypted (STARTTLS or SSL/TLS), and a mail server on the site's own
+machine or network is refused. **Send me a test email** checks the settings
+and shows what the mail server answered. Every email sent, or that failed, is
+logged with who sent it, to whom, the subject, what it was about and its
+attachments (#70).
+
 ## Storage
 
 Files are stored in S3-compatible object storage or on local disk, chosen per
@@ -566,3 +581,4 @@ a document or a release, does not sort.
 | 2026-11-23 | Lyrics contain falls back to close matches. |
 | 2026-11-23 | Addresses by name, without /#/ (#60). |
 | 2026-11-23 | Stems and Multitracks tabs: one file each, Download all as zip (#43). |
+| 2026-11-23 | Email sending from each user's own mail account (#70). |

@@ -28,6 +28,9 @@ const CONSTRAINTS = {
   ipi_check_digit: { field: 'member_ipi', message: M.ipiDigit },
   contact_ipi_key: { field: 'member_ipi', message: 'Another person already has this IPI name number' },
   organization_ipi_key: { field: 'member_ipi', message: 'Another company already has this IPI name number' },
+  email_format: { field: { user_mail: 'from_address' }, message: 'This is not an email address' },
+  user_mail_port_check: { field: 'smtp_port', message: 'A port is a number from 1 to 65535, usually 587 or 465' },
+  user_mail_security_check: { field: 'smtp_security', message: 'Choose STARTTLS or SSL/TLS' },
 };
 
 const fieldFor = (field, resource) =>
