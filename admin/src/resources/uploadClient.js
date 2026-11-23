@@ -73,3 +73,20 @@ export const fileUrl = async (key, name) => {
   const { url } = await res.json();
   return url;
 };
+
+// A short-lived link to a zip of a recording's stems or multitrack tracks
+// (kind 'stems' or 'multitracks'), built by the upload service as it is
+// downloaded.
+export const zipUrl = async (recordingId, kind) => {
+  const res = await fetch('/upload/zip-link', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify({ recording_id: recordingId, kind }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const { url } = await res.json();
+  return url;
+};

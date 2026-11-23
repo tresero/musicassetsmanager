@@ -103,10 +103,18 @@ recording. **Copy from song** fills them in from the song to edit from there
 (a medley copies each song's under its title), and asks before replacing
 lyrics already entered (#48).
 
-**Audio**: the master and its alternates, timed cuts, and stems, each typed and
-described, and a Multitracks available flag set by hand, since multitrack
-sessions are not uploaded. A Stem file makes the pitch comment say Stems
-Available, and any type other than Full Mix or Stem says Alts Available. See
+**Audio**: the master and its alternates and timed cuts, each typed and
+described, and a Multitracks available flag for a session kept elsewhere.
+Any type other than Full Mix makes the pitch comment say Alts Available.
+
+**Stems** and **Multitracks**: each stem, and each track of the multitrack
+session, stored as its own file, so it keeps its name and its audio details
+and anyone looking can see what there is. Drop one file, many, or a folder at
+once; each is named from its file name, its header read, and a file already
+on the recording is turned away. **Download all as zip** gives one zip of
+them, built as it downloads with the files stored as they are (audio hardly
+compresses), named after the recording. Any stem makes the pitch comment say
+Stems Available, and any multitrack track Multitracks Available (#43). See
 Audio files below.
 
 **Master**: country of recording, country of commissioning, the P line year,
@@ -556,3 +564,4 @@ a document or a release, does not sort.
 | 2026-11-23 | Lyrics on recordings with Copy from song, and a Lyrics contain filter (#48). |
 | 2026-11-23 | Lyrics contain falls back to close matches. |
 | 2026-11-23 | Addresses by name, without /#/ (#60). |
+| 2026-11-23 | Stems and Multitracks tabs: one file each, Download all as zip (#43). |

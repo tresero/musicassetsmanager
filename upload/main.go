@@ -1,15 +1,17 @@
 // mam-upload: file service for Music Assets Manager.
 //
-//   POST /upload/presign             where to send a file, or that it exists
-//   PUT  /upload/direct?key=...      local backend only
-//   GET  /upload/download?key=...    a short-lived link to open or save a file
-//   GET  /upload/file?...            local backend: serves a signed link
-//   GET  /upload/health
+//	POST /upload/presign             where to send a file, or that it exists
+//	PUT  /upload/direct?key=...      local backend only
+//	GET  /upload/download?key=...    a short-lived link to open or save a file
+//	GET  /upload/file?...            local backend: serves a signed link
+//	POST /upload/zip-link            a signed link to a zip of a recording's stems or multitracks
+//	GET  /upload/zip?...             that zip, built as it is sent (zip.go)
+//	GET  /upload/health
 //
 // It also emails invites: see invite.go.
 //
-//   mam-upload sweep [-dry-run] [-grace 24h]
-//        delete stored files that nothing in the database refers to
+//	mam-upload sweep [-dry-run] [-grace 24h]
+//	     delete stored files that nothing in the database refers to
 //
 // Keys are the SHA-256 of the file's contents, so the same file uploaded
 // twice is one object. Readable names live in the database and are applied
@@ -123,6 +125,8 @@ func main() {
 	mux.HandleFunc("/upload/direct", s.direct)
 	mux.HandleFunc("/upload/download", s.download)
 	mux.HandleFunc("/upload/file", s.serveSigned)
+	mux.HandleFunc("/upload/zip-link", s.zipLink)
+	mux.HandleFunc("/upload/zip", s.serveZip)
 
 	log.Printf("listening on %s", cfg.Listen)
 	log.Fatal(http.ListenAndServe(cfg.Listen, mux))

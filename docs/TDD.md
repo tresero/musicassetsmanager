@@ -118,6 +118,18 @@ admin's.
   searches again with its words, and shows the close-match notice (checked
   by hand in a browser; waits on #81).
 
+## Stems and multitracks (#43)
+
+- Dropping several files on the Stems tab adds a named row for each, with
+  its header details and size, and turns away a file already on the
+  recording; saving sends them as stem_files (checked by hand in a browser;
+  waits on #81).
+- `/upload/zip-link` refuses a recording in another account; `/upload/zip`
+  refuses an expired or altered link, names files by file name, else
+  description and format, and stores each one unchanged (checked by hand
+  against a test copy of the service on the scratch database; an automated
+  test waits on #82).
+
 ## Addresses by name (#60)
 
 - A list row opens `/song/<slug>`; `/song/<id>` and an old slug move to the
@@ -372,3 +384,4 @@ admin's.
 | 2026-11-23 | Accounts kept apart (#33) and most of change history (#78) written as database tests |
 | 2026-11-23 | Recording lyrics (#48) |
 | 2026-11-23 | Addresses by name (#60) |
+| 2026-11-23 | Stems and multitracks (#43) |

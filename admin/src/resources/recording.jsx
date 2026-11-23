@@ -13,6 +13,7 @@ import { PersonOrCompanyInput, ArtistInput } from './partyInputs';
 import { IsrcInput, IsrcArrayInput } from './codeInputs';
 import { DocumentsInput } from './documentsTab';
 import { AudioFilesInput } from './audioFilesTab';
+import { AudioSetInput } from './audioSetTab';
 import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
@@ -271,8 +272,16 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Audio">
       <BooleanInput source="multitracks_available" label="Multitracks available"
-                    helperText="Set by hand when the multitrack session can be supplied. Multitracks aren't uploaded here. Adds Multitracks Available to the pitch comment." />
+                    helperText="For a multitrack session kept somewhere else. Tracks stored on the Multitracks tab count on their own. Adds Multitracks Available to the pitch comment." />
       <AudioFilesInput />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Stems">
+      <AudioSetInput kind="stems" />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Multitracks">
+      <AudioSetInput kind="multitracks" />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Master">

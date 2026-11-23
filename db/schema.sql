@@ -1228,6 +1228,7 @@ DECLARE
   phone      text;
   has_stems  boolean;
   has_alts   boolean;
+  has_multi  boolean;
   avail      text[];
   head       text;
   seg_text   text[];
@@ -1258,14 +1259,15 @@ BEGIN
      ORDER BY p.is_primary DESC, p.id LIMIT 1;
   END IF;
 
-  SELECT bool_or(t.name = 'Stem'), bool_or(t.name NOT IN ('Stem', 'Full Mix'))
-    INTO has_stems, has_alts
+  SELECT bool_or(t.name = 'Stem'), bool_or(t.name NOT IN ('Stem', 'Multitrack', 'Full Mix')),
+         bool_or(t.name = 'Multitrack')
+    INTO has_stems, has_alts, has_multi
     FROM music.audio_file f JOIN music.audio_file_type t ON t.id = f.file_type_id
    WHERE f.recording_id = p_recording;
 
   avail := array_remove(ARRAY[
     CASE WHEN has_stems THEN 'Stems' END,
-    CASE WHEN rec.multitracks_available THEN 'Multitracks' END,
+    CASE WHEN rec.multitracks_available OR has_multi THEN 'Multitracks' END,
     CASE WHEN has_alts THEN 'Alts' END], NULL);
 
   head := concat_ws(' ',
@@ -1410,6 +1412,16 @@ ALTER TABLE ONLY music.audio_file FORCE ROW LEVEL SECURITY;
 --
 
 COMMENT ON COLUMN music.audio_file.file_name IS 'The name the file had on the computer it was uploaded from. It is kept on the row, not with the stored object, because storage names objects by their hash and the same file can be uploaded under several names. Empty for files uploaded before names were kept; api.name_files fills those in.';
+
+--
+-- Name: audio_file_type; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.audio_file_type (
+    id integer NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT audio_file_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
+);
 
 --
 -- Name: contact; Type: TABLE; Schema: music; Owner: -
@@ -2002,9 +2014,11 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     ( SELECT sum(c.featured_share) AS sum
            FROM music.recording_credit c
           WHERE (c.recording_id = r.id)) AS featured_total,
-    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes, 'file_name', f.file_name) ORDER BY f.id) AS jsonb_agg
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes, 'file_name', f.file_name, 'byte_size', f.byte_size) ORDER BY f.id) AS jsonb_agg
            FROM music.audio_file f
-          WHERE (f.recording_id = r.id)), '[]'::jsonb) AS audio_files,
+          WHERE ((f.recording_id = r.id) AND (NOT (f.file_type_id IN ( SELECT t.id
+                   FROM music.audio_file_type t
+                  WHERE (t.name = ANY (ARRAY['Stem'::text, 'Multitrack'::text]))))))), '[]'::jsonb) AS audio_files,
     COALESCE(( SELECT array_agg(g.genre_id ORDER BY g.genre_id) AS array_agg
            FROM music.recording_genre g
           WHERE (g.recording_id = r.id)), '{}'::integer[]) AS genre_ids,
@@ -2048,8 +2062,24 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
     claimant_contact_id,
     claimant_organization_id,
     lyrics,
-    slug
+    slug,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes, 'file_name', f.file_name, 'byte_size', f.byte_size) ORDER BY COALESCE(f.title, f.file_name), f.id) AS jsonb_agg
+           FROM music.audio_file f
+          WHERE ((f.recording_id = r.id) AND (f.file_type_id IN ( SELECT t.id
+                   FROM music.audio_file_type t
+                  WHERE (t.name = 'Stem'::text))))), '[]'::jsonb) AS stem_files,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', f.id, 'title', f.title, 'file_type_id', f.file_type_id, 'storage_kind', f.storage_kind, 'storage_uri', f.storage_uri, 'format', f.format, 'is_lossless', f.is_lossless, 'sample_rate', f.sample_rate, 'bit_depth', f.bit_depth, 'bit_rate_kbps', f.bit_rate_kbps, 'channels', f.channels, 'duration_ms', f.duration_ms, 'notes', f.notes, 'file_name', f.file_name, 'byte_size', f.byte_size) ORDER BY COALESCE(f.title, f.file_name), f.id) AS jsonb_agg
+           FROM music.audio_file f
+          WHERE ((f.recording_id = r.id) AND (f.file_type_id IN ( SELECT t.id
+                   FROM music.audio_file_type t
+                  WHERE (t.name = 'Multitrack'::text))))), '[]'::jsonb) AS multitrack_files
    FROM music.recording r;
+
+--
+-- Name: COLUMN recording.audio_files; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.audio_files IS 'The recording''s mixes, alternates and cuts: every audio file except stems and multitracks, which have lists of their own (#43).';
 
 --
 -- Name: COLUMN recording.artist_names; Type: COMMENT; Schema: api; Owner: -
@@ -2080,6 +2110,18 @@ COMMENT ON COLUMN api.recording.language_name IS 'The language used (language_us
 --
 
 COMMENT ON COLUMN api.recording.copyright_status IS 'The registration that applies, its own, an attached document''s or a release''s (music.recording_copyright).';
+
+--
+-- Name: COLUMN recording.stem_files; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.stem_files IS 'The recording''s stems, one file each, by name (#43). Saved with audio_files and multitrack_files.';
+
+--
+-- Name: COLUMN recording.multitrack_files; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON COLUMN api.recording.multitrack_files IS 'The tracks of the recording''s multitrack session, one file each, by name (#43). Any one stored makes the pitch comment say Multitracks Available.';
 
 --
 -- Name: lyrics_search(api.recording); Type: FUNCTION; Schema: api; Owner: -
@@ -2506,6 +2548,8 @@ DECLARE
   _id    integer;
   _cid   integer;
   _title text;
+  _audio jsonb := coalesce(NEW.audio_files, '[]') || coalesce(NEW.stem_files, '[]')
+                  || coalesce(NEW.multitrack_files, '[]');
   x      jsonb;
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -2728,7 +2772,7 @@ BEGIN
   DELETE FROM music.audio_file f
    WHERE f.recording_id = _id
      AND f.id NOT IN (SELECT (y->>'id')::integer
-                        FROM jsonb_array_elements(coalesce(NEW.audio_files,'[]')) y
+                        FROM jsonb_array_elements(_audio) y
                        WHERE y->>'id' IS NOT NULL);
   UPDATE music.audio_file f
      SET title = nullif(y->>'title',''),
@@ -2744,15 +2788,16 @@ BEGIN
          channels = nullif(y->>'channels','')::smallint,
          duration_ms = nullif(y->>'duration_ms','')::integer,
          notes = nullif(y->>'notes',''),
+         byte_size = coalesce(nullif(y->>'byte_size','')::bigint, f.byte_size),
          file_name = CASE WHEN y ? 'file_name'
                           THEN nullif(btrim(y->>'file_name'),'')
                           ELSE f.file_name END
-    FROM jsonb_array_elements(coalesce(NEW.audio_files,'[]')) y
+    FROM jsonb_array_elements(_audio) y
    WHERE f.id = (y->>'id')::integer AND f.recording_id = _id;
   INSERT INTO music.audio_file (recording_id, title, file_type_id, storage_kind, storage_uri,
                                 format, is_lossless, sample_rate, bit_depth,
                                 bit_rate_kbps, channels, duration_ms, notes,
-                                file_name)
+                                file_name, byte_size)
   SELECT _id, nullif(y->>'title',''),
          coalesce(nullif(y->>'file_type_id','')::integer,
                   music.default_audio_file_type(y->>'format')),
@@ -2765,8 +2810,9 @@ BEGIN
          nullif(y->>'channels','')::smallint,
          nullif(y->>'duration_ms','')::integer,
          nullif(y->>'notes',''),
-         nullif(btrim(y->>'file_name'),'')
-    FROM jsonb_array_elements(coalesce(NEW.audio_files,'[]')) y
+         nullif(btrim(y->>'file_name'),''),
+         nullif(y->>'byte_size','')::bigint
+    FROM jsonb_array_elements(_audio) y
    WHERE y->>'id' IS NULL
      AND nullif(btrim(y->>'storage_uri'),'') IS NOT NULL;
 
@@ -3109,16 +3155,6 @@ CREATE FUNCTION api.search(api.asset_status) RETURNS tsvector
 --
 
 COMMENT ON FUNCTION api.search(api.asset_status) IS 'The name, for search=fts(fold).term:*.';
-
---
--- Name: audio_file_type; Type: TABLE; Schema: music; Owner: -
---
-
-CREATE TABLE music.audio_file_type (
-    id integer NOT NULL,
-    name text NOT NULL,
-    CONSTRAINT audio_file_type_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
-);
 
 --
 -- Name: audio_file_type; Type: VIEW; Schema: api; Owner: -
@@ -14186,6 +14222,13 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file TO app_user;
 GRANT SELECT ON TABLE music.audio_file TO mamupload;
 
 --
+-- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
+GRANT SELECT ON TABLE music.audio_file_type TO mamupload;
+
+--
 -- Name: TABLE contact; Type: ACL; Schema: music; Owner: -
 --
 
@@ -14421,12 +14464,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.asset_status TO app_user;
 --
 
 GRANT ALL ON FUNCTION api.search(api.asset_status) TO app_user;
-
---
--- Name: TABLE audio_file_type; Type: ACL; Schema: music; Owner: -
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.audio_file_type TO app_user;
 
 --
 -- Name: TABLE audio_file_type; Type: ACL; Schema: api; Owner: -

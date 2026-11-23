@@ -1204,6 +1204,7 @@ COPY music.audio_file_type (id, name) FROM stdin;
 11	60 Second
 12	Sting
 13	Stem
+14	Multitrack
 \.
 SELECT setval(pg_get_serial_sequence('music.audio_file_type', 'id'), (SELECT max(id) FROM music.audio_file_type));
 

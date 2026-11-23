@@ -6,6 +6,7 @@ import { parseBlob } from 'music-metadata';
 import { uploadFile } from './uploadClient';
 import { useAudioFileTypes } from './AudioPlayer';
 import { DropZone } from './DropZone';
+import { findStored } from '../audioFiles';
 
 /*
  * Drop an audio file on the row, or click to pick one.
@@ -70,6 +71,61 @@ const describeFile = (ext, tagTitle, recordingTitle) => {
   return null;
 };
 
+// Reads a file's audio details from its header, before it is sent; a zip
+// of stems has none. warn is told when the header could not be read.
+export const readAudio = async (file, warn) => {
+  const ext = extOf(file.name);
+  let f = {};
+  let tagTitle = null;
+  if (ext !== 'ZIP') {
+    let why = 'no sample rate in the header';
+    try {
+      const meta = await parseBlob(file, { duration: true });
+      f = meta.format || {};
+      tagTitle = meta.common?.title?.trim() || null;
+    } catch (e) {
+      console.error('Reading the audio header failed', file.name, e);
+      why = e?.message || String(e);
+      f = {};
+    }
+    if (!f.sampleRate) {
+      warn(`Could not read the audio details of ${file.name} (${why}). `
+           + 'It still uploads; fill in the details by hand.');
+    }
+  }
+  const lossless = ext === 'ZIP' ? null : isLossless(f);
+  const seconds = durationOf(f, file);
+  return {
+    ext,
+    tagTitle,
+    info: {
+      format: ext,
+      lossless,
+      rate: f.sampleRate ?? null,
+      bits: lossless ? (f.bitsPerSample ?? null) : null,
+      kbps: f.bitrate ? Math.round(f.bitrate / 1000) : null,
+      channels: f.numberOfChannels ?? null,
+      ms: seconds ? Math.round(seconds * 1000) : null,
+    },
+  };
+};
+
+// The fields of an audio file row, from what readAudio found and where the
+// upload stored it.
+export const audioRow = (file, info, plan) => ({
+  storage_kind: plan.backend,
+  storage_uri: plan.key,
+  file_name: file.name,
+  byte_size: file.size,
+  format: info.format,
+  is_lossless: info.lossless,
+  sample_rate: info.rate,
+  bit_depth: info.bits,
+  bit_rate_kbps: info.kbps,
+  channels: info.channels,
+  duration_ms: info.ms,
+});
+
 export const AudioUploadInput = ({ scoped = false }) => {
   const notify = useNotify();
   const { setValue, getValues } = useFormContext();
@@ -86,38 +142,7 @@ export const AudioUploadInput = ({ scoped = false }) => {
   const upload = async ([file]) => {
     setPct(0);
     try {
-      // 1. read the header; a zip of stems has none, and still uploads
-      const ext = extOf(file.name);
-      let f = {};
-      let tagTitle = null;
-      if (ext !== 'ZIP') {
-        let why = 'no sample rate in the header';
-        try {
-          const meta = await parseBlob(file, { duration: true });
-          f = meta.format || {};
-          tagTitle = meta.common?.title?.trim() || null;
-        } catch (e) {
-          console.error('Reading the audio header failed', file.name, e);
-          why = e?.message || String(e);
-          f = {};
-        }
-        if (!f.sampleRate) {
-          notify(`Could not read the audio details of ${file.name} (${why}). `
-                 + 'It still uploads; fill in the details by hand.',
-                 { type: 'warning', autoHideDuration: 15000 });
-        }
-      }
-      const lossless = ext === 'ZIP' ? null : isLossless(f);
-      const seconds = durationOf(f, file);
-      const info = {
-        format: extOf(file.name),
-        lossless,
-        rate: f.sampleRate ?? null,
-        bits: lossless ? (f.bitsPerSample ?? null) : null,
-        kbps: f.bitrate ? Math.round(f.bitrate / 1000) : null,
-        channels: f.numberOfChannels ?? null,
-        ms: seconds ? Math.round(seconds * 1000) : null,
-      };
+      const { ext, info, tagTitle } = await readAudio(file, (m) => notify(m, { type: 'warning', autoHideDuration: 15000 }));
 
       // 2. hash, then send unless an identical file is already stored
       setPhase('Checking file');
@@ -131,13 +156,12 @@ export const AudioUploadInput = ({ scoped = false }) => {
       //    name that row if it has no name yet
       const opts = { shouldDirty: true };
       const here = path('storage_uri');
-      const rows = getValues('audio_files') || [];
-      const twin = rows.findIndex((r, i) =>
-        r?.storage_uri === plan.key && `audio_files.${i}.storage_uri` !== here);
+      const found = findStored(getValues(), plan.key);
+      const twin = found && `${found.list}.${found.index}.storage_uri` !== here ? found.index : -1;
       if (twin >= 0) {
-        const label = rows[twin]?.title ? ` (${rows[twin].title})` : '';
-        if (!rows[twin]?.file_name) {
-          setValue(`audio_files.${twin}.file_name`, file.name, opts);
+        const label = found.row?.title ? ` (${found.row.title})` : '';
+        if (!found.row?.file_name) {
+          setValue(`${found.list}.${twin}.file_name`, file.name, opts);
           notify(`Row ${twin + 1}${label} already has that file; it is now named ${file.name}. `
                  + (getValues(here) ? 'Save to keep it.' : 'Remove this empty row and save.'),
                  { type: 'info' });
@@ -149,16 +173,8 @@ export const AudioUploadInput = ({ scoped = false }) => {
       }
 
       // 4. fill the row
-      setValue(path('storage_kind'), plan.backend, opts);
-      setValue(path('storage_uri'), plan.key, opts);
-      setValue(path('file_name'), file.name, opts);
-      setValue(path('format'), info.format, opts);
-      setValue(path('is_lossless'), info.lossless, opts);
-      setValue(path('sample_rate'), info.rate, opts);
-      setValue(path('bit_depth'), info.bits, opts);
-      setValue(path('bit_rate_kbps'), info.kbps, opts);
-      setValue(path('channels'), info.channels, opts);
-      setValue(path('duration_ms'), info.ms, opts);
+      Object.entries(audioRow(file, info, plan))
+        .forEach(([field, value]) => setValue(path(field), value, opts));
       if (!getValues(path('file_type_id'))) {
         setValue(path('file_type_id'),
                  typeId(ext === 'ZIP' ? 'Stem' : 'Full Mix'), opts);

@@ -9,6 +9,7 @@ import { FileLink } from './FileLink';
 import { AudioFilePlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
 import { SharedListPicker, BlockIterator } from './shared';
+import { sizeText } from '../audioFiles';
 
 const row = {
   display: 'flex',
@@ -19,16 +20,16 @@ const row = {
 };
 
 const DETAILS = ['format', 'is_lossless', 'sample_rate', 'bit_depth',
-                 'bit_rate_kbps', 'channels', 'duration_ms'];
+                 'bit_rate_kbps', 'channels', 'duration_ms', 'byte_size'];
 
 const channelText = (n) => (n === 1 ? 'mono' : n === 2 ? 'stereo' : `${n} channels`);
 
 // A row's technical details, read from the file's header when it is
 // dropped and shown read only: format, lossless, sample rate, bit depth,
 // bit rate, channels and length.
-const AudioDetails = () => {
+export const AudioDetails = () => {
   const ctx = useSourceContext();
-  const [format, lossless, rate, bits, kbps, channels, ms] =
+  const [format, lossless, rate, bits, kbps, channels, ms, size] =
     useWatch({ name: DETAILS.map((f) => ctx.getSource(f)) });
   const parts = [
     format,
@@ -38,6 +39,7 @@ const AudioDetails = () => {
     kbps ? `${kbps} kbps` : null,
     channels ? channelText(Number(channels)) : null,
     formatDuration(ms) || null,
+    sizeText(size),
   ].filter(Boolean);
   return (
     <Typography variant="body2" color="text.secondary">
@@ -48,7 +50,7 @@ const AudioDetails = () => {
 
 export const AudioFilesInput = () => (
   <ArrayInput source="audio_files" label={false}
-              helperText="Drop a file on a row; its name, format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip. The type decides what the pitch comment offers: any Stem adds Stems Available, and any type other than Full Mix or Stem adds Alts Available.">
+              helperText="Drop a file on a row; its name, format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems and the multitrack session have tabs of their own. The type decides what the pitch comment offers: any type other than Full Mix adds Alts Available.">
     <BlockIterator disableReordering
                         removeButton={<RemoveAndPlay player={<AudioFilePlayer />} />}>
 
