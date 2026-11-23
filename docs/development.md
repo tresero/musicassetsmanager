@@ -150,8 +150,8 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
 
 - **Frontend:** Vitest. `cd admin && npm test` runs every `*.test.js` next to
   the code it tests. So far: the code rules (`codes.js`), the search query
-  (`search.js`), the database error mapping (`dbErrors.js`) and trimming
-  (`trim.js`).
+  (`search.js`), the database error mapping (`dbErrors.js`), trimming
+  (`trim.js`) and the change history wording (`changes.js`).
 - **Upload service:** `cd upload && go test ./...`.
 - **Database:** not yet. pgTAP against a scratch database Jon creates, never
   production.
