@@ -92,6 +92,17 @@ frontend sends new array items without an id.
 
 Never supply an id on insert. `GENERATED ALWAYS AS IDENTITY` rejects it.
 
+### Addresses by name
+
+The catalog record tables (song, recording, release, contact, organization,
+artist, document) have a `slug`, the record's name in its web address (#60),
+kept by the `<table>_slug` trigger (`music.set_slug`) and unique in the
+account. A renamed record's old slug goes to `music.slug_alias`, and
+`api.find_by_slug` finds either. A new record type with its own page gets the
+column, the trigger, the unique index on `(account_id, slug)`, the name rule
+in `music.set_slug`, `slug` in its view, its name in `SLUGGED` in
+`src/paths.js` and in `api.find_by_slug`, and `SlugEdit` for its edit page.
+
 ### Change history
 
 Every table holding a song's, recording's, release's, person's, company's or
@@ -174,6 +185,7 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
 | RLS returns everything | View missing `security_invoker`, or no `FORCE ROW LEVEL SECURITY` |
 | `cannot change name of view column` | `CREATE OR REPLACE` can't reshape. Drop first, and remember that takes the INSTEAD OF triggers with it. |
 | `null value in column "account_id"` | Running SQL without a JWT. Use `SET LOCAL "request.jwt.claims"` inside the transaction. |
+| A record page says its id must match the requested id | React Admin checks the record it loads against the id in the address. Catalog edit pages use `SlugEdit` from `resources/shared`, which turns `/song/agarra-lo-tuyo` into the id (`api.find_by_slug`) before Edit loads it |
 | A search is slow | A computed column that takes the whole view row (`api.search(api.song)`) makes the view compute every column of every row. Keep the function a one-line call on `$1.id`, so it is inlined, and read the words from the tables, as `music.song_search_doc` does |
 | Search box or picker matches nothing | Send React Admin's `q` filter (the default); `dataProvider.js` turns it into `search=fts(fold)` with `search.js`. A custom `filterToQuery` or `search@ilike` bypasses it. |
 | Generated column write error | Strip it in the `transform` prop |
@@ -211,3 +223,4 @@ written by row triggers.
 | 2026-11-23 | Database tests: pgTAP in `db/tests/`, run with `db/tests/run.sh` |
 | 2026-11-23 | The server runs PostgreSQL 19 |
 | 2026-11-23 | Searches read from the tables, not the whole view row |
+| 2026-11-23 | Addresses by name: slugs, `SlugEdit` |

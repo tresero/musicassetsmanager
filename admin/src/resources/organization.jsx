@@ -7,7 +7,7 @@ import { EditToolbar } from './formToolbar';
 import { DocumentsInput } from './documentsTab';
 import { IsniInput, IpiInput } from './codeInputs';
 import { byCode, proOptionText, proInputText } from './vocab';
-import { CatalogDatagrid, CountryInput, searchFilter } from './shared';
+import { CatalogDatagrid, CountryInput, searchFilter, SlugEdit } from './shared';
 import { ChangeHistory } from './changeHistory';
 
 const filters = [searchFilter];
@@ -65,7 +65,7 @@ const strip = ({ created_at, updated_at, ...rest }) => rest;
 
 export default {
   list: OrgList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><OrgForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><OrgForm /></SlugEdit>,
   create: () => <Create transform={strip}><OrgForm /></Create>,
   recordRepresentation: 'name',
 };

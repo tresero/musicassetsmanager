@@ -1,6 +1,7 @@
 import { Edit, Create, TabbedForm } from 'react-admin';
 import { EditToolbar } from '../formToolbar';
 import { DocumentsInput } from '../documentsTab';
+import { SlugEdit } from '../shared';
 import { ChangeHistory } from '../changeHistory';
 
 import SongList from './SongList';
@@ -36,7 +37,7 @@ const strip = ({ writer_total, publisher_total, one_stop, one_stop_reason,
 
 export default {
   list: SongList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><SongForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><SongForm /></SlugEdit>,
   create: () => <Create transform={strip}><SongForm /></Create>,
   recordRepresentation: 'title',
 };

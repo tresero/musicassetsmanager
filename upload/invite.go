@@ -86,7 +86,7 @@ func (s *server) sendInvite(from *mail.Address, inv invite) error {
 	if err != nil {
 		return err
 	}
-	link := strings.TrimRight(s.cfg.AppURL, "/") + "/#/accept-invite?token=" + inv.Token
+	link := strings.TrimRight(s.cfg.AppURL, "/") + "/accept-invite?token=" + inv.Token
 	who := oneLine(inv.InvitedBy)
 	if who == "" {
 		who = "Someone"

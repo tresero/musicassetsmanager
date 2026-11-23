@@ -790,6 +790,34 @@ $$;
 COMMENT ON FUNCTION api.document_write() IS 'Runs as the signed-in user, so row security limits every write to that account.';
 
 --
+-- Name: find_by_slug(text, text); Type: FUNCTION; Schema: api; Owner: -
+--
+
+CREATE FUNCTION api.find_by_slug(p_resource text, p_slug text) RETURNS integer
+    LANGUAGE plpgsql STABLE
+    AS $_$
+DECLARE
+  _id integer;
+BEGIN
+  IF p_resource NOT IN ('song', 'recording', 'release', 'contact', 'organization', 'artist', 'document') THEN
+    RETURN NULL;
+  END IF;
+  EXECUTE format('SELECT id FROM music.%I WHERE slug = $1', p_resource) INTO _id USING p_slug;
+  IF _id IS NULL THEN
+    SELECT a.record_id INTO _id FROM music.slug_alias a
+     WHERE a.table_name = p_resource AND a.slug = p_slug;
+  END IF;
+  RETURN _id;
+END;
+$_$;
+
+--
+-- Name: FUNCTION find_by_slug(p_resource text, p_slug text); Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON FUNCTION api.find_by_slug(p_resource text, p_slug text) IS 'The id of the record at /<resource>/<slug> in the signed-in account: its current address, else one it had before a rename (#60).';
+
+--
 -- Name: import_statement(jsonb, jsonb); Type: FUNCTION; Schema: api; Owner: -
 --
 
@@ -1401,6 +1429,7 @@ CREATE TABLE music.contact (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     credit_name text,
+    slug text NOT NULL,
     CONSTRAINT contact_has_name CHECK ((COALESCE(first_name, last_name) IS NOT NULL))
 );
 
@@ -1413,6 +1442,12 @@ ALTER TABLE ONLY music.contact FORCE ROW LEVEL SECURITY;
 COMMENT ON COLUMN music.contact.credit_name IS 'Name this person performs and is credited under, when it differs from
 their legal name. Blank means credit them by their own name. A single
 credit can still override it through recording_credit.credited_as.';
+
+--
+-- Name: COLUMN contact.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.contact.slug IS 'The contact''s web address after /contact/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: language; Type: TABLE; Schema: music; Owner: -
@@ -1440,10 +1475,17 @@ CREATE TABLE music.organization (
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    slug text NOT NULL,
     CONSTRAINT organization_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
 
 ALTER TABLE ONLY music.organization FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN organization.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.organization.slug IS 'The organization''s web address after /organization/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: recording; Type: TABLE; Schema: music; Owner: -
@@ -1483,6 +1525,7 @@ CREATE TABLE music.recording (
     claimant_contact_id integer,
     claimant_organization_id integer,
     lyrics text,
+    slug text NOT NULL,
     CONSTRAINT recording_bpm CHECK (((bpm IS NULL) OR ((bpm >= (20)::numeric) AND (bpm <= (400)::numeric)))),
     CONSTRAINT recording_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT recording_duration CHECK (((duration_ms IS NULL) OR (duration_ms > 0))),
@@ -1578,6 +1621,12 @@ COMMENT ON COLUMN music.recording.claimant_organization_id IS 'Company named as 
 --
 
 COMMENT ON COLUMN music.recording.lyrics IS 'The lyrics as recorded, entered when they differ from the song''s or are needed for delivery; blank means the song''s lyrics (#48).';
+
+--
+-- Name: COLUMN recording.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.recording.slug IS 'The recording''s web address after /recording/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: recording_artist; Type: TABLE; Schema: music; Owner: -
@@ -1823,6 +1872,7 @@ CREATE TABLE music.song (
     easy_clear boolean DEFAULT false NOT NULL,
     claimant_contact_id integer,
     claimant_organization_id integer,
+    slug text NOT NULL,
     CONSTRAINT song_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT song_derivation CHECK (((derivation_type IS NULL) OR (derivation_type = ANY (ARRAY['arrangement'::text, 'translation'::text, 'adaptation'::text, 'sample'::text])))),
     CONSTRAINT song_derivation_pair CHECK ((((derived_from_id IS NULL) = (derivation_type IS NULL)) OR (derived_from_id IS NULL))),
@@ -1864,6 +1914,12 @@ COMMENT ON COLUMN music.song.claimant_contact_id IS 'Person named as claimant on
 --
 
 COMMENT ON COLUMN music.song.claimant_organization_id IS 'Company named as claimant on the composition''s own registration, when a company rather than a person holds it.';
+
+--
+-- Name: COLUMN song.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.song.slug IS 'The song''s web address after /song/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: theme; Type: TABLE; Schema: music; Owner: -
@@ -1991,7 +2047,8 @@ CREATE VIEW api.recording WITH (security_invoker='true') AS
           WHERE (rt.recording_id = r.id)) AS theme_names,
     claimant_contact_id,
     claimant_organization_id,
-    lyrics
+    lyrics,
+    slug
    FROM music.recording r;
 
 --
@@ -2220,7 +2277,8 @@ CREATE VIEW api.song WITH (security_invoker='true') AS
           WHERE ((l.code)::text = (s.language_code)::text)) AS language_name,
     music.song_copyright(id) AS copyright_status,
     claimant_contact_id,
-    claimant_organization_id
+    claimant_organization_id,
+    slug
    FROM music.song s;
 
 --
@@ -2945,11 +3003,18 @@ CREATE TABLE music.artist (
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    slug text NOT NULL,
     CONSTRAINT artist_kind CHECK ((kind = ANY (ARRAY['person'::text, 'group'::text]))),
     CONSTRAINT artist_trimmed CHECK (((name = btrim(name)) AND (name <> ''::text)))
 );
 
 ALTER TABLE ONLY music.artist FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: COLUMN artist.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.artist.slug IS 'The artist''s web address after /artist/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: artist_member; Type: TABLE; Schema: music; Owner: -
@@ -2998,7 +3063,8 @@ CREATE VIEW api.artist WITH (security_invoker='true') AS
           WHERE (m.artist_id = a.id)) AS member_count,
     created_at,
     updated_at,
-    COALESCE(NULLIF(btrim(sort_name), ''::text), name) AS sort_key
+    COALESCE(NULLIF(btrim(sort_name), ''::text), name) AS sort_key,
+    slug
    FROM music.artist a;
 
 --
@@ -3187,7 +3253,8 @@ CREATE VIEW api.contact WITH (security_invoker='true') AS
           WHERE (o.contact_id = c.id)), '[]'::jsonb) AS organizations,
     music.documents_of('contact_document'::text, 'contact_id'::text, id) AS documents,
     created_at,
-    updated_at
+    updated_at,
+    slug
    FROM music.contact c;
 
 --
@@ -3283,6 +3350,7 @@ CREATE TABLE music.document (
     file_name text,
     claimant_contact_id integer,
     claimant_organization_id integer,
+    slug text NOT NULL,
     CONSTRAINT document_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
     CONSTRAINT document_dates CHECK (((expires_on IS NULL) OR (signed_on IS NULL) OR (expires_on >= signed_on))),
     CONSTRAINT document_file_name_trimmed CHECK (((file_name IS NULL) OR ((file_name = btrim(file_name)) AND (file_name <> ''::text)))),
@@ -3315,6 +3383,12 @@ COMMENT ON COLUMN music.document.claimant_contact_id IS 'On a Copyright Registra
 --
 
 COMMENT ON COLUMN music.document.claimant_organization_id IS 'On a Copyright Registration document, the company named as claimant, when a company rather than a person holds it.';
+
+--
+-- Name: COLUMN document.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.document.slug IS 'The document''s web address after /document/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: organization_document; Type: TABLE; Schema: music; Owner: -
@@ -3386,7 +3460,8 @@ CREATE VIEW api.document WITH (security_invoker='true') AS
     updated_at,
     file_name,
     claimant_contact_id,
-    claimant_organization_id
+    claimant_organization_id,
+    slug
    FROM music.document d;
 
 --
@@ -3627,7 +3702,8 @@ CREATE VIEW api.organization WITH (security_invoker='true') AS
     notes,
     music.documents_of('organization_document'::text, 'organization_id'::text, id) AS documents,
     created_at,
-    updated_at
+    updated_at,
+    slug
    FROM music.organization o;
 
 --
@@ -3802,6 +3878,7 @@ CREATE TABLE music.release (
     copyright_date date,
     claimant_contact_id integer,
     claimant_organization_id integer,
+    slug text NOT NULL,
     CONSTRAINT release_c_line_one_owner CHECK ((num_nonnulls(c_line_contact_id, c_line_organization_id) <= 1)),
     CONSTRAINT release_c_line_year CHECK (((c_line_year IS NULL) OR ((c_line_year >= 1900) AND (c_line_year <= 2200)))),
     CONSTRAINT release_claimant_one CHECK ((num_nonnulls(claimant_contact_id, claimant_organization_id) <= 1)),
@@ -3865,6 +3942,12 @@ COMMENT ON COLUMN music.release.claimant_contact_id IS 'Person named as claimant
 --
 
 COMMENT ON COLUMN music.release.claimant_organization_id IS 'Company named as claimant on the release''s own registration, when a company rather than a person holds it.';
+
+--
+-- Name: COLUMN release.slug; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.release.slug IS 'The release''s web address after /release/, from its name (#60). Set by music.set_slug.';
 
 --
 -- Name: release_artist; Type: TABLE; Schema: music; Owner: -
@@ -3995,7 +4078,8 @@ CREATE VIEW api.release WITH (security_invoker='true') AS
     copyright_date,
     music.release_copyright(id) AS copyright_status,
     claimant_contact_id,
-    claimant_organization_id
+    claimant_organization_id,
+    slug
    FROM music.release r;
 
 --
@@ -5632,7 +5716,7 @@ BEGIN
     RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
   END IF;
 
-  SELECT array['account_id', 'created_at', 'updated_at'] || coalesce(array_agg(a.attname::text), '{}')
+  SELECT array['account_id', 'created_at', 'updated_at', 'slug'] || coalesce(array_agg(a.attname::text), '{}')
     INTO _skip
     FROM pg_attribute a
    WHERE a.attrelid = TG_RELID AND a.attgenerated <> '';
@@ -6497,6 +6581,67 @@ $$;
 COMMENT ON FUNCTION music.send_invite(p_invite uuid, p_token text) IS 'Hands an invite and its link code to mam-upload, which listens on the mam_invite channel and sends the email. The notice is delivered only if the transaction commits. Owner rights only to read the account and inviter names.';
 
 --
+-- Name: set_slug(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.set_slug() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  _j     jsonb := to_jsonb(NEW);
+  _base  text;
+  _slug  text;
+  _n     integer := 1;
+  _taken boolean;
+BEGIN
+  _base := coalesce(music.slugify(CASE TG_TABLE_NAME
+    WHEN 'contact' THEN concat_ws(' ', _j->>'first_name', _j->>'last_name')
+    WHEN 'organization' THEN _j->>'name'
+    WHEN 'artist' THEN _j->>'name'
+    WHEN 'recording' THEN concat_ws(' ', _j->>'title', nullif(_j->>'version_label', 'Release'))
+    ELSE _j->>'title'
+  END), TG_TABLE_NAME);
+  IF _base ~ '^[0-9]+$' THEN
+    _base := _base || '-' || TG_TABLE_NAME;
+  END IF;
+
+  -- A save that leaves the name alone keeps the address, -2 and all.
+  IF TG_OP = 'UPDATE' AND OLD.slug IS NOT NULL
+     AND (OLD.slug = _base OR OLD.slug ~ ('^' || _base || '-[0-9]+$')) THEN
+    NEW.slug := OLD.slug;
+    RETURN NEW;
+  END IF;
+
+  _slug := _base;
+  LOOP
+    EXECUTE format('SELECT EXISTS (SELECT 1 FROM music.%I WHERE account_id = $1 AND slug = $2 AND id IS DISTINCT FROM $3)',
+                   TG_TABLE_NAME)
+       INTO _taken USING NEW.account_id, _slug, NEW.id;
+    EXIT WHEN NOT _taken;
+    _n := _n + 1;
+    _slug := _base || '-' || _n;
+  END LOOP;
+
+  IF TG_OP = 'UPDATE' AND OLD.slug IS NOT NULL AND OLD.slug <> _slug THEN
+    INSERT INTO music.slug_alias (table_name, account_id, slug, record_id)
+    VALUES (TG_TABLE_NAME, NEW.account_id, OLD.slug, NEW.id)
+    ON CONFLICT (account_id, table_name, slug) DO UPDATE SET record_id = EXCLUDED.record_id;
+  END IF;
+  DELETE FROM music.slug_alias a
+   WHERE a.account_id = NEW.account_id AND a.table_name = TG_TABLE_NAME AND a.slug = _slug;
+
+  NEW.slug := _slug;
+  RETURN NEW;
+END;
+$_$;
+
+--
+-- Name: FUNCTION set_slug(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.set_slug() IS 'Keeps a record''s web address (slug) in step with its name (#60): unique in the account, with -2, -3 for a name already used; a renamed record''s old address goes to music.slug_alias.';
+
+--
 -- Name: set_updated_at(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -6547,6 +6692,22 @@ $$;
 --
 
 COMMENT ON FUNCTION music.site_account() IS 'Every account with its user count, first Owner and the state of its Owner invite. Returns rows only to the site admin. Owner rights because app_user cannot read other accounts.';
+
+--
+-- Name: slugify(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.slugify(p text) RETURNS text
+    LANGUAGE sql STABLE PARALLEL SAFE
+    AS $$
+  SELECT nullif(btrim(left(regexp_replace(lower(public.unaccent(coalesce(p, ''))), '[^a-z0-9]+', '-', 'g'), 80), '-'), '')
+$$;
+
+--
+-- Name: FUNCTION slugify(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.slugify(p text) IS 'A name as it appears in a web address: lowercase, no accents, dashes between words, at most 80 characters (#60).';
 
 --
 -- Name: song_controlled_share(integer); Type: FUNCTION; Schema: music; Owner: -
@@ -8702,6 +8863,25 @@ ALTER TABLE music.schema_type ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 );
 
 --
+-- Name: slug_alias; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.slug_alias (
+    table_name text NOT NULL,
+    account_id uuid NOT NULL,
+    slug text NOT NULL,
+    record_id integer NOT NULL
+);
+
+ALTER TABLE ONLY music.slug_alias FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE slug_alias; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.slug_alias IS 'Addresses a record had before it was renamed, so an old link or bookmark still finds it (#60). Written by music.set_slug.';
+
+--
 -- Name: song_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -9371,6 +9551,13 @@ ALTER TABLE ONLY music.site_setting
     ADD CONSTRAINT site_setting_pkey PRIMARY KEY (id);
 
 --
+-- Name: slug_alias slug_alias_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.slug_alias
+    ADD CONSTRAINT slug_alias_pkey PRIMARY KEY (account_id, table_name, slug);
+
+--
 -- Name: song_document song_document_pkey; Type: CONSTRAINT; Schema: music; Owner: -
 --
 
@@ -9608,6 +9795,12 @@ COMMENT ON INDEX music.app_user_email_key IS 'One login per email address regard
 CREATE INDEX artist_member_contact_id_idx ON music.artist_member USING btree (contact_id);
 
 --
+-- Name: artist_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX artist_slug_key ON music.artist USING btree (account_id, slug);
+
+--
 -- Name: asset_status_name_key; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -9728,6 +9921,12 @@ CREATE UNIQUE INDEX contact_phone_one_primary ON music.contact_phone USING btree
 CREATE INDEX contact_pro_code_idx ON music.contact USING btree (pro_code);
 
 --
+-- Name: contact_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX contact_slug_key ON music.contact USING btree (account_id, slug);
+
+--
 -- Name: country_name_key; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -9756,6 +9955,12 @@ CREATE UNIQUE INDEX document_one_per_file ON music.document USING btree (account
 --
 
 COMMENT ON INDEX music.document_one_per_file IS 'A stored file is one document, attached wherever it applies. Files are named by their contents, so the same file uploaded twice has the same storage_uri.';
+
+--
+-- Name: document_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX document_slug_key ON music.document USING btree (account_id, slug);
 
 --
 -- Name: document_type_name_key; Type: INDEX; Schema: music; Owner: -
@@ -9858,6 +10063,12 @@ COMMENT ON INDEX music.organization_name_key IS 'A company name is used once per
 --
 
 CREATE INDEX organization_pro_code_idx ON music.organization USING btree (pro_code);
+
+--
+-- Name: organization_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_slug_key ON music.organization USING btree (account_id, slug);
 
 --
 -- Name: pro_home_country_idx; Type: INDEX; Schema: music; Owner: -
@@ -9998,6 +10209,12 @@ CREATE INDEX recording_representation_organization_idx ON music.recording_repres
 CREATE INDEX recording_representation_recording_idx ON music.recording_representation USING btree (recording_id);
 
 --
+-- Name: recording_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX recording_slug_key ON music.recording USING btree (account_id, slug);
+
+--
 -- Name: recording_song_song_id_idx; Type: INDEX; Schema: music; Owner: -
 --
 
@@ -10020,6 +10237,12 @@ CREATE INDEX recording_theme_theme_id_idx ON music.recording_theme USING btree (
 --
 
 CREATE INDEX release_distribution_release_idx ON music.release_distribution USING btree (release_id);
+
+--
+-- Name: release_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX release_slug_key ON music.release USING btree (account_id, slug);
 
 --
 -- Name: release_track_recording_idx; Type: INDEX; Schema: music; Owner: -
@@ -10128,6 +10351,12 @@ CREATE INDEX song_registration_song_id_idx ON music.song_registration USING btre
 --
 
 CREATE INDEX song_registration_work_number_idx ON music.song_registration USING btree (work_number);
+
+--
+-- Name: song_slug_key; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE UNIQUE INDEX song_slug_key ON music.song USING btree (account_id, slug);
 
 --
 -- Name: song_title_lower_idx; Type: INDEX; Schema: music; Owner: -
@@ -10632,6 +10861,12 @@ CREATE TRIGGER artist_edit_permission BEFORE INSERT OR UPDATE ON music.artist FO
 --
 
 CREATE TRIGGER artist_member_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.artist_member FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: artist artist_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER artist_slug BEFORE INSERT OR UPDATE ON music.artist FOR EACH ROW EXECUTE FUNCTION music.set_slug();
 
 --
 -- Name: asset_status asset_status_site_admin; Type: TRIGGER; Schema: music; Owner: -
@@ -11318,6 +11553,12 @@ CREATE TRIGGER contact_phone_edit_permission BEFORE INSERT OR DELETE OR UPDATE O
 CREATE TRIGGER contact_phone_touch BEFORE UPDATE ON music.contact_phone FOR EACH ROW EXECUTE FUNCTION music.set_updated_at();
 
 --
+-- Name: contact contact_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER contact_slug BEFORE INSERT OR UPDATE ON music.contact FOR EACH ROW EXECUTE FUNCTION music.set_slug();
+
+--
 -- Name: contact contact_touch; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -11340,6 +11581,12 @@ CREATE TRIGGER document_delete_permission BEFORE DELETE ON music.document FOR EA
 --
 
 CREATE TRIGGER document_edit_permission BEFORE INSERT OR UPDATE ON music.document FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: document document_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER document_slug BEFORE INSERT OR UPDATE ON music.document FOR EACH ROW EXECUTE FUNCTION music.set_slug();
 
 --
 -- Name: document document_storage_kind; Type: TRIGGER; Schema: music; Owner: -
@@ -11400,6 +11647,12 @@ CREATE TRIGGER organization_document_edit_permission BEFORE INSERT OR DELETE OR 
 --
 
 CREATE TRIGGER organization_edit_permission BEFORE INSERT OR UPDATE ON music.organization FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: organization organization_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER organization_slug BEFORE INSERT OR UPDATE ON music.organization FOR EACH ROW EXECUTE FUNCTION music.set_slug();
 
 --
 -- Name: organization organization_touch; Type: TRIGGER; Schema: music; Owner: -
@@ -11516,6 +11769,12 @@ CREATE TRIGGER recording_representation_edit_permission BEFORE INSERT OR DELETE 
 CREATE CONSTRAINT TRIGGER recording_representation_exclusive AFTER INSERT OR UPDATE ON music.recording_representation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION music.check_representation_exclusive();
 
 --
+-- Name: recording recording_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER recording_slug BEFORE INSERT OR UPDATE ON music.recording FOR EACH ROW EXECUTE FUNCTION music.set_slug();
+
+--
 -- Name: recording_song recording_song_edit_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -11576,6 +11835,12 @@ CREATE TRIGGER release_in_statements BEFORE DELETE ON music.release FOR EACH ROW
 CREATE TRIGGER release_in_transactions BEFORE DELETE ON music.release FOR EACH ROW EXECUTE FUNCTION music.in_transactions();
 
 --
+-- Name: release release_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER release_slug BEFORE INSERT OR UPDATE ON music.release FOR EACH ROW EXECUTE FUNCTION music.set_slug();
+
+--
 -- Name: release_track release_track_edit_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -11598,6 +11863,12 @@ CREATE TRIGGER role_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.role F
 --
 
 CREATE TRIGGER site_setting_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.site_setting FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin('the site settings');
+
+--
+-- Name: slug_alias slug_alias_edit_permission; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER slug_alias_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.slug_alias FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
 
 --
 -- Name: song song_delete_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -11640,6 +11911,12 @@ CREATE TRIGGER song_publisher_edit_permission BEFORE INSERT OR DELETE OR UPDATE 
 --
 
 CREATE TRIGGER song_registration_edit_permission BEFORE INSERT OR DELETE OR UPDATE ON music.song_registration FOR EACH STATEMENT EXECUTE FUNCTION music.require_permission('catalog.edit');
+
+--
+-- Name: song song_slug; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER song_slug BEFORE INSERT OR UPDATE ON music.song FOR EACH ROW EXECUTE FUNCTION music.set_slug();
 
 --
 -- Name: song_title song_title_edit_permission; Type: TRIGGER; Schema: music; Owner: -
@@ -12383,6 +12660,13 @@ ALTER TABLE ONLY music.role
 
 ALTER TABLE ONLY music.schema_type
     ADD CONSTRAINT schema_type_vocabulary_fkey FOREIGN KEY (vocabulary) REFERENCES music.vocabulary(prefix) ON UPDATE CASCADE;
+
+--
+-- Name: slug_alias slug_alias_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.slug_alias
+    ADD CONSTRAINT slug_alias_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
 
 --
 -- Name: song song_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -13411,6 +13695,22 @@ CREATE POLICY release_track_account ON music.release_track USING (music.own_rele
 --
 
 COMMENT ON POLICY release_track_account ON music.release_track IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: slug_alias; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.slug_alias ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: slug_alias slug_alias_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY slug_alias_account ON music.slug_alias USING ((account_id = ( SELECT music.current_account() AS current_account))) WITH CHECK ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: slug_alias slug_alias_read_all; Type: POLICY; Schema: music; Owner: -
+--
 
 --
 -- Name: song; Type: ROW SECURITY; Schema: music; Owner: -
@@ -15353,6 +15653,12 @@ GRANT USAGE ON SEQUENCE music.mood_id_seq TO app_user;
 --
 
 GRANT USAGE ON SEQUENCE music.organization_id_seq TO app_user;
+
+--
+-- Name: TABLE slug_alias; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE music.slug_alias TO app_user;
 
 --
 -- Name: SEQUENCE statement_id_seq; Type: ACL; Schema: music; Owner: -

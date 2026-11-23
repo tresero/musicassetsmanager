@@ -484,6 +484,12 @@ a document or a release, does not sort.
   letters may be one letter off and a longer one two, and two words run
   together count ("agarralo" finds "agarra lo"), so "korazon" finds
   corazón.
+- Addresses are plain paths with the record's name: `/song/agarra-lo-tuyo`,
+  `/recording/paloma-remix` (the version unless it is the release),
+  `/contact/ada-example`. A second record with the same name gets `-2`. An
+  address with the record's number, or the name it had before a rename,
+  still opens it and changes to the current name, so old links and bookmarks
+  keep working (#60).
 - An empty Songs, Recordings or Releases list says to set up Storage and
   Pitch settings before adding the catalog, to those who can (#35).
 
@@ -549,3 +555,4 @@ a document or a release, does not sort.
 | 2026-11-23 | Help text across the forms; what to do when a list value is missing; first steps on an empty catalog (#35). |
 | 2026-11-23 | Lyrics on recordings with Copy from song, and a Lyrics contain filter (#48). |
 | 2026-11-23 | Lyrics contain falls back to close matches. |
+| 2026-11-23 | Addresses by name, without /#/ (#60). |

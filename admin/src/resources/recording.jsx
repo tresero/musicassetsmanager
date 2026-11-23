@@ -17,7 +17,7 @@ import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
-  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, lyricsFilter, RowIterator, StartHere, CloseLyricsNotice,
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, lyricsFilter, RowIterator, StartHere, CloseLyricsNotice, SlugEdit,
 } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { RecordingLyricsInput } from './recordingLyrics';
@@ -347,7 +347,7 @@ const strip = ({ duration_display, owner_total, p_line, featured_total, pitch_co
 
 export default {
   list: RecordingList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><RecordingForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><RecordingForm /></SlugEdit>,
   create: () => <Create transform={strip}><RecordingForm /></Create>,
   recordRepresentation: 'title',
 };

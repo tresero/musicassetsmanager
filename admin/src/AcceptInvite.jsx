@@ -13,7 +13,7 @@ import { CardContent, Typography, Alert, Button as SubmitButton } from '@mui/mat
 // which answers the same whether or not an invite exists.
 
 const token = () =>
-  new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
+  new URLSearchParams(window.location.search).get('token');
 
 const matches = (value, all) =>
   value === all.pass ? undefined : 'The passwords do not match';
@@ -45,7 +45,7 @@ const JoinForm = ({ code, invite }) => {
       if (!body.token) throw new Error('Could not accept the invite. Try again.');
       localStorage.setItem('token', body.token);
       // A full load so the new user's role is read fresh.
-      window.location.replace(window.location.pathname);
+      window.location.replace('/');
     } catch (e) {
       notify(e.message, { type: 'error' });
       setBusy(false);

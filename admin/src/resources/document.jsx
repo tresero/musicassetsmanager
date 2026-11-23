@@ -10,7 +10,7 @@ import { EditToolbar } from './formToolbar';
 import { FileLink } from './FileLink';
 import { DocumentDatesInput } from './DocumentDatesInput';
 import { RegistrationInputs } from './documentsTab';
-import { CatalogDatagrid, SharedListPicker, searchFilter } from './shared';
+import { CatalogDatagrid, SharedListPicker, searchFilter, SlugEdit } from './shared';
 
 const filters = [searchFilter];
 
@@ -98,7 +98,7 @@ const strip = ({ created_at, updated_at, sha256, ...rest }) => rest;
 
 export default {
   list: DocumentList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><DocumentForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><DocumentForm /></SlugEdit>,
   create: () => <Create transform={strip}><DocumentForm /></Create>,
   recordRepresentation: 'title',
 };

@@ -118,6 +118,14 @@ admin's.
   searches again with its words, and shows the close-match notice (checked
   by hand in a browser; waits on #81).
 
+## Addresses by name (#60)
+
+- A list row opens `/song/<slug>`; `/song/<id>` and an old slug move to the
+  current slug; an unknown slug returns to the list; saving at a slug address
+  saves the record; `/accept-invite?token=` opens the invite page (checked by
+  hand in a browser with a mock API; waits on #83).
+- An invite email links to `/accept-invite?token=...` (upload service test).
+
 ## Help text (#35)
 
 - A shared list picker's help ends with "Not listed? Ask us to add it to the
@@ -363,3 +371,4 @@ admin's.
 | 2026-11-23 | Help text (#35) |
 | 2026-11-23 | Accounts kept apart (#33) and most of change history (#78) written as database tests |
 | 2026-11-23 | Recording lyrics (#48) |
+| 2026-11-23 | Addresses by name (#60) |

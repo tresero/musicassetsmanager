@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   List, Datagrid, DataTable, TextField, Edit, Create, SimpleForm, TextInput,
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput,
-  useRecordContext, useListContext,
-  SimpleFormIterator, CreateButton,
+  useRecordContext, useListContext, useResourceContext,
+  SimpleFormIterator, CreateButton, Loading, useNotify,
 } from 'react-admin';
-import { Link as RouterLink } from 'react-router';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { SLUGGED, isSlug, prettyPath, slugPath } from '../paths';
+import { rememberSlug, findBySlug } from '../dataProvider';
 import { Alert, Box, Button, Link, Stack, TextField as MuiTextField } from '@mui/material';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useSourceContext } from 'ra-core';
@@ -161,18 +164,74 @@ export const CurrencyInput = ({ source, label = 'Currency', helperText, validate
 };
 
 // A list of whole records. Bulk delete shows only for roles that may delete.
-export const CatalogDatagrid = ({ bulkActionButtons, ...props }) => {
+export const CatalogDatagrid = ({ bulkActionButtons, rowClick, ...props }) => {
   const canDelete = useCan('catalog.delete');
-  return <Datagrid bulkActionButtons={canDelete ? bulkActionButtons : false} {...props} />;
+  return <Datagrid bulkActionButtons={canDelete ? bulkActionButtons : false}
+                   rowClick={useSlugRowClick(rowClick)} {...props} />;
 };
 
 // The same for lists whose columns the user chooses (with ListActions):
 // list every useful column and name the ones that start hidden in
 // hiddenColumns. A column sorts by its source, so show a name or time with
 // render and sort by the value behind it.
-export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
+export const CatalogDataTable = ({ bulkActionButtons, rowClick, ...props }) => {
   const canDelete = useCan('catalog.delete');
-  return <DataTable bulkActionButtons={canDelete ? bulkActionButtons : false} {...props} />;
+  return <DataTable bulkActionButtons={canDelete ? bulkActionButtons : false}
+                    rowClick={useSlugRowClick(rowClick)} {...props} />;
+};
+
+// A row of songs, recordings and the like opens at the record's name (#60).
+const useSlugRowClick = (rowClick) => {
+  const resource = useResourceContext();
+  if (rowClick !== 'edit' || !SLUGGED.has(resource)) return rowClick;
+  return (id, res, record) => {
+    rememberSlug(res, record.slug, id);
+    return slugPath(res, record);
+  };
+};
+
+// On a record's page: an address with its number, or a name it had before a
+// rename, becomes its current name (#60). The name is remembered with the
+// id, so the page is not looked up again.
+const PrettyPath = () => {
+  const record = useRecordContext();
+  const resource = useResourceContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const to = record ? prettyPath(location.pathname, resource, record.slug) : null;
+  useEffect(() => {
+    if (!to) return;
+    rememberSlug(resource, record.slug, record.id);
+    queryClient.setQueryData([resource, 'findBySlug', record.slug], record.id);
+    navigate({ pathname: to, search: location.search }, { replace: true });
+  }, [to, record, resource, location.search, navigate, queryClient]);
+  return null;
+};
+
+// The edit page of a record addressed by name (#60). React Admin loads a
+// record by the id in the address and insists the two match, so a name is
+// turned into the id first (api.find_by_slug) and given to Edit. A name that
+// finds nothing goes back to the list, as an unknown id does.
+export const SlugEdit = (props) => {
+  const { id: routeId } = useParams();
+  const resource = useResourceContext();
+  const notify = useNotify();
+  const navigate = useNavigate();
+  const named = isSlug(routeId);
+  const { data: id, isError } = useQuery({
+    queryKey: [resource, 'findBySlug', routeId],
+    queryFn: () => findBySlug(resource, routeId),
+    enabled: named,
+    retry: false,
+  });
+  useEffect(() => {
+    if (!isError) return;
+    notify('ra.notification.item_doesnt_exist', { type: 'error' });
+    navigate(`/${resource}`, { replace: true });
+  }, [isError, notify, navigate, resource]);
+  if (named && id == null) return isError ? null : <Loading />;
+  return <Edit {...props} id={named ? id : routeId} aside={<PrettyPath />} />;
 };
 
 // The search box at the top of a list. It sends q, which dataProvider turns

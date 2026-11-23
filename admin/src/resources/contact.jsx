@@ -9,7 +9,7 @@ import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput, IpiInput } from './codeInputs';
-import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
+import { CatalogDatagrid, searchFilter, RowIterator, SlugEdit } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { useDefaultCallingCode } from '../permissions';
 
@@ -118,7 +118,7 @@ const strip = ({ display_name, sort_name, primary_email,
 
 export default {
   list: ContactList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><ContactForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><ContactForm /></SlugEdit>,
   create: () => <Create transform={strip}><ContactForm /></Create>,
   recordRepresentation: 'display_name',
 };

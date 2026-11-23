@@ -7,7 +7,7 @@ import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
 import { IsniInput } from './codeInputs';
-import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
+import { CatalogDatagrid, searchFilter, RowIterator, SlugEdit } from './shared';
 import { ChangeHistory } from './changeHistory';
 
 const filters = [searchFilter];
@@ -86,7 +86,7 @@ const strip = ({ isni, isni_inherited, member_count, sort_key,
 
 export default {
   list: ArtistList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><ArtistForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><ArtistForm /></SlugEdit>,
   create: () => <Create transform={strip}><ArtistForm /></Create>,
   recordRepresentation: 'name',
 };

@@ -1,8 +1,9 @@
-import { fetchUtils } from 'react-admin';
+import { fetchUtils, HttpError } from 'react-admin';
 import postgrestRestProvider, { defaultSchema } from '@raphiniert/ra-data-postgrest';
 import { searchFilters, withCloseLyrics } from './search';
 import { explainDbError } from './dbErrors';
 import { trimText } from './trim';
+import { SLUGGED, isSlug } from './paths';
 
 const httpClient = (url, options = {}) => {
   if (!options.headers) options.headers = new Headers({ Accept: 'application/json' });
@@ -67,17 +68,45 @@ const getList = async (resource, params) => {
   return { ...found, meta: { ...found.meta, closeLyrics: close.words } };
 };
 
+// A record opened at /song/agarra-lo-tuyo (#60) is loaded, saved and deleted
+// by its id, which the database finds from the name (api.find_by_slug).
+// Names already seen, in a list row or on a page, are remembered.
+const slugIds = new Map();
+
+export const rememberSlug = (resource, slug, id) => {
+  if (slug && id != null) slugIds.set(`${resource}/${slug}`, id);
+};
+
+const resolveId = async (resource, id) => {
+  if (!SLUGGED.has(resource) || !isSlug(id)) return id;
+  const key = `${resource}/${id}`;
+  if (!slugIds.has(key)) {
+    const query = new URLSearchParams({ p_resource: resource, p_slug: id });
+    const { json } = await httpClient(`/api/rpc/find_by_slug?${query}`);
+    if (json == null) throw new HttpError('Not found', 404);
+    slugIds.set(key, json);
+  }
+  return slugIds.get(key);
+};
+
+export const findBySlug = resolveId;
+
+const byId = (method) => async (resource, params) =>
+  method(resource, { ...params, id: await resolveId(resource, params.id) });
+
 // Every save trims its text first (trim.js), and a save the database
 // refuses marks the field it is about (dbErrors.js).
-const explained = (method) => (resource, params) =>
+const explained = (method) => byId((resource, params) =>
   provider[method](resource, { ...params, data: trimText(params.data) })
-    .catch((error) => { throw explainDbError(resource, error); });
+    .catch((error) => { throw explainDbError(resource, error); }));
 
 export default {
   ...provider,
   getList,
   getManyReference: (resource, params) =>
     provider.getManyReference(resource, toSearch(params)),
+  getOne: byId(provider.getOne),
+  delete: byId(provider.delete),
   create: explained('create'),
   update: explained('update'),
   updateMany: explained('updateMany'),

@@ -13,7 +13,7 @@ import { DocumentsInput } from './documentsTab';
 import { UpcInput } from './codeInputs';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
-import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator, StartHere } from './shared';
+import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator, StartHere, SlugEdit } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { ListActions } from './listActions';
 
@@ -239,7 +239,7 @@ const strip = ({ status, track_count, duration_display, c_line, artist_names,
 
 export default {
   list: ReleaseList,
-  edit: () => <Edit transform={strip} mutationMode="pessimistic"><ReleaseForm /></Edit>,
+  edit: () => <SlugEdit transform={strip} mutationMode="pessimistic"><ReleaseForm /></SlugEdit>,
   create: () => <Create transform={strip}><ReleaseForm /></Create>,
   recordRepresentation: 'title',
 };

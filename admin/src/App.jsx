@@ -1,5 +1,5 @@
 import { Admin, Resource, CustomRoutes, defaultTheme } from 'react-admin';
-import { Route } from 'react-router';
+import { BrowserRouter, Route } from 'react-router';
 import dataProvider from './dataProvider';
 import authProvider from './authProvider';
 import { i18nProvider } from './i18n';
@@ -88,7 +88,10 @@ const theme = {
 };
 
 export default function App() {
+  // Real paths, /song/agarra-lo-tuyo, rather than /#/song/52 (#60). Caddy
+  // serves index.html for any path that is not a file.
   return (
+    <BrowserRouter>
     <Admin dataProvider={dataProvider} authProvider={authProvider}
            theme={theme} i18nProvider={i18nProvider} layout={AppLayout}>
       {(permissions) => {
@@ -161,5 +164,6 @@ export default function App() {
         </>);
       }}
     </Admin>
+    </BrowserRouter>
   );
 }
