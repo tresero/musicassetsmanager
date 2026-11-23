@@ -20,6 +20,7 @@ const messages = {
     document_orphan:   { name: 'Unattached document |||| Unattached documents' },
     file_unnamed:      { name: 'File without a name |||| Files without names' },
     email_duplicate:   { name: 'Duplicate email |||| Duplicate emails' },
+    deleted_record:    { name: 'Deleted record |||| Deleted records' },
 
     statement:         { name: 'Statement |||| Statements' },
     statement_line:    { name: 'Statement line |||| Statement lines' },

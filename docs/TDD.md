@@ -115,6 +115,22 @@ admin's.
   merging two documents keeps the kept one's claimant, or takes the other's
   when the kept one has none.
 
+## Change history (#78), `music.log_change` and `api.change_log`
+
+- An edit through a form leaves one entry per changed row, holding only the
+  changed columns; saving a form unchanged leaves none.
+- A change made in SQL with no signed-in user is logged with no user, in the
+  record's account.
+- Deleting a song lists it under `api.deleted_record` with its writers and
+  publishers; deleting a recording lists its credits with their roles and
+  instruments.
+- A second account reads none of the first account's entries, and no app
+  user can insert, change or delete an entry.
+- Deleting an account works and removes its entries.
+- Every table that holds a song's, recording's, release's, person's,
+  company's or artist's rows has the three `change_log_*` triggers (a query
+  over `pg_trigger` against the list in `docs/development.md`).
+
 ## Codes (#18)
 
 - **IPI and ISNI (#74):** a save with a wrong IPI or ISNI check digit is
@@ -324,3 +340,4 @@ admin's.
 | 2026-11-22 | Code rules, code search and database error mapping tests written (Vitest) |
 | 2026-11-22 | Tests for every feature in `features.md` not yet listed |
 | 2026-11-22 | Country of performance (#42) |
+| 2026-11-23 | Change history (#78) |

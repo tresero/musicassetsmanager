@@ -21,6 +21,7 @@ import songUnregistered from './resources/songUnregistered';
 import recordingUnregistered from './resources/recordingUnregistered';
 import documentExpiring from './resources/documentExpiring';
 import emailDuplicate from './resources/emailDuplicate';
+import deletedRecord from './resources/deletedRecord';
 
 import country from './resources/country';
 import pro from './resources/pro';
@@ -118,6 +119,7 @@ export default function App() {
       <Resource name="recording_unregistered" {...recordingUnregistered} />
       <Resource name="document_expiring" {...documentExpiring} />
       <Resource name="email_duplicate" {...emailDuplicate} />
+      <Resource name="deleted_record" {...deletedRecord} />
 
       <Resource name="statement" {...moneyEdit(money(statement))} />
       <Resource name="statement_line" {...moneyEdit(statementLine)} />

@@ -14,6 +14,7 @@ import { UpcInput } from './codeInputs';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
 import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator } from './shared';
+import { ChangeHistory } from './changeHistory';
 import { ListActions } from './listActions';
 
 const filters = [searchFilter];
@@ -223,6 +224,10 @@ const ReleaseForm = () => (
         least 3000 by 3000 pixels, so it can be found for delivery.
       </Typography>
       <DocumentsInput />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="History">
+      <ChangeHistory recordType="release" />
     </TabbedForm.Tab>
   </TabbedForm>
 );

@@ -4894,6 +4894,113 @@ $$;
 COMMENT ON FUNCTION music.can(p_code text) IS 'True when the signed-in user''s role has the permission. Owner rights only to read the user''s own role; it changes nothing.';
 
 --
+-- Name: change_names(jsonb); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.change_names(p_row jsonb) RETURNS jsonb
+    LANGUAGE sql STABLE
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT coalesce(jsonb_object_agg(e.key || ':' || e.value, n.name), '{}'::jsonb)
+    FROM jsonb_each_text(p_row) e
+    CROSS JOIN LATERAL (
+      SELECT CASE
+        WHEN e.key IN ('contact_id', 'claimant_contact_id', 'pitch_contact_id', 'c_line_contact_id')
+          THEN (SELECT c.display_name FROM music.contact c WHERE c.id = e.value::integer)
+        WHEN e.key IN ('organization_id', 'claimant_organization_id', 'c_line_organization_id',
+                       'label_id', 'distributor_id')
+          THEN (SELECT o.name FROM music.organization o WHERE o.id = e.value::integer)
+        WHEN e.key = 'for_writer_id'
+          THEN (SELECT c.display_name FROM music.song_writer w
+                  JOIN music.contact c ON c.id = w.contact_id
+                 WHERE w.id = e.value::integer)
+        WHEN e.key = 'role_id'
+          THEN (SELECT r.name FROM music.role r WHERE r.id = e.value::integer)
+        WHEN e.key = 'instrument_id'
+          THEN (SELECT i.name FROM music.instrument i WHERE i.id = e.value::integer)
+        WHEN e.key IN ('genre_id', 'primary_genre_id')
+          THEN (SELECT g.name FROM music.genre g WHERE g.id = e.value::integer)
+        WHEN e.key = 'mood_id'
+          THEN (SELECT m.name FROM music.mood m WHERE m.id = e.value::integer)
+        WHEN e.key = 'theme_id'
+          THEN (SELECT t.name FROM music.theme t WHERE t.id = e.value::integer)
+        WHEN e.key = 'status_id'
+          THEN (SELECT s.name FROM music.asset_status s WHERE s.id = e.value::integer)
+        WHEN e.key = 'vocal_type_id'
+          THEN (SELECT v.name FROM music.vocal_type v WHERE v.id = e.value::integer)
+        WHEN e.key = 'file_type_id'
+          THEN (SELECT f.name FROM music.audio_file_type f WHERE f.id = e.value::integer)
+        WHEN e.key = 'document_id'
+          THEN (SELECT d.title FROM music.document d WHERE d.id = e.value::integer)
+        WHEN e.key = 'artist_id'
+          THEN (SELECT a.name FROM music.artist a WHERE a.id = e.value::integer)
+        WHEN e.key IN ('song_id', 'derived_from_id')
+          THEN (SELECT s.title FROM music.song s WHERE s.id = e.value::integer)
+        WHEN e.key = 'recording_id'
+          THEN (SELECT r.title FROM music.recording r WHERE r.id = e.value::integer)
+        WHEN e.key = 'release_id'
+          THEN (SELECT r.title FROM music.release r WHERE r.id = e.value::integer)
+        WHEN e.key = 'pro_code'
+          THEN (SELECT p.name FROM music.pro p WHERE p.code = e.value)
+        WHEN e.key IN ('recorded_country', 'commissioned_country', 'performed_country', 'country')
+          THEN (SELECT c.name FROM music.country c WHERE c.code::text = e.value)
+        WHEN e.key = 'language_code'
+          THEN (SELECT l.name FROM music.language l WHERE l.code::text = e.value)
+      END AS name) n
+   WHERE n.name IS NOT NULL;
+$$;
+
+--
+-- Name: FUNCTION change_names(p_row jsonb); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.change_names(p_row jsonb) IS 'Names for the ids and codes in a row, keyed column:value, for music.change_log.names.';
+
+--
+-- Name: change_row_label(text, jsonb, jsonb); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.change_row_label(p_table text, p_row jsonb, p_names jsonb) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    SET search_path TO 'pg_catalog'
+    AS $$
+  SELECT CASE
+    WHEN p_table IN ('song', 'recording', 'release', 'contact', 'organization', 'artist') THEN NULL
+    WHEN p_table = 'contact_organization'
+      THEN p_names->>('organization_id:' || (p_row->>'organization_id'))
+    WHEN p_table IN ('song_writer', 'song_publisher', 'recording_credit', 'recording_owner',
+                     'recording_representation', 'artist_member')
+      THEN coalesce(p_names->>('contact_id:' || (p_row->>'contact_id')),
+                    p_names->>('organization_id:' || (p_row->>'organization_id')))
+    WHEN p_table = 'song_title' THEN p_row->>'title'
+    WHEN p_table = 'song_registration'
+      THEN concat_ws(' ', coalesce(p_names->>('pro_code:' || (p_row->>'pro_code')), p_row->>'pro_code'),
+                     p_row->>'work_number')
+    WHEN p_table = 'recording_isrc' THEN p_row->>'isrc'
+    WHEN p_table = 'recording_song' THEN p_names->>('song_id:' || (p_row->>'song_id'))
+    WHEN p_table IN ('recording_artist', 'release_artist')
+      THEN p_names->>('artist_id:' || (p_row->>'artist_id'))
+    WHEN p_table = 'release_track'
+      THEN p_names->>('recording_id:' || (p_row->>'recording_id'))
+    WHEN p_table = 'release_distribution'
+      THEN p_names->>('distributor_id:' || (p_row->>'distributor_id'))
+    WHEN p_table = 'recording_genre' THEN p_names->>('genre_id:' || (p_row->>'genre_id'))
+    WHEN p_table = 'recording_mood' THEN p_names->>('mood_id:' || (p_row->>'mood_id'))
+    WHEN p_table = 'recording_theme' THEN p_names->>('theme_id:' || (p_row->>'theme_id'))
+    WHEN p_table LIKE '%\_document' THEN p_names->>('document_id:' || (p_row->>'document_id'))
+    WHEN p_table = 'audio_file' THEN coalesce(p_row->>'file_name', p_row->>'title')
+    WHEN p_table = 'contact_email' THEN p_row->>'email'
+    WHEN p_table = 'contact_phone' THEN p_row->>'number'
+  END;
+$$;
+
+--
+-- Name: FUNCTION change_row_label(p_table text, p_row jsonb, p_names jsonb); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.change_row_label(p_table text, p_row jsonb, p_names jsonb) IS 'Which child row a change is about, in words, for music.change_log.row_label.';
+
+--
 -- Name: check_local_storage(); Type: FUNCTION; Schema: music; Owner: -
 --
 
@@ -5337,6 +5444,124 @@ $$;
 --
 
 COMMENT ON FUNCTION music.local_storage_allowed() IS 'The allow_local_storage site setting, false when unset.';
+
+--
+-- Name: log_change(); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.log_change() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $_$
+DECLARE
+  _row     jsonb := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+  _type    text  := TG_ARGV[0];
+  _rid     integer;
+  _account uuid;
+  _rlabel  text;
+  _skip    text[];
+  _old     jsonb;
+  _new     jsonb;
+  _names   jsonb;
+  _user    uuid  := music.current_app_user();
+  _label   text;
+BEGIN
+  IF TG_ARGV[1] = 'credit_id' THEN
+    SELECT c.recording_id INTO _rid
+      FROM music.recording_credit c WHERE c.id = (_row->>'credit_id')::integer;
+    IF _rid IS NULL THEN
+      SELECT l.record_id INTO _rid
+        FROM music.change_log l
+       WHERE l.xact = pg_current_xact_id() AND l.table_name = 'recording_credit'
+         AND l.op = 'delete' AND l.old_values->>'id' = _row->>'credit_id'
+       ORDER BY l.id DESC LIMIT 1;
+    END IF;
+  ELSIF TG_NARGS > 2 AND _row->>TG_ARGV[1] IS NULL THEN
+    _type := TG_ARGV[2];
+    _rid := (_row->>TG_ARGV[3])::integer;
+  ELSE
+    _rid := (_row->>TG_ARGV[1])::integer;
+  END IF;
+
+  IF _type = TG_TABLE_NAME THEN
+    _account := (_row->>'account_id')::uuid;
+    _rlabel := coalesce(_row->>'title', _row->>'name', _row->>'display_name');
+  ELSIF _rid IS NOT NULL THEN
+    EXECUTE format('SELECT account_id, %s FROM music.%I WHERE id = $1',
+                   CASE _type WHEN 'contact' THEN 'display_name'
+                              WHEN 'organization' THEN 'name'
+                              WHEN 'artist' THEN 'name'
+                              ELSE 'title' END,
+                   _type)
+       INTO _account, _rlabel USING _rid;
+    IF _account IS NULL THEN
+      SELECT l.account_id, l.record_label INTO _account, _rlabel
+        FROM music.change_log l
+       WHERE l.xact = pg_current_xact_id()
+         AND l.record_type = _type AND l.record_id = _rid
+       ORDER BY l.id DESC LIMIT 1;
+    END IF;
+  END IF;
+
+  IF _account IS NULL OR NOT EXISTS (SELECT 1 FROM music.account a WHERE a.id = _account) THEN
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  END IF;
+
+  SELECT array['account_id', 'created_at', 'updated_at'] || coalesce(array_agg(a.attname::text), '{}')
+    INTO _skip
+    FROM pg_attribute a
+   WHERE a.attrelid = TG_RELID AND a.attgenerated <> '';
+
+  IF TG_OP = 'UPDATE' THEN
+    SELECT jsonb_object_agg(o.key, o.value), jsonb_object_agg(o.key, n.value)
+      INTO _old, _new
+      FROM jsonb_each(to_jsonb(OLD)) o
+      JOIN jsonb_each(to_jsonb(NEW)) n USING (key)
+     WHERE o.value IS DISTINCT FROM n.value
+       AND o.key <> ALL (_skip);
+    IF _old IS NULL THEN
+      RETURN NEW;
+    END IF;
+  ELSIF TG_OP = 'INSERT' THEN
+    _new := jsonb_strip_nulls(_row) - _skip;
+  ELSE
+    _old := jsonb_strip_nulls(_row) - _skip;
+  END IF;
+
+  _names := music.change_names(_row) || music.change_names(coalesce(_old, '{}'));
+  IF TG_TABLE_NAME IN ('recording_credit_role', 'recording_credit_instrument') THEN
+    SELECT coalesce(c.display_name, o.name) INTO _label
+      FROM music.recording_credit rc
+      LEFT JOIN music.contact c ON c.id = rc.contact_id
+      LEFT JOIN music.organization o ON o.id = rc.organization_id
+     WHERE rc.id = (_row->>'credit_id')::integer;
+    IF _label IS NULL THEN
+      SELECT l.row_label INTO _label
+        FROM music.change_log l
+       WHERE l.xact = pg_current_xact_id() AND l.table_name = 'recording_credit'
+         AND l.old_values->>'id' = _row->>'credit_id'
+       ORDER BY l.id DESC LIMIT 1;
+    END IF;
+  ELSE
+    _label := music.change_row_label(TG_TABLE_NAME, _row, _names);
+  END IF;
+
+  INSERT INTO music.change_log
+    (account_id, user_id, user_email, record_type, record_id, record_label,
+     table_name, row_label, op, old_values, new_values, names)
+  VALUES
+    (_account, _user, (SELECT u.email::text FROM music.user_account u WHERE u.id = _user),
+     _type, _rid, _rlabel, TG_TABLE_NAME, _label, lower(TG_OP), _old, _new, _names);
+
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$_$;
+
+--
+-- Name: FUNCTION log_change(); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.log_change() IS 'Writes music.change_log for the logged tables (#78). Arguments: the record type and the column holding its id; for contact_email and contact_phone a second pair used when the first column is null; credit_id finds the recording through the credit. SECURITY DEFINER because nobody may write the log directly, and it must log changes made by any user and outside the app; it writes only an entry describing the row being changed, in that row''s account. Deletes are logged before the row goes, so a record is logged before the rows its delete cascades to, which find its account and name in the log.';
 
 --
 -- Name: match_key(text); Type: FUNCTION; Schema: music; Owner: -
@@ -6831,6 +7056,130 @@ CREATE VIEW api.artist_member WITH (security_invoker='true') AS
    FROM music.artist_member;
 
 --
+-- Name: change_log; Type: TABLE; Schema: music; Owner: -
+--
+
+CREATE TABLE music.change_log (
+    id bigint NOT NULL,
+    account_id uuid NOT NULL,
+    xact xid8 DEFAULT pg_current_xact_id() NOT NULL,
+    changed_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid,
+    user_email text,
+    db_user text DEFAULT SESSION_USER NOT NULL,
+    record_type text NOT NULL,
+    record_id integer NOT NULL,
+    record_label text,
+    table_name text NOT NULL,
+    row_label text,
+    op text NOT NULL,
+    old_values jsonb,
+    new_values jsonb,
+    names jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT change_log_op_check CHECK ((op = ANY (ARRAY['insert'::text, 'update'::text, 'delete'::text])))
+);
+
+ALTER TABLE ONLY music.change_log FORCE ROW LEVEL SECURITY;
+
+--
+-- Name: TABLE change_log; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON TABLE music.change_log IS 'Who changed what and when, one row per row changed in a logged table (#78). Written only by music.log_change(); nobody writes it through the API. Removed with its account.';
+
+--
+-- Name: COLUMN change_log.xact; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.xact IS 'The transaction: one save, or one SQL statement run by hand, and the rows a delete took with it.';
+
+--
+-- Name: COLUMN change_log.user_id; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.user_id IS 'The signed-in user; null for a change made outside the app, such as in pgAdmin.';
+
+--
+-- Name: COLUMN change_log.user_email; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.user_email IS 'The user''s email when the change was made, kept after the user is removed.';
+
+--
+-- Name: COLUMN change_log.db_user; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.db_user IS 'The database login, which tells who made a change outside the app.';
+
+--
+-- Name: COLUMN change_log.record_type; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.record_type IS 'The record whose history this belongs to: song, recording, release, contact, organization or artist.';
+
+--
+-- Name: COLUMN change_log.record_label; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.record_label IS 'The record''s title or name when the change was made, so a deleted record still has one.';
+
+--
+-- Name: COLUMN change_log.table_name; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.table_name IS 'The table the changed row is in: the record''s own, or a child such as song_writer.';
+
+--
+-- Name: COLUMN change_log.row_label; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.row_label IS 'Which child row changed, in words: the writer''s name, the society, the ISRC.';
+
+--
+-- Name: COLUMN change_log.old_values; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.old_values IS 'Before: on an update the changed columns only, on a delete the whole row.';
+
+--
+-- Name: COLUMN change_log.new_values; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.new_values IS 'After: on an update the changed columns only, on an insert the whole row.';
+
+--
+-- Name: COLUMN change_log.names; Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON COLUMN music.change_log.names IS 'Names for the ids in old_values and new_values, keyed column:value, looked up when the change was made.';
+
+--
+-- Name: change_log; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.change_log WITH (security_invoker='true') AS
+ SELECT id,
+    (xact)::text AS change_set,
+    changed_at,
+    COALESCE(user_email, 'Outside the app'::text) AS changed_by,
+    record_type,
+    record_id,
+    record_label,
+    table_name,
+    row_label,
+    op,
+    old_values,
+    new_values,
+    names
+   FROM music.change_log l;
+
+--
+-- Name: VIEW change_log; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.change_log IS 'A record''s history (#78): filter on record_type and record_id, newest first by id. Read only.';
+
+--
 -- Name: contact_email; Type: VIEW; Schema: api; Owner: -
 --
 
@@ -6873,6 +7222,31 @@ CREATE VIEW api.contact_phone WITH (security_invoker='true') AS
     created_at,
     updated_at
    FROM music.contact_phone;
+
+--
+-- Name: deleted_record; Type: VIEW; Schema: api; Owner: -
+--
+
+CREATE VIEW api.deleted_record WITH (security_invoker='true') AS
+ SELECT id,
+    record_type,
+    record_id,
+    record_label,
+    changed_at AS deleted_at,
+    COALESCE(user_email, 'Outside the app'::text) AS deleted_by,
+    old_values,
+    names,
+    ( SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'table_name', c.table_name, 'row_label', c.row_label, 'old_values', c.old_values, 'names', c.names) ORDER BY c.id), '[]'::jsonb) AS "coalesce"
+           FROM music.change_log c
+          WHERE ((c.xact = l.xact) AND (c.record_type = l.record_type) AND (c.record_id = l.record_id) AND (c.op = 'delete'::text) AND (c.id <> l.id))) AS child_rows
+   FROM music.change_log l
+  WHERE ((op = 'delete'::text) AND (table_name = record_type));
+
+--
+-- Name: VIEW deleted_record; Type: COMMENT; Schema: api; Owner: -
+--
+
+COMMENT ON VIEW api.deleted_record IS 'Songs, recordings, releases, people, companies and artists that were deleted, with their last values and the child rows the delete took with it (#78). Read only.';
 
 --
 -- Name: document_expiring; Type: VIEW; Schema: api; Owner: -
@@ -7801,6 +8175,19 @@ ALTER TABLE music.audio_file_type ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTI
 );
 
 --
+-- Name: change_log_id_seq; Type: SEQUENCE; Schema: music; Owner: -
+--
+
+ALTER TABLE music.change_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME music.change_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
 -- Name: contact_email_id_seq; Type: SEQUENCE; Schema: music; Owner: -
 --
 
@@ -8305,6 +8692,13 @@ ALTER TABLE ONLY music.audio_file
 
 ALTER TABLE ONLY music.audio_file_type
     ADD CONSTRAINT audio_file_type_pkey PRIMARY KEY (id);
+
+--
+-- Name: change_log change_log_pkey; Type: CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.change_log
+    ADD CONSTRAINT change_log_pkey PRIMARY KEY (id);
 
 --
 -- Name: contact_document contact_document_pkey; Type: CONSTRAINT; Schema: music; Owner: -
@@ -8994,6 +9388,18 @@ CREATE UNIQUE INDEX audio_file_type_name_key ON music.audio_file_type USING btre
 --
 
 COMMENT ON INDEX music.audio_file_type_name_key IS 'Names are unique regardless of case, so Rock and rock cannot both exist.';
+
+--
+-- Name: change_log_record_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX change_log_record_idx ON music.change_log USING btree (account_id, record_type, record_id, id DESC);
+
+--
+-- Name: change_log_xact_idx; Type: INDEX; Schema: music; Owner: -
+--
+
+CREATE INDEX change_log_xact_idx ON music.change_log USING btree (xact);
 
 --
 -- Name: contact_account_id_idx; Type: INDEX; Schema: music; Owner: -
@@ -9998,6 +10404,618 @@ CREATE TRIGGER audio_file_touch BEFORE UPDATE ON music.audio_file FOR EACH ROW E
 CREATE TRIGGER audio_file_type_site_admin BEFORE INSERT OR DELETE OR UPDATE ON music.audio_file_type FOR EACH STATEMENT EXECUTE FUNCTION music.require_site_admin();
 
 --
+-- Name: artist change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.artist FOR EACH ROW EXECUTE FUNCTION music.log_change('artist', 'id');
+
+--
+-- Name: artist_member change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.artist_member FOR EACH ROW EXECUTE FUNCTION music.log_change('artist', 'artist_id');
+
+--
+-- Name: audio_file change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.audio_file FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: contact change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.contact FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'id');
+
+--
+-- Name: contact_document change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.contact_document FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_email change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.contact_email FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: contact_organization change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.contact_organization FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_phone change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.contact_phone FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: organization change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.organization FOR EACH ROW EXECUTE FUNCTION music.log_change('organization', 'id');
+
+--
+-- Name: organization_document change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.organization_document FOR EACH ROW EXECUTE FUNCTION music.log_change('organization', 'organization_id');
+
+--
+-- Name: recording change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'id');
+
+--
+-- Name: recording_artist change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_artist FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_credit FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit_instrument change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_credit_instrument FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_credit_role change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_credit_role FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_document change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_document FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_genre change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_genre FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_isrc change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_isrc FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_mood change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_mood FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_owner change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_owner FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_representation change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_representation FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_song change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_song FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_theme change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.recording_theme FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: release change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.release FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'id');
+
+--
+-- Name: release_artist change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.release_artist FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_distribution change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.release_distribution FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_document change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.release_document FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_track change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.release_track FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: song change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'id');
+
+--
+-- Name: song_document change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_document FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_publisher change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_publisher FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_registration change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_registration FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_title change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_title FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_writer change_log_delete; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_writer FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: artist change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.artist FOR EACH ROW EXECUTE FUNCTION music.log_change('artist', 'id');
+
+--
+-- Name: artist_member change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.artist_member FOR EACH ROW EXECUTE FUNCTION music.log_change('artist', 'artist_id');
+
+--
+-- Name: audio_file change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.audio_file FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: contact change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.contact FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'id');
+
+--
+-- Name: contact_document change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.contact_document FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_email change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.contact_email FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: contact_organization change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.contact_organization FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_phone change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.contact_phone FOR EACH ROW EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: organization change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.organization FOR EACH ROW EXECUTE FUNCTION music.log_change('organization', 'id');
+
+--
+-- Name: organization_document change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.organization_document FOR EACH ROW EXECUTE FUNCTION music.log_change('organization', 'organization_id');
+
+--
+-- Name: recording change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'id');
+
+--
+-- Name: recording_artist change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_artist FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_credit FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit_instrument change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_credit_instrument FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_credit_role change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_credit_role FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_document change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_document FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_genre change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_genre FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_isrc change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_isrc FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_mood change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_mood FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_owner change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_owner FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_representation change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_representation FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_song change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_song FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_theme change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.recording_theme FOR EACH ROW EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: release change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.release FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'id');
+
+--
+-- Name: release_artist change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.release_artist FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_distribution change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.release_distribution FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_document change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.release_document FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_track change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.release_track FOR EACH ROW EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: song change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'id');
+
+--
+-- Name: song_document change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_document FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_publisher change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_publisher FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_registration change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_registration FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_title change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_title FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_writer change_log_insert; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_writer FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: artist change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.artist FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('artist', 'id');
+
+--
+-- Name: artist_member change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.artist_member FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('artist', 'artist_id');
+
+--
+-- Name: audio_file change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.audio_file FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: contact change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.contact FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('contact', 'id');
+
+--
+-- Name: contact_document change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.contact_document FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_email change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.contact_email FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: contact_organization change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.contact_organization FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('contact', 'contact_id');
+
+--
+-- Name: contact_phone change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.contact_phone FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('contact', 'contact_id', 'organization', 'organization_id');
+
+--
+-- Name: organization change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.organization FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('organization', 'id');
+
+--
+-- Name: organization_document change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.organization_document FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('organization', 'organization_id');
+
+--
+-- Name: recording change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'id');
+
+--
+-- Name: recording_artist change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_artist FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_credit FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_credit_instrument change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_credit_instrument FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_credit_role change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_credit_role FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'credit_id');
+
+--
+-- Name: recording_document change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_document FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_genre change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_genre FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_isrc change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_isrc FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_mood change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_mood FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_owner change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_owner FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_representation change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_representation FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_song change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_song FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: recording_theme change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.recording_theme FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('recording', 'recording_id');
+
+--
+-- Name: release change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.release FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('release', 'id');
+
+--
+-- Name: release_artist change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.release_artist FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_distribution change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.release_distribution FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_document change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.release_document FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: release_track change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.release_track FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('release', 'release_id');
+
+--
+-- Name: song change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'id');
+
+--
+-- Name: song_document change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_document FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_publisher change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_publisher FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_registration change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_registration FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_title change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_title FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
+-- Name: song_writer change_log_update; Type: TRIGGER; Schema: music; Owner: -
+--
+
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_writer FOR EACH ROW WHEN ((old.* IS DISTINCT FROM new.*)) EXECUTE FUNCTION music.log_change('song', 'song_id');
+
+--
 -- Name: contact contact_delete_permission; Type: TRIGGER; Schema: music; Owner: -
 --
 
@@ -10551,6 +11569,13 @@ ALTER TABLE ONLY music.audio_file
 
 ALTER TABLE ONLY music.audio_file
     ADD CONSTRAINT audio_file_recording_id_fkey FOREIGN KEY (recording_id) REFERENCES music.recording(id) ON DELETE CASCADE;
+
+--
+-- Name: change_log change_log_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
+--
+
+ALTER TABLE ONLY music.change_log
+    ADD CONSTRAINT change_log_account_id_fkey FOREIGN KEY (account_id) REFERENCES music.account(id) ON DELETE CASCADE;
 
 --
 -- Name: contact contact_account_id_fkey; Type: FK CONSTRAINT; Schema: music; Owner: -
@@ -11558,6 +12583,22 @@ CREATE POLICY audio_file_account ON music.audio_file USING (music.own_recording(
 --
 
 COMMENT ON POLICY audio_file_account ON music.audio_file IS 'Visible through its parent row''s account; on write, every linked record must be in the same account.';
+
+--
+-- Name: change_log; Type: ROW SECURITY; Schema: music; Owner: -
+--
+
+ALTER TABLE music.change_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: change_log change_log_account; Type: POLICY; Schema: music; Owner: -
+--
+
+CREATE POLICY change_log_account ON music.change_log FOR SELECT USING ((account_id = ( SELECT music.current_account() AS current_account)));
+
+--
+-- Name: change_log change_log_read_all; Type: POLICY; Schema: music; Owner: -
+--
 
 --
 -- Name: contact; Type: ROW SECURITY; Schema: music; Owner: -
@@ -13663,6 +14704,18 @@ GRANT SELECT,DELETE,UPDATE ON TABLE api.account_user TO app_user;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.artist_member TO app_user;
 
 --
+-- Name: TABLE change_log; Type: ACL; Schema: music; Owner: -
+--
+
+GRANT SELECT ON TABLE music.change_log TO app_user;
+
+--
+-- Name: TABLE change_log; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.change_log TO app_user;
+
+--
 -- Name: TABLE contact_email; Type: ACL; Schema: api; Owner: -
 --
 
@@ -13679,6 +14732,12 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact_organization TO app_user;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE api.contact_phone TO app_user;
+
+--
+-- Name: TABLE deleted_record; Type: ACL; Schema: api; Owner: -
+--
+
+GRANT SELECT ON TABLE api.deleted_record TO app_user;
 
 --
 -- Name: TABLE document_expiring; Type: ACL; Schema: api; Owner: -

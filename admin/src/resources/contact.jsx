@@ -10,6 +10,7 @@ import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput, IpiInput } from './codeInputs';
 import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
+import { ChangeHistory } from './changeHistory';
 import { useDefaultCallingCode } from '../permissions';
 
 const filters = [searchFilter];
@@ -100,6 +101,10 @@ const ContactForm = () => {
 
       <TabbedForm.Tab label="Documents">
         <DocumentsInput />
+      </TabbedForm.Tab>
+
+      <TabbedForm.Tab label="History">
+        <ChangeHistory recordType="contact" />
       </TabbedForm.Tab>
     </TabbedForm>
   );

@@ -8,6 +8,7 @@ import { DocumentsInput } from './documentsTab';
 import { IsniInput, IpiInput } from './codeInputs';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { CatalogDatagrid, CountryInput, searchFilter } from './shared';
+import { ChangeHistory } from './changeHistory';
 
 const filters = [searchFilter];
 
@@ -48,6 +49,10 @@ const OrgForm = () => (
 
     <TabbedForm.Tab label="Documents">
       <DocumentsInput />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="History">
+      <ChangeHistory recordType="organization" />
     </TabbedForm.Tab>
   </TabbedForm>
 );

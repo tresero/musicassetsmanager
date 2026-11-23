@@ -322,6 +322,21 @@ transactions needs money.view and entering them money.edit.
 - **Expiring documents**: anything expiring within 90 days.
 - **Unattached documents**: documents no longer linked to anything.
 - **Duplicate emails**: the same address on more than one person.
+- **Deleted records**: songs, recordings, releases, people, companies and
+  artists that were deleted, who deleted them and when, with their last
+  values and the writers, publishers, credits and other rows that went with
+  them, so a record deleted by mistake can be entered again.
+
+## Change history
+
+Songs, recordings, releases, people, companies and artists have a History
+tab: every change to the record and its rows (writers, publishers,
+registrations, credits, owners, tracks, artists, documents, audio files),
+newest first, grouped by save, with who made it and the values before and
+after. A change made outside the app, such as a fix in pgAdmin, is listed as
+"Outside the app". Saving a form without changing anything adds nothing.
+History starts on 2026-11-23; earlier changes are not listed. An account's
+history is deleted with the account.
 
 ## Lists
 
@@ -503,3 +518,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Child rows are numbered, outlined cards that wrap (#72). |
 | 2026-11-22 | Pages fit the window down to phone width. |
 | 2026-11-22 | ISNI and IPI check digits; IPIs saved as 11 digits (#74). |
+| 2026-11-23 | Change history on every record, and the Deleted records report (#78). |

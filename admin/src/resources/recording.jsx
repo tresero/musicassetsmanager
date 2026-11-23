@@ -19,6 +19,7 @@ import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
   CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, RowIterator,
 } from './shared';
+import { ChangeHistory } from './changeHistory';
 import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
 
@@ -295,6 +296,10 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Documents">
       <DocumentsInput />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="History">
+      <ChangeHistory recordType="recording" />
     </TabbedForm.Tab>
   </TabbedForm>
 );

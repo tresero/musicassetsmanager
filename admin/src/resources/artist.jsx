@@ -8,6 +8,7 @@ import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
 import { IsniInput } from './codeInputs';
 import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
+import { ChangeHistory } from './changeHistory';
 
 const filters = [searchFilter];
 
@@ -72,6 +73,10 @@ const ArtistForm = () => (
                      sx={{ width: { xs: '100%', md: 240 } }} />
         </RowIterator>
       </ArrayInput>
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="History">
+      <ChangeHistory recordType="artist" />
     </TabbedForm.Tab>
   </TabbedForm>
 );

@@ -92,6 +92,29 @@ frontend sends new array items without an id.
 
 Never supply an id on insert. `GENERATED ALWAYS AS IDENTITY` rejects it.
 
+### Change history
+
+Every table holding a song's, recording's, release's, person's, company's or
+artist's rows is logged to `music.change_log` (#78), and a new one gets the
+same three triggers in the migration that creates it, naming the record type
+and the column holding its id:
+
+```sql
+CREATE TRIGGER change_log_insert AFTER INSERT ON music.song_thing
+  FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+CREATE TRIGGER change_log_update AFTER UPDATE ON music.song_thing
+  FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
+  EXECUTE FUNCTION music.log_change('song', 'song_id');
+CREATE TRIGGER change_log_delete BEFORE DELETE ON music.song_thing
+  FOR EACH ROW EXECUTE FUNCTION music.log_change('song', 'song_id');
+```
+
+Deletes are logged before the row goes, so a record's entry is written before
+the rows its delete cascades to, which find its account and name in the log.
+A column holding an id of a person, company, role or other list gets its name
+looked up in `music.change_names`, and a new child table its row label in
+`music.change_row_label`; the frontend's wording is in `src/changes.js`.
+
 ## Frontend
 
 One file per resource in `admin/src/resources/`, each default-exporting
@@ -172,3 +195,4 @@ written by row triggers.
 | 2026-11-22 | `RowIterator` and `BlockIterator` for child rows |
 | 2026-11-22 | Pages fit the window: theme overrides in `App.jsx` |
 | 2026-11-23 | `RETURNING OLD`/`NEW` don't replace audit triggers; the change log (#78) uses row triggers |
+| 2026-11-23 | Change history triggers for child tables (#78) |

@@ -1,6 +1,7 @@
 import { Edit, Create, TabbedForm } from 'react-admin';
 import { EditToolbar } from '../formToolbar';
 import { DocumentsInput } from '../documentsTab';
+import { ChangeHistory } from '../changeHistory';
 
 import SongList from './SongList';
 import DetailsFields from './tabs/Details';
@@ -25,6 +26,7 @@ const SongForm = () => (
     <TabbedForm.Tab label="Lyrics">        <LyricsFields /></TabbedForm.Tab>
     <TabbedForm.Tab label="Notes">         <NotesFields /></TabbedForm.Tab>
     <TabbedForm.Tab label="Documents">     <DocumentsInput /></TabbedForm.Tab>
+    <TabbedForm.Tab label="History">       <ChangeHistory recordType="song" /></TabbedForm.Tab>
   </TabbedForm>
 );
 
