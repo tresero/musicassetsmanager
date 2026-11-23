@@ -57,7 +57,9 @@ export const AudioFilesInput = () => (
       <Box sx={row}>
         <AudioUploadInput scoped />
         <FileLink scoped sx={{ alignSelf: 'center' }} />
+        {/* Stems and multitrack tracks have tabs of their own (#43). */}
         <ReferenceInput source="file_type_id" reference="audio_file_type"
+                        filter={{ 'name@not.in': '(Stem,Multitrack)' }}
                         perPage={100} sort={{ field: 'name', order: 'ASC' }}>
           <SharedListPicker label="Type"
                              helperText={false}

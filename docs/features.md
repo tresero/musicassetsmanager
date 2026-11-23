@@ -104,7 +104,8 @@ recording. **Copy from song** fills them in from the song to edit from there
 lyrics already entered (#48).
 
 **Audio**: the master and its alternates and timed cuts, each typed and
-described, and a Multitracks available flag for a session kept elsewhere.
+described (Stem and Multitrack are not offered there; they have their own
+tabs), and a Multitracks available flag for a session kept elsewhere.
 Any type other than Full Mix makes the pitch comment say Alts Available.
 
 **Stems** and **Multitracks**: each stem, and each track of the multitrack

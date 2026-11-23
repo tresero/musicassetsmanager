@@ -33,7 +33,7 @@ import { findStored } from '../audioFiles';
  * than an alternate or a stem, the recording's duration is taken from
  * this file as well.
  *
- * A zip of stems has no header to read. It uploads anyway, typed as Stem.
+ * Stems and multitrack tracks go on their own tabs, one file each (#43).
  *
  * The file's own name is kept in file_name, since the stored key is only
  * its hash. Dropping a file that another row already has refuses it, but
@@ -60,13 +60,12 @@ const durationOf = (f, file) => {
 };
 
 // Description names what a file is, not its specs, which have fields of
-// their own. A zip is all the stems. Otherwise use a title embedded in the
+// their own. Use a title embedded in the
 // file, as MP3s usually carry, but only when it says more than the
 // recording's title does; a tag that repeats the song name adds nothing.
 const norm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-const describeFile = (ext, tagTitle, recordingTitle) => {
-  if (ext === 'ZIP') return 'All stems';
+const describeFile = (tagTitle, recordingTitle) => {
   if (tagTitle && norm(tagTitle) !== norm(recordingTitle)) return tagTitle;
   return null;
 };
@@ -142,7 +141,7 @@ export const AudioUploadInput = ({ scoped = false }) => {
   const upload = async ([file]) => {
     setPct(0);
     try {
-      const { ext, info, tagTitle } = await readAudio(file, (m) => notify(m, { type: 'warning', autoHideDuration: 15000 }));
+      const { info, tagTitle } = await readAudio(file, (m) => notify(m, { type: 'warning', autoHideDuration: 15000 }));
 
       // 2. hash, then send unless an identical file is already stored
       setPhase('Checking file');
@@ -176,11 +175,10 @@ export const AudioUploadInput = ({ scoped = false }) => {
       Object.entries(audioRow(file, info, plan))
         .forEach(([field, value]) => setValue(path(field), value, opts));
       if (!getValues(path('file_type_id'))) {
-        setValue(path('file_type_id'),
-                 typeId(ext === 'ZIP' ? 'Stem' : 'Full Mix'), opts);
+        setValue(path('file_type_id'), typeId('Full Mix'), opts);
       }
       if (!getValues(path('title'))) {
-        const desc = describeFile(ext, tagTitle, getValues('title'));
+        const desc = describeFile(tagTitle, getValues('title'));
         if (desc) setValue(path('title'), desc, opts);
       }
 
@@ -203,7 +201,7 @@ export const AudioUploadInput = ({ scoped = false }) => {
       onFiles={upload}
       busy={!!phase}
       pct={pct}
-      accept="audio/*,.zip"
+      accept="audio/*"
       dense
       label={phase ?? (storageUri ? 'Drop to replace' : 'Drop audio or click')}
       sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0 }}
