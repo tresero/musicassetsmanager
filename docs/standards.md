@@ -17,7 +17,14 @@ All are format-checked by domains. ISWC is `T` plus ten digits. ISRC is a
 two-letter country code, a three-character registrant, and seven digits. IPI is
 nine to eleven digits. ISNI is sixteen characters with a possible trailing X.
 A UPC or EAN has its GTIN check digit verified, and an ISWC its ISO 15707 check
-digit (`music.iswc_valid`).
+digit (`music.iswc_valid`). An ISNI has its ISO 27729 check character
+(`music.isni_valid`), and an IPI name number its two mod-101 check digits
+(`music.ipi_valid`). IPIs are stored as 11 digits, since a number pasted
+without its leading zeros is the same number.
+
+An IPI is used once among an account's people and once among its companies,
+but a person and a company may share one: BMI lets a writer who publishes
+their own share use their own IPI for the publishing designation.
 
 An ISRC identifies one recording, but one recording can earn under several:
 a reissue through a later distributor gets a new ISRC while the original still
@@ -234,3 +241,4 @@ than a CHECK constraint so they can be extended without a migration.
 | 2026-11-15 | UPC and other ISRCs among the identifiers; copyright registrations and how they apply; release title matching and unit-price sales reports. |
 | 2026-11-22 | ISWC check digit verified (#18). |
 | 2026-11-22 | Country of performance per credit (#42). |
+| 2026-11-22 | ISNI and IPI check digits; IPIs stored as 11 digits; a person and a company may share an IPI (#74). |

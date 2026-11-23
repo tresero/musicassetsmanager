@@ -117,6 +117,11 @@ admin's.
 
 ## Codes (#18)
 
+- **IPI and ISNI (#74):** a save with a wrong IPI or ISNI check digit is
+  refused by `ipi_check_digit` / `isni_check_digit`; a 9 or 10 digit IPI is
+  stored padded to 11, so it collides with the same number already stored on
+  another person; a person and a company may hold the same IPI.
+
 - **Database:** an ISWC with a wrong check digit is refused by
   `iswc_check_digit`; `music.iswc_valid` and `music.gtin_valid` accept known
   good codes and refuse a changed last digit.

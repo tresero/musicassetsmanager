@@ -30,10 +30,18 @@ describe('codes', () => {
     expect(gtinValid('19692543121')).toBe(false);
   });
 
-  test('ISNI and IPI format', () => {
-    expect(isniValid('000000036189600X')).toBe(true);
+  test('ISNI check character', () => {
+    expect(isniValid('0000000123456789')).toBe(true);
+    expect(isniValid('000000001000003X')).toBe(true);
+    expect(isniValid('0000000123456788')).toBe(false);
     expect(isniValid('00000003618960')).toBe(false);
-    expect(ipiValid('00052210040')).toBe(true);
+  });
+
+  test('IPI check digits, with or without leading zeros', () => {
+    expect(ipiValid('12345678993')).toBe(true);
+    expect(ipiValid('01234567846')).toBe(true);
+    expect(ipiValid('1234567846')).toBe(true);
+    expect(ipiValid('12345678994')).toBe(false);
     expect(ipiValid('1234567')).toBe(false);
   });
 });

@@ -10,9 +10,10 @@ flags for public domain and easy clear.
 
 ISWCs, ISRCs, UPCs, ISNIs and IPI name numbers can be pasted however they are
 written: spaces, dashes and dots are dropped and letters uppercased as you
-type. On save, a wrong format or check digit (ISWC, UPC or EAN) marks the field
+type. On save, a wrong format or check digit (ISWC, UPC or EAN, ISNI, IPI) marks the field
 in red and says what is wrong, before anything is sent. An ISWC typed without
-its T gets one. When the database refuses a save over one of these codes,
+its T gets one, and an IPI is saved as 11 digits, with any leading zeros
+that were dropped. When the database refuses a save over one of these codes,
 such as an ISRC already on another recording, the same field is marked with a
 plain message.
 
@@ -501,3 +502,4 @@ a document or a release, does not sort.
 | 2026-11-22 | Country of performance on each credit, defaulting to the country of recording (#42). |
 | 2026-11-22 | Child rows are numbered, outlined cards that wrap (#72). |
 | 2026-11-22 | Pages fit the window down to phone width. |
+| 2026-11-22 | ISNI and IPI check digits; IPIs saved as 11 digits (#74). |

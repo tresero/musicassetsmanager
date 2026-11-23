@@ -23,7 +23,9 @@ const CONSTRAINTS = {
   artist_isni_key: { field: 'isni_own', message: 'Another artist already has this ISNI' },
   contact_isni_key: { field: 'isni', message: 'Another person already has this ISNI' },
   organization_isni_key: { field: 'isni', message: 'Another company already has this ISNI' },
+  isni_check_digit: { field: { artist: 'isni_own', default: 'isni' }, message: M.isniDigit },
   ipi_format: { field: 'member_ipi', message: M.ipiShape },
+  ipi_check_digit: { field: 'member_ipi', message: M.ipiDigit },
   contact_ipi_key: { field: 'member_ipi', message: 'Another person already has this IPI name number' },
   organization_ipi_key: { field: 'member_ipi', message: 'Another company already has this IPI name number' },
 };

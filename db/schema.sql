@@ -69,17 +69,67 @@ CREATE DOMAIN music.email_address AS text
 	CONSTRAINT email_format CHECK ((VALUE ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'::text));
 
 --
+-- Name: ipi_valid(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.ipi_valid(p text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $_$
+  SELECT p ~ '^[0-9]{9,11}$'
+     AND (SELECT CASE WHEN s = 0 THEN 0 ELSE (101 - s) % 100 END
+            FROM (SELECT sum(substr(lpad(p, 11, '0'), i, 1)::int * (11 - i)) % 101 AS s
+                    FROM generate_series(1, 9) i) x)
+         = right(lpad(p, 11, '0'), 2)::int
+$_$;
+
+--
+-- Name: FUNCTION ipi_valid(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.ipi_valid(p text) IS 'True for an IPI name number whose last two digits are its check: padded to 11 digits, the first nine weighted 10 down to 2, summed modulo 101, the check is (101 - sum) mod 100, or 00 when the sum is 0. Shorter numbers are ones with leading zeros dropped.';
+
+--
 -- Name: ipi_name_number; Type: DOMAIN; Schema: music; Owner: -
 --
 
 CREATE DOMAIN music.ipi_name_number AS text
+	CONSTRAINT ipi_check_digit CHECK (music.ipi_valid(VALUE))
 	CONSTRAINT ipi_format CHECK ((VALUE ~ '^[0-9]{9,11}$'::text));
+
+--
+-- Name: isni_valid(text); Type: FUNCTION; Schema: music; Owner: -
+--
+
+CREATE FUNCTION music.isni_valid(p text) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE
+    AS $_$
+DECLARE
+  t integer := 0;
+  r integer;
+BEGIN
+  IF p !~ '^[0-9]{15}[0-9X]$' THEN
+    RETURN false;
+  END IF;
+  FOR i IN 1..15 LOOP
+    t := (t + substr(p, i, 1)::int) * 2;
+  END LOOP;
+  r := (12 - t % 11) % 11;
+  RETURN right(p, 1) = CASE WHEN r = 10 THEN 'X' ELSE r::text END;
+END;
+$_$;
+
+--
+-- Name: FUNCTION isni_valid(p text); Type: COMMENT; Schema: music; Owner: -
+--
+
+COMMENT ON FUNCTION music.isni_valid(p text) IS 'True for an ISNI whose last character is its ISO 27729 check character (MOD 11-2, as ORCID): X stands for 10.';
 
 --
 -- Name: isni_number; Type: DOMAIN; Schema: music; Owner: -
 --
 
 CREATE DOMAIN music.isni_number AS text
+	CONSTRAINT isni_check_digit CHECK (music.isni_valid(VALUE))
 	CONSTRAINT isni_format CHECK ((VALUE ~ '^[0-9]{15}[0-9X]$'::text));
 
 --
@@ -528,13 +578,13 @@ BEGIN
                                member_ipi, isni, notes)
     VALUES (NEW.first_name, NEW.last_name,
             nullif(btrim(coalesce(NEW.credit_name,'')), ''),
-            NEW.pro_code, NEW.member_ipi, NEW.isni, NEW.notes)
+            NEW.pro_code, lpad(NEW.member_ipi, 11, '0'), NEW.isni, NEW.notes)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.contact
        SET first_name = NEW.first_name, last_name = NEW.last_name,
            credit_name = nullif(btrim(coalesce(NEW.credit_name,'')), ''),
-           pro_code = NEW.pro_code, member_ipi = NEW.member_ipi,
+           pro_code = NEW.pro_code, member_ipi = lpad(NEW.member_ipi, 11, '0'),
            isni = NEW.isni, notes = NEW.notes
      WHERE id = OLD.id;
     _id := OLD.id;
@@ -975,13 +1025,13 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     INSERT INTO music.organization (name, pro_code, member_ipi, isni,
                                     country, notes)
-    VALUES (btrim(NEW.name), NEW.pro_code, NEW.member_ipi, NEW.isni,
+    VALUES (btrim(NEW.name), NEW.pro_code, lpad(NEW.member_ipi, 11, '0'), NEW.isni,
             NEW.country, NEW.notes)
     RETURNING id INTO _id;
   ELSE
     UPDATE music.organization
        SET name = btrim(NEW.name), pro_code = NEW.pro_code,
-           member_ipi = NEW.member_ipi, isni = NEW.isni,
+           member_ipi = lpad(NEW.member_ipi, 11, '0'), isni = NEW.isni,
            country = NEW.country, notes = NEW.notes
      WHERE id = OLD.id;
     _id := OLD.id;
@@ -12389,6 +12439,18 @@ GRANT USAGE ON SCHEMA music TO mamupload;
 --
 
 GRANT ALL ON TYPE music.copyright_status TO app_user;
+
+--
+-- Name: FUNCTION ipi_valid(p text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.ipi_valid(p text) TO app_user;
+
+--
+-- Name: FUNCTION isni_valid(p text); Type: ACL; Schema: music; Owner: -
+--
+
+GRANT ALL ON FUNCTION music.isni_valid(p text) TO app_user;
 
 --
 -- Name: FUNCTION iswc_valid(p text); Type: ACL; Schema: music; Owner: -

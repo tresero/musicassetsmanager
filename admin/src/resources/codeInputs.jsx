@@ -3,7 +3,8 @@ import {
   compactCode, iswcValid, isrcValid, gtinValid, isniValid, ipiValid, CODE_MESSAGES as M,
 } from '../codes';
 
-// Inputs for ISWC, ISRC, UPC, ISNI and IPI. A pasted code keeps working
+// Inputs for ISWC, ISRC, UPC, ISNI and IPI. The database pads an IPI to 11
+// digits on save. A pasted code keeps working
 // however it was written: spaces, dashes and dots are dropped and letters
 // uppercased as you type, and a wrong format or check digit marks the field
 // when you save. The database checks the same rules; when it refuses one,
@@ -44,16 +45,16 @@ export const UpcInput = codeInput({
 
 export const IpiInput = codeInput({
   source: 'member_ipi', label: 'IPI name number', parse: digits,
-  check: (v) => (ipiValid(v) ? undefined : M.ipiShape),
+  check: (v) => (!/^[0-9]{9,11}$/.test(v) ? M.ipiShape : !ipiValid(v) ? M.ipiDigit : undefined),
 });
 
 // ISNI is shown in groups of four, as isni.org prints it, and stored compact.
 export const IsniInput = codeInput({
-  source: 'isni', label: 'ISNI', placeholder: '0000 0000 3618 9600',
+  source: 'isni', label: 'ISNI', placeholder: '0000 0001 2345 6789',
   parse: (v) => (v || '').toUpperCase().replace(/[^0-9X]/g, '').slice(0, 16) || null,
   format: (v) => (v || '').replace(/(.{4})(?=.)/g, '$1 '),
   inputProps: { maxLength: 19 },
-  check: (v) => (isniValid(v) ? undefined : M.isniShape),
+  check: (v) => (!/^[0-9]{15}[0-9X]$/.test(v) ? M.isniShape : !isniValid(v) ? M.isniDigit : undefined),
 });
 
 // Other ISRCs: each one typed is checked, and the first bad one is named.
