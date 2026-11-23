@@ -1,7 +1,7 @@
 import {
   List, DataTable, BooleanField, DateField, NullableBooleanInput,
 } from 'react-admin';
-import { CatalogDataTable, registrationText, searchFilter } from '../shared';
+import { CatalogDataTable, registrationText, searchFilter, StartHere } from '../shared';
 import { ListActions } from '../listActions';
 
 const filters = [
@@ -18,7 +18,8 @@ const hiddenColumns = [
 
 const SongList = () => (
   <List filters={filters} actions={<ListActions />}
-        sort={{ field: 'title', order: 'ASC' }} perPage={50}>
+        sort={{ field: 'title', order: 'ASC' }} perPage={50}
+        empty={<StartHere />}>
     <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
       <DataTable.Col source="title" />
       <DataTable.Col source="writer_names" label="Writers" />

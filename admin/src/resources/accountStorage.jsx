@@ -103,6 +103,10 @@ const StorageFields = () => {
   return (
     <>
       <Alert severity="info" sx={{ width: '100%', mb: 2 }}>
+        <strong>Set this up first,</strong> before adding documents or audio:
+        every upload in this account goes where it says, and changing it later
+        does not move files already stored.
+        <br /><br />
         <strong>S3 is recommended.</strong> Large uploads go straight from the
         browser to the bucket, so they never pass through this server. Works with
         AWS, Hetzner Object Storage, Backblaze B2, Cloudflare R2, Wasabi, and
@@ -128,7 +132,7 @@ const StorageFields = () => {
                  helperText="Directory for local, key prefix for S3" />
       <TextInput source="public_base_url" label="Public URL base" fullWidth
                  helperText="If public objects are served from a different hostname" />
-      <TextInput source="notes" multiline fullWidth />
+      <TextInput source="notes" multiline fullWidth helperText="For your own reference" />
     </>
   );
 };

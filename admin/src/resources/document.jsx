@@ -45,11 +45,12 @@ const DocumentForm = () => (
     <TextInput source="title" required fullWidth />
     <ReferenceInput source="document_type_id" reference="document_type"
                     perPage={100} sort={{ field: 'name', order: 'ASC' }}>
-      <SharedListPicker label="Type" />
+      <SharedListPicker label="Type" helperText="What it is: a split sheet, a contract, a registration" />
     </ReferenceInput>
 
     <SelectInput source="storage_kind" choices={storageKinds}
-                 label="Storage" defaultValue="url" />
+                 label="Storage" defaultValue="url"
+                 helperText="Where the file is kept. An upload goes to the account's storage, set in Settings." />
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 2, width: '100%' }}>
       <TextInput source="storage_uri" label="Location" required
                  helperText="URL, path, or object key depending on storage type"
@@ -68,7 +69,8 @@ const DocumentForm = () => (
 
     <ReferenceArrayInput source="song_ids" reference="song" perPage={500}
                          sort={{ field: 'title', order: 'ASC' }}>
-      <AutocompleteArrayInput optionText="title" label="Compositions" />
+      <AutocompleteArrayInput optionText="title" label="Compositions"
+                              helperText="What this document is about. It shows on the Documents tab of each one chosen here." />
     </ReferenceArrayInput>
 
     <ReferenceArrayInput source="recording_ids" reference="recording" perPage={500}
@@ -86,8 +88,8 @@ const DocumentForm = () => (
       <AutocompleteArrayInput optionText="name" label="Companies" />
     </ReferenceArrayInput>
 
-    <TextInput source="mime_type" label="MIME type" />
-    <NumberInput source="byte_size" label="Size (bytes)" />
+    <TextInput source="mime_type" label="MIME type" helperText="The file's type, filled in on upload" />
+    <NumberInput source="byte_size" label="Size (bytes)" helperText="Filled in on upload" />
     <RichTextInput source="notes" />
   </SimpleForm>
 );

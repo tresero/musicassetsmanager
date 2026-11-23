@@ -49,10 +49,13 @@ const ContactForm = () => {
                              optionText={proOptionText}
                              inputText={proInputText}
                              filterToQuery={byCode}
+                             helperText="The performing rights society they belong to, such as BMI or ASCAP. Their writer rows start on it."
                              sx={{ width: { xs: '100%', md: 260 } }} />
         </ReferenceInput>
-        <IpiInput sx={{ width: { xs: '100%', md: 220 } }} />
+        <IpiInput helperText="From their society membership. Needed to register works."
+                  sx={{ width: { xs: '100%', md: 220 } }} />
         <IsniInput source="isni" label="ISNI"
+                   helperText="Their public identity number, from isni.org. Optional."
                    sx={{ width: { xs: '100%', md: 260 } }} />
         <RichTextInput source="notes" />
       </TabbedForm.Tab>

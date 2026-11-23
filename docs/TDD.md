@@ -115,6 +115,15 @@ admin's.
   merging two documents keeps the kept one's claimant, or takes the other's
   when the kept one has none.
 
+## Help text (#35)
+
+- A shared list picker's help ends with "Not listed? Ask us to add it to the
+  list." for a user who is not the site admin, the genre, mood and theme
+  pickers with the Keywords hint instead, and "Type it and choose Create" for
+  the site admin; a row picker with helperText={false} shows none.
+- An empty Songs list shows the Storage and Pitch settings links to an Owner
+  and only the Create button to an Editor.
+
 ## Artists from people (#30)
 
 - Saving the New artist dialog with a person chosen sends `members` with that
@@ -358,3 +367,4 @@ admin's.
 | 2026-11-23 | Change history (#78) |
 | 2026-11-23 | Public domain arrangements (#11) |
 | 2026-11-23 | Artists from people (#30) |
+| 2026-11-23 | Help text (#35) |

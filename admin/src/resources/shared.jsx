@@ -4,9 +4,10 @@ import {
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput,
   useRecordContext,
-  SimpleFormIterator,
+  SimpleFormIterator, CreateButton,
 } from 'react-admin';
-import { Alert, Button, Stack, TextField as MuiTextField } from '@mui/material';
+import { Link as RouterLink } from 'react-router';
+import { Alert, Box, Button, Link, Stack, TextField as MuiTextField } from '@mui/material';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useSourceContext } from 'ra-core';
 import { useCan, useIsSiteAdmin, useDefaultCountry, useAccountCurrency, useFirstLanguages } from '../permissions';
@@ -65,15 +66,26 @@ export const sharedList = ({ list = NameList, Inputs = NameInputs } = {}) => ({
 // ReferenceInput or ReferenceArrayInput. The site admin can add a missing
 // entry from the picker without leaving the form; nobody else sees Create.
 // Create is not offered when the typed name matches an entry in any case:
-// typing rock picks Rock.
-export const SharedListPicker = ({ multiple = false, onInputChange, ...props }) => {
+// typing rock picks Rock. Below its own help text it says what to do when a
+// value is missing: notListed, or asking for it to be added. A row input
+// with helperText={false} stays without, to keep the row short.
+export const SharedListPicker = ({
+  multiple = false, onInputChange, helperText, notListed, ...props
+}) => {
   const { resource, allChoices } = useChoicesContext();
   const siteAdmin = useIsSiteAdmin();
   const [typed, setTyped] = useState('');
   const key = typed.trim().toLowerCase();
   const exists = !!key && !!allChoices?.some((c) => c.name?.toLowerCase() === key);
   const Input = multiple ? AutocompleteArrayInput : AutocompleteInput;
+  const missing = siteAdmin
+    ? 'Not listed? Type it and choose Create.'
+    : notListed ?? 'Not listed? Ask us to add it to the list.';
+  const own = typeof helperText === 'string' && !/[.?!]$/.test(helperText)
+    ? `${helperText}.` : helperText;
+  const help = helperText === false ? false : [own, missing].filter(Boolean).join(' ');
   return <Input optionText="name"
+                helperText={help}
                 create={siteAdmin && !exists ? <QuickCreateName resource={resource} /> : undefined}
                 onInputChange={(e, value, reason) => {
                   setTyped(value || '');
@@ -325,3 +337,23 @@ export const RowIterator = ({ sx, ...props }) => (
 export const BlockIterator = ({ sx, ...props }) => (
   <SimpleFormIterator getItemLabel={number} sx={withSx(blockSx, sx)} {...props} />
 );
+
+// A catalog list with nothing in it yet: what to set up before the first
+// record, for those who can, and the button to add it.
+export const StartHere = () => {
+  const canSettings = useCan('settings.edit');
+  const canEdit = useCan('catalog.edit');
+  return (
+    <Alert severity="info" sx={{ m: 2 }}>
+      Nothing here yet.
+      {canSettings && <>
+        {' '}Before adding the catalog, set up{' '}
+        <Link component={RouterLink} to="/account_storage">Storage</Link>,
+        where documents and audio are kept, and{' '}
+        <Link component={RouterLink} to="/pitch_setting">Pitch settings</Link>,
+        the contact named in a recording&apos;s pitch comment.
+      </>}
+      {canEdit && <Box sx={{ mt: 1 }}><CreateButton variant="contained" /></Box>}
+    </Alert>
+  );
+};

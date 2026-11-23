@@ -26,12 +26,14 @@ const DetailsFields = () => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
       <TextInput source="title" required helperText={false}
                  sx={{ width: { xs: '100%', md: 420 } }} />
-      <IswcInput helperText={false}
+      <IswcInput helperText="Assigned once the work is registered. Paste it as written."
                  sx={{ width: { xs: '100%', md: 200 } }} />
-      <LanguageInput sx={{ width: { xs: '100%', md: 240 } }} />
+      <LanguageInput helperText="Of the lyrics; Instrumental for none"
+                     sx={{ width: { xs: '100%', md: 240 } }} />
     </Box>
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-      <BooleanInput source="easy_clear" label="Easy clear" helperText={false} />
+      <BooleanInput source="easy_clear" label="Easy clear"
+                    helperText="Set by hand: can be cleared quickly for sync, even when not one stop" />
       <BooleanInput source="public_domain_p" label="Public domain source"
                     helperText="The tune is public domain. With no shares it is free to use; with shares the writers are its arrangers, and one stop follows their shares." />
     </Box>

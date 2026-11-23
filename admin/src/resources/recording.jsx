@@ -17,7 +17,7 @@ import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
-  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, RowIterator,
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, RowIterator, StartHere,
 } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { useDefaultParentalWarning } from '../permissions';
@@ -77,7 +77,8 @@ const hiddenColumns = [
 
 const RecordingList = () => (
   <List filters={filters} actions={<ListActions />}
-        sort={{ field: 'title', order: 'ASC' }} perPage={50}>
+        sort={{ field: 'title', order: 'ASC' }} perPage={50}
+        empty={<StartHere />}>
     <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
       <DataTable.Col source="title" />
       <DataTable.Col source="version_label" label="Version" />
@@ -148,6 +149,7 @@ const RecordingForm = () => (
                       helperText="ISRCs this same recording also earns under, such as a reissue's. Statement lines match these too. Type one and press Enter."
                       sx={{ width: { xs: '100%', md: 520 } }} />
       <NumberInput source="bpm" label="BPM" step={0.01}
+                   helperText="Beats per minute"
                    sx={{ width: { xs: '100%', md: 130 } }} />
       <AutocompleteInput source="tempo" label="Tempo"
                          choices={tempos}
@@ -157,6 +159,7 @@ const RecordingForm = () => (
       <ReferenceInput source="key_signature" reference="key_signature" perPage={50}
                       sort={{ field: 'accidentals', order: 'ASC' }}>
         <AutocompleteInput optionText="name" label="Key"
+                           helperText="The key it is in"
                            sx={{ width: { xs: '100%', md: 200 } }} />
       </ReferenceInput>
       <ReferenceInput source="vocal_type_id" reference="vocal_type" perPage={50}
@@ -167,7 +170,8 @@ const RecordingForm = () => (
       </ReferenceInput>
       <LanguageInput helperText="Language of the vocal. Leave blank to use the song's language."
                      sx={{ width: { xs: '100%', md: 240 } }} />
-      <BooleanInput source="is_instrumental" label="Instrumental" />
+      <BooleanInput source="is_instrumental" label="Instrumental"
+                    helperText="No vocals" />
       <BooleanInput source="is_cover" label="Cover"
                     helperText="A recording of someone else's composition" />
       <ParentalWarningInput />
@@ -176,11 +180,15 @@ const RecordingForm = () => (
       <ReferenceInput source="status_id" reference="asset_status" perPage={50}
                       sort={{ field: 'name', order: 'ASC' }}>
         <SharedListPicker label="Status"
+                     helperText="Where it stands: started, finished, pitched, released"
                      sx={{ width: { xs: '100%', md: 220 } }} />
       </ReferenceInput>
-      <TextInput source="description" multiline fullWidth />
-      <TextInput source="keywords" fullWidth />
-      <TextInput source="sounds_like" label="Sounds like" fullWidth />
+      <TextInput source="description" multiline fullWidth
+                 helperText="Being phased out: move what it says into the fields above, Keywords and Sounds like. It is not in the pitch comment." />
+      <TextInput source="keywords" fullWidth
+                 helperText="Words a search should find that the lists don't cover, such as a genre or mood that isn't listed" />
+      <TextInput source="sounds_like" label="Sounds like" fullWidth
+                 helperText="Artists or tracks it sounds like, as a music supervisor would put it" />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Artists">
@@ -200,7 +208,7 @@ const RecordingForm = () => (
 
     <TabbedForm.Tab label="Credits">
       <ArrayInput source="credits" label={false}
-                  helperText="One row per person, with all their roles and instruments. Leave Performed in blank when they played in the country of recording. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
+                  helperText="One row per person, with all their roles and instruments. Leave Performed in blank when they played in the country of recording. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay. An instrument or role that isn't listed: ask us to add it.">
         <RowIterator>
           <PersonOrCompanyInput w={240} required />
           <TextInput source="credited_as" label="Credited as (this recording)"
@@ -236,17 +244,20 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Tags">
       <ReferenceArrayInput source="genre_ids" reference="genre" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
-        <SharedListPicker multiple label="Genres" />
+        <SharedListPicker multiple label="Genres"
+                          notListed="Not listed? Add it to Keywords on the Details tab, or ask us to add it to the list." />
       </ReferenceArrayInput>
       <ReferenceArrayInput source="mood_ids" reference="mood" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <SharedListPicker multiple label="Moods"
-                          helperText="How it feels: triumphant, melancholy, laid back" />
+                          helperText="How it feels: triumphant, melancholy, laid back"
+                          notListed="Not listed? Add it to Keywords on the Details tab, or ask us to add it to the list." />
       </ReferenceArrayInput>
       <ReferenceArrayInput source="theme_ids" reference="theme" perPage={200}
                            sort={{ field: 'name', order: 'ASC' }}>
         <SharedListPicker multiple label="Themes"
-                          helperText="What it is about or the scene it fits, as a music supervisor searches: patriotic, Christmas, road trip. Goes in the pitch comment after the tempo." />
+                          helperText="What it is about or the scene it fits, as a music supervisor searches: patriotic, Christmas, road trip. Goes in the pitch comment after the tempo."
+                          notListed="Not listed? Add it to Keywords on the Details tab, or ask us to add it to the list." />
       </ReferenceArrayInput>
       <PitchCommentInput />
     </TabbedForm.Tab>
@@ -266,6 +277,7 @@ const RecordingForm = () => (
                     helperText="Where the original owner of the master was based when it was made: the label's country, or yours if self-released, wherever the tracks were cut. Societies such as PPL use this and the country of recording to decide eligibility for performance income."
                     sx={{ width: { xs: '100%', md: 340 } }} />
       <NumberInput source="p_line_year" label="℗ year"
+                   helperText="The year the recording was first released, printed in the P line"
                    sx={{ width: { xs: '100%', md: 150 } }} />
 
       <ArrayInput source="owners" label="Master owners"

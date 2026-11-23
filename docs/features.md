@@ -465,6 +465,13 @@ a document or a release, does not sort.
 - Pages fit the window down to phone width: forms stack their fields, a
   form's tabs and a list's wide table scroll within themselves, and toolbars
   wrap, so the page itself never scrolls sideways.
+- Fields carry help text written for people who are not database people.
+  A picker for a shared list (genres, moods, instruments, document types and
+  the like) says what to do when a value is missing: ask for it to be added,
+  or, for genres, moods and themes, put it in the recording's Keywords. The
+  site admin is told to type it and choose Create instead.
+- An empty Songs, Recordings or Releases list says to set up Storage and
+  Pitch settings before adding the catalog, to those who can (#35).
 
 ## Revision history
 
@@ -525,3 +532,4 @@ a document or a release, does not sort.
 | 2026-11-23 | Change history on every record, and the Deleted records report (#78). |
 | 2026-11-23 | Public domain source: one stop checks an arrangement's shares (#11). |
 | 2026-11-23 | A new solo artist is linked to its person when added (#30). |
+| 2026-11-23 | Help text across the forms; what to do when a list value is missing; first steps on an empty catalog (#35). |

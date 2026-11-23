@@ -13,7 +13,7 @@ import { DocumentsInput } from './documentsTab';
 import { UpcInput } from './codeInputs';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
-import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator } from './shared';
+import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator, StartHere } from './shared';
 import { ChangeHistory } from './changeHistory';
 import { ListActions } from './listActions';
 
@@ -83,7 +83,8 @@ const hiddenColumns = [
 
 const ReleaseList = () => (
   <List filters={filters} actions={<ListActions />}
-        sort={{ field: 'release_date', order: 'DESC' }} perPage={50}>
+        sort={{ field: 'release_date', order: 'DESC' }} perPage={50}
+        empty={<StartHere />}>
     <CatalogDataTable rowClick="edit" hiddenColumns={hiddenColumns}>
       <DataTable.Col source="title" />
       <DataTable.Col source="artist_names" label="Artist" />

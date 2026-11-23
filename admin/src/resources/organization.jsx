@@ -38,12 +38,16 @@ const OrgForm = () => (
                            optionText={proOptionText}
                            inputText={proInputText}
                            filterToQuery={byCode}
+                           helperText="For a publisher, the society it is affiliated with"
                            sx={{ width: { xs: '100%', md: 280 } }} />
       </ReferenceInput>
-      <IpiInput sx={{ width: { xs: '100%', md: 240 } }} />
+      <IpiInput helperText="The company's IPI name number, from its society. Needed to register works."
+                sx={{ width: { xs: '100%', md: 240 } }} />
       <IsniInput source="isni" label="ISNI"
+                 helperText="Its public identity number, from isni.org. Optional."
                  sx={{ width: { xs: '100%', md: 260 } }} />
-      <CountryInput source="country" sx={{ width: { xs: '100%', md: 300 } }} />
+      <CountryInput source="country" helperText="Where it is based"
+                    sx={{ width: { xs: '100%', md: 300 } }} />
       <RichTextInput source="notes" />
     </TabbedForm.Tab>
 
