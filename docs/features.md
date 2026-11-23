@@ -476,8 +476,7 @@ a document or a release, does not sort.
   the like) says what to do when a value is missing: ask for it to be added,
   or, for genres, moods and themes, put it in the recording's Keywords. The
   site admin is told to type it and choose Create instead.
-- The Songs and Recordings lists have a **Lyrics contain** filter, under Add
-  filter: every word typed must start a word of the lyrics, accents and
+- The Songs and Recordings lists have a **Lyrics contain** box beside Search: every word typed must start a word of the lyrics, accents and
   formatting ignored. A recording is searched by its own lyrics, else its
   songs'. The main search box leaves lyrics out, since common words would
   match nearly every song (#48). When nothing matches as typed, it searches

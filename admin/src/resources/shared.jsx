@@ -179,7 +179,7 @@ export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
 // into a search of the view's search value.
 export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;
 // Lyrics contain (#48): every word, matched at the start, in the lyrics only.
-export const lyricsFilter = <TextInput key="lyrics" source="lyrics" label="Lyrics contain" />;
+export const lyricsFilter = <TextInput key="lyrics" source="lyrics" label="Lyrics contain" alwaysOn />;
 
 // Above a list whose Lyrics contain search matched nothing exactly and was
 // run again with the closest words in the lyrics (dataProvider.js).

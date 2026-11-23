@@ -147,13 +147,13 @@ stop. Its **Master** tab says which of these is missing.
 The search box looks at names and codes: titles, writers, ISWCs and the like.
 Lyrics are left out on purpose, since a word like "la" or "amor" is in nearly
 every lyric and would bury the song you were looking for. To search lyrics,
-open the Songs or Recordings list, choose **Add filter > Lyrics contain**, and
-type a few words of the line. A typo or two words run together still finds
+open the Songs or Recordings list and type a few words of the line in
+**Lyrics contain**, beside Search. A typo or two words run together still finds
 it: when nothing matches as typed, the list shows the closest words in your
 lyrics instead and says so above the results.
 
-To show it: open **Songs**, choose **Add filter > Lyrics contain**, and type
-two words from a chorus; then type one of them with a letter wrong.
+To show it: open **Songs** and type two words from a chorus in **Lyrics
+contain**; then type one of them with a letter wrong.
 
 ### What is the difference between one stop and easy clear?
 
