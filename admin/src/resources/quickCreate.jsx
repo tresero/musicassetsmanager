@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useCreate, useCreateSuggestionContext, useNotify } from 'react-admin';
+import { useCreate, useCreateSuggestionContext, useGetList, useNotify } from 'react-admin';
 import {
   Dialog, DialogActions, DialogContent, DialogTitle,
-  Button, TextField, Stack, MenuItem,
+  Button, TextField, Stack, MenuItem, Autocomplete,
 } from '@mui/material';
 
 /*
@@ -95,16 +95,54 @@ export const QuickCreateContact = () => {
   );
 };
 
-/* an artist needs a name and whether it is one person or a group */
+/* the person behind a solo artist, searched as you type */
+const PersonPicker = ({ value, onChange, initialSearch }) => {
+  const [text, setText] = useState('');
+  const q = text || initialSearch;
+  const { data = [], isPending } = useGetList('contact', {
+    filter: q ? { q } : {},
+    sort: { field: 'sort_name', order: 'ASC' },
+    pagination: { page: 1, perPage: 20 },
+  });
+  return (
+    <Autocomplete options={data} value={value} loading={isPending}
+                  onChange={(e, person) => onChange(person)}
+                  onInputChange={(e, typed, reason) => { if (reason === 'input') setText(typed); }}
+                  getOptionLabel={(c) => c.display_name ?? ''}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  filterOptions={(options) => options}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Who is it"
+                               helperText="The person in People, if they are there: they become the artist's member, and their ISNI carries over" />
+                  )} />
+  );
+};
+
+/*
+ * An artist needs a name and whether it is one person or a group. A person
+ * already in People is chosen as who it is, so the artist is linked to them
+ * instead of standing alone; a group's members are added on its page.
+ */
 export const QuickCreateArtist = () => {
   const { filter, onCancel, onCreate } = useCreateSuggestionContext();
   const [name, setName] = useState(filter || '');
   const [kind, setKind] = useState('person');
+  const [person, setPerson] = useState(null);
   const save = useQuickCreate('artist');
+
+  // Choosing the person fills in their credited name, unless a different
+  // name (a stage name) has been typed.
+  const choose = (chosen) => {
+    setPerson(chosen);
+    const billed = chosen?.credit_name || chosen?.display_name;
+    const typed = name.trim().toLowerCase();
+    if (billed && (!typed || billed.toLowerCase().startsWith(typed))) setName(billed);
+  };
 
   const submit = (e) => {
     e.preventDefault();
-    save({ name: name.trim(), kind }, onCreate);
+    const members = kind === 'person' && person ? [{ contact_id: person.id }] : [];
+    save({ name: name.trim(), kind, members }, onCreate);
   };
 
   return (
@@ -112,15 +150,18 @@ export const QuickCreateArtist = () => {
       <form onSubmit={submit}>
         <DialogTitle>New artist</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1, minWidth: 340 }}>
-            <TextField autoFocus label="Name" value={name}
-                       onChange={(e) => setName(e.target.value)}
-                       helperText="As it appears on the release" />
+          <Stack spacing={2} sx={{ mt: 1, minWidth: { sm: 400 } }}>
             <TextField select label="Kind" value={kind}
                        onChange={(e) => setKind(e.target.value)}>
               <MenuItem value="person">Person</MenuItem>
               <MenuItem value="group">Group</MenuItem>
             </TextField>
+            {kind === 'person' && (
+              <PersonPicker value={person} onChange={choose} initialSearch={filter} />
+            )}
+            <TextField autoFocus label="Name" value={name}
+                       onChange={(e) => setName(e.target.value)}
+                       helperText="As it appears on the release" />
           </Stack>
         </DialogContent>
         <DialogActions>

@@ -148,6 +148,31 @@ One stop is worked out from the shares; you can't set it. Easy clear is a box
 you tick yourself, for a track you know can be cleared quickly even when it is
 not one stop, such as one whose co-owner always says yes.
 
+## Artists
+
+### My featured artist is already in People. Do I add them again?
+
+No, but they do need an artist. A person is who gets paid and signs; an artist
+is the name a record is billed under. So a featured artist who is already in
+People becomes an artist with that person as its only member, not a second
+person. Their ISNI carries over to the artist unless the artist has its own.
+
+On a recording's **Artists** tab, type the name. If no artist has it yet,
+choose to add one, keep Kind as **Person**, and pick them under **Who is it**:
+the name fills in with their credited name, and you can change it to a stage
+name. A stage name is a second artist backed by the same person.
+
+A company is never the artist. An act run by a company is a **Group** artist
+with its members; the company goes on the recording as a master owner or on a
+credit.
+
+To show it:
+
+1. Open a recording, go to **Artists**, and add a row.
+2. Type the featured artist's name and choose to add a new artist.
+3. Pick the person under **Who is it**, check the name, and save.
+4. Open **Catalog > Artists** and the new artist: **Members** lists the person.
+
 ## Copyright
 
 ### I registered an album as one work. Do I enter the number on every track?
@@ -202,3 +227,4 @@ To show it:
 | 2026-11-15 | Importing CD Baby sales, returns included. |
 | 2026-11-15 | Copyright: album registrations and mismatched numbers. |
 | 2026-11-23 | Songs: public domain source, versions of a tune, Based on, crediting the original writer, one stop and easy clear. |
+| 2026-11-23 | Artists: a featured artist who is already in People. |

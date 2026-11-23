@@ -179,7 +179,9 @@ The identity a record is released under: name, how it sorts, whether it is a
 person or a group, and its ISNI. A solo act under its own name inherits the
 member's ISNI. An ISNI is used once per account. Artists are listed by how they sort, or by name
 when that is blank. Members are listed with the
-dates they joined and left.
+dates they joined and left. Adding an artist from a recording or release asks,
+for a person, who it is in People, links them as the member, and fills in their
+credited name (#30).
 
 ## Documents
 
@@ -522,3 +524,4 @@ a document or a release, does not sort.
 | 2026-11-22 | ISNI and IPI check digits; IPIs saved as 11 digits (#74). |
 | 2026-11-23 | Change history on every record, and the Deleted records report (#78). |
 | 2026-11-23 | Public domain source: one stop checks an arrangement's shares (#11). |
+| 2026-11-23 | A new solo artist is linked to its person when added (#30). |

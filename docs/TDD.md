@@ -115,6 +115,13 @@ admin's.
   merging two documents keeps the kept one's claimant, or takes the other's
   when the kept one has none.
 
+## Artists from people (#30)
+
+- Saving the New artist dialog with a person chosen sends `members` with that
+  person, and the new artist lists them as its member and inherits their ISNI.
+- Choosing a person fills the name with their credited name, else their
+  name, unless a different name was typed.
+
 ## Public domain arrangements (#11), `music.song_one_stop_reason`
 
 - A song marked Public domain source with no share above 0 is one stop, and
@@ -350,3 +357,4 @@ admin's.
 | 2026-11-22 | Country of performance (#42) |
 | 2026-11-23 | Change history (#78) |
 | 2026-11-23 | Public domain arrangements (#11) |
+| 2026-11-23 | Artists from people (#30) |
