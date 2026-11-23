@@ -178,7 +178,9 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
 | Generated column write error | Strip it in the `transform` prop |
 | Logged out on any 403 | The auth provider should only clear the token on 401 |
 
-## PostgreSQL 18 notes
+## PostgreSQL notes
+
+The server runs PostgreSQL 19. The schema relies on these, which came in 18:
 
 Generated columns default to VIRTUAL. Virtual ones cannot be indexed, cannot
 use a domain type, cannot have NOT NULL, and don't replicate. Say `STORED`
@@ -206,3 +208,4 @@ written by row triggers.
 | 2026-11-23 | `RETURNING OLD`/`NEW` don't replace audit triggers; the change log (#78) uses row triggers |
 | 2026-11-23 | Change history triggers for child tables (#78) |
 | 2026-11-23 | Database tests: pgTAP in `db/tests/`, run with `db/tests/run.sh` |
+| 2026-11-23 | The server runs PostgreSQL 19 |

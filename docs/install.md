@@ -2,7 +2,9 @@
 
 ## Requirements
 
-- PostgreSQL 18. Needs `uuidv7()` and stored generated columns.
+- PostgreSQL 18 or later; developed on 19. Needs `uuidv7()` and stored generated columns.
+- For the database tests only: pgTAP and `pg_prove` (on Debian or Ubuntu,
+  `postgresql-19-pgtap` and `libtap-parser-sourcehandler-pgtap-perl`).
 - PostgREST 14 or later
 - Node 20 or later, to build the admin app
 - Go 1.24 or later, to build the upload service
@@ -158,3 +160,4 @@ Then log in at the app's root URL. Invite everyone else from Settings, Users.
 | 2026-10-08 | Database files in db/ create every role and the extensions; set app.jwt_secret |
 | 2026-10-10 | PostgREST db-pre-request; first user is an Owner |
 | 2026-11-14 | pg_trgm for statement line suggestions. |
+| 2026-11-23 | Developed on PostgreSQL 19; pgTAP and pg_prove for the database tests. |

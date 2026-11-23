@@ -1,6 +1,6 @@
 # music_tracker — conventions
 
-Postgres 18 on Hetzner (loopback only) → PostgREST → React Admin, served by Caddy
+Postgres 19 on Hetzner (loopback only) → PostgREST → React Admin, served by Caddy
 at `musicassetsmanager.com`.
 
 ## Layout
@@ -170,3 +170,8 @@ that into a real component when the generated view isn't enough.
   once. Contacts hang off `party`, ported from SQLite
 - Mechanicals, and neighbouring rights for masters (separate table entirely —
   SCAPR/IPD identifiers, not CISAC/IPI)
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-11-23 | Postgres 19 |

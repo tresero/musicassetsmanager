@@ -7,7 +7,7 @@ enforce the rules. The frontend is deliberately thin.
 
 | Layer | What it does |
 |---|---|
-| PostgreSQL 18 | Tables in schema `music`. All constraints and business logic. |
+| PostgreSQL 19 | Tables in schema `music`. All constraints and business logic. |
 | PostgREST | Publishes schema `api`, views over `music` shaped for the client. |
 | React Admin | Static SPA. CRUD screens. No server process. |
 
@@ -95,3 +95,9 @@ instrument list nested inside each credit.
 
 The logic ends up in the database rather than the frontend, which is where it
 belongs given everything else about this project.
+
+## Revision History
+
+| Date | Revision |
+|---|---|
+| 2026-11-23 | The server runs PostgreSQL 19 |
