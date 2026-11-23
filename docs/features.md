@@ -401,18 +401,37 @@ that resolve to nobody, which would go out with nobody to call.
 
 ## Email
 
-Each user connects their own mail account under **My settings > Email
-sending**: their address and name, their provider's outgoing (SMTP) server,
-with one click for Gmail or Google Workspace, Microsoft 365, iCloud and
-Fastmail, and their password or app password. Email sent from the app goes
-out as them, through their provider, never through the site's own mail
-server, which only sends invites. The password is saved on its own, never
-shown again, and read only by the upload service when it sends. Mail is
-always encrypted (STARTTLS or SSL/TLS), and a mail server on the site's own
-machine or network is refused. **Send me a test email** checks the settings
-and shows what the mail server answered. Every email sent, or that failed, is
-logged with who sent it, to whom, the subject, what it was about and its
-attachments (#70).
+Email from the app goes out through the account's sending service, set up
+under **Settings > Email sending** by a role that edits settings: Amazon SES
+or a service like it (Postmark, Mailgun, SendGrid, Brevo, SMTP2GO, each one
+click to fill in), reached over SMTP, with the address and name to send from.
+Email comes from that address with the user who sent it as Reply-To, so
+replies reach them. Nothing goes through the site's own mail server, which
+only sends invites. Mailbox providers (Google Workspace, Microsoft 365,
+iCloud and the like), which cannot send in bulk, are refused, and so are
+personal addresses (Gmail, iCloud, Outlook.com, Yahoo and the like) as the
+address to send from. With no service set up, Email says so in a popup and
+nothing is sent. The password is saved on its own, never shown again, and
+read only by the upload service when it sends. Mail is always encrypted
+(STARTTLS or SSL/TLS), and a mail server on the site's own machine or network
+is refused. **Send me a test email** sends to the user's sign-in address and
+shows what the server answered. Every email sent, or that failed, is logged
+with who sent it, to whom, the subject, what it was about and its
+attachments (#70). Sending in bulk, one email per recipient with delivery
+and opens reported back, is #86.
+
+**Emailing documents:** each document on a song's, recording's, release's,
+person's or company's Documents tab, and on the document's own page, has an
+**Email** button. It suggests the people and companies on the record with
+their part in it (a song's writers and publishers, a recording's credits and
+master owners, a release's artists and the master owners of its tracks, a
+company's own address and its people; a document, those on the records it is
+attached to), and any address can be typed or pasted. The subject names the
+record and the document, other documents on the record can be added, and a
+document kept at a web address is sent as a link. Files over 20 MB in all
+are refused, since most providers refuse them. What was sent, or failed,
+is listed under **Sent by email** on the record it was sent from, on each
+person and company it went to, and on each document it attached.
 
 ## Storage
 
@@ -582,3 +601,5 @@ a document or a release, does not sort.
 | 2026-11-23 | Addresses by name, without /#/ (#60). |
 | 2026-11-23 | Stems and Multitracks tabs: one file each, Download all as zip (#43). |
 | 2026-11-23 | Email sending from each user's own mail account (#70). |
+| 2026-11-23 | Emailing documents from a record, and Sent by email (#70). |
+| 2026-11-23 | Email through the account's sending service only (SES and the like); mailbox providers refused (#70). |

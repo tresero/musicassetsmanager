@@ -30,6 +30,7 @@ import keySignature from './resources/keySignature';
 import genre from './resources/genre';
 import language from './resources/language';
 import pitchSetting from './resources/pitchSetting';
+import accountMail from './resources/accountMail';
 import userPreference from './resources/userPreference';
 import roleGroup from './resources/roleGroup';
 import role from './resources/role';
@@ -150,7 +151,8 @@ export default function App() {
       <Resource name="account_storage" {...settings(accountStorage)} />
       <Resource name="pitch_setting" {...settings(pitchSetting)} />
       <Resource name="user_preference" {...userPreference} />
-      <Resource name="user_mail" />
+      <Resource name="account_mail" {...settings(accountMail)} />
+      <Resource name="mail_sent" />
       <Resource name="document_orphan" {...documentOrphan} />
       <Resource name="file_unnamed" {...fileUnnamed} />
       <Resource name="account_user" {...accountUser} />

@@ -104,3 +104,21 @@ export const sendTestMail = async () => {
   }
   return res.json();
 };
+
+// Sends an email through the signed-in user's own mail account (#70):
+// { to, cc, subject, text, record_type, record_id, document_ids }.
+export const sendMail = async (body) => {
+  const res = await fetch('/upload/mail/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'The email could not be sent');
+  }
+  return res.json();
+};

@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router';
 import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { CountryInput } from './shared';
 import { parentalWarnings } from './vocab';
-import { UserMailCard } from './userMail';
 
 const FIELDS = ['country_code', 'language_codes', 'parental_warning'];
 
@@ -45,7 +44,6 @@ const UserPreferencePage = () => {
   };
 
   return (
-    <>
     <Card sx={{ mt: 2 }}>
       <Title title="My settings" />
       <CardContent>
@@ -75,8 +73,6 @@ const UserPreferencePage = () => {
         </Form>
       </CardContent>
     </Card>
-    <UserMailCard />
-    </>
   );
 };
 

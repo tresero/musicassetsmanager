@@ -48,6 +48,7 @@ const messages = {
     account_storage:   { name: 'Storage setting |||| Storage settings' },
     pitch_setting:     { name: 'Pitch setting |||| Pitch settings' },
     user_preference:   { name: 'My settings |||| My settings' },
+    account_mail:      { name: 'Email sending |||| Email sending' },
     account_user:      { name: 'User |||| Users' },
     account_role:      { name: 'Account role |||| Account roles' },
     account_invite:    { name: 'Invite |||| Invites' },

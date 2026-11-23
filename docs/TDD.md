@@ -120,12 +120,18 @@ admin's.
 
 ## Email from the user's own account (#70)
 
-- A real send through a provider: settings saved, test email arrives, a send
-  with a document attached arrives with it, and a wrong password says the
-  server refused it (by hand with a real mailbox; needs a test mail account).
-- The upload service refuses a mail server on this machine or a private
-  network, a missing password, no recipients and a malformed address, and
-  logs each attempt that reached a mail server (checked by hand against a
+- A real send through a sending service (Amazon SES): settings saved, test
+  email arrives, a send with a document attached arrives with it and
+  replies go to the sender, and a wrong password says the server refused it
+  (by hand; needs a test SES account).
+- The Email dialog: suggested recipients, typed and pasted addresses, the
+  subject, a web address document sent as a link, and Sent by email listing
+  the send (checked in a browser against a mocked API; an automated browser
+  test waits on #81).
+- The upload service refuses with no sending service set up, a mail server
+  on this machine or a private network, a missing password, no recipients,
+  a malformed address and an unknown kind of record, and logs each attempt
+  that reached a mail server (checked by hand against a
   test copy of the service; an automated test waits on #82).
 
 ## Stems and multitracks (#43)
@@ -396,3 +402,5 @@ admin's.
 | 2026-11-23 | Addresses by name (#60) |
 | 2026-11-23 | Stems and multitracks (#43) |
 | 2026-11-23 | Email from the user's own account (#70) |
+| 2026-11-23 | The Email dialog for documents (#70) |
+| 2026-11-23 | Email through the account's sending service (#70) |

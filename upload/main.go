@@ -6,8 +6,8 @@
 //	GET  /upload/file?...            local backend: serves a signed link
 //	POST /upload/zip-link            a signed link to a zip of a recording's stems or multitracks
 //	GET  /upload/zip?...             that zip, built as it is sent (zip.go)
-//	POST /upload/mail/test           a test email from the user's own mail settings (mail.go)
-//	POST /upload/mail/send           an email from the user, through their own provider
+//	POST /upload/mail/test           a test email to the user, through the account's sending service (mail.go)
+//	POST /upload/mail/send           an email from the account, replies to the user who sent it
 //	GET  /upload/health
 //
 // It also emails invites: see invite.go.

@@ -1,6 +1,6 @@
 import {
   ArrayInput, SimpleFormIterator, TextInput,
-  ReferenceInput, useGetOne,
+  ReferenceInput, useGetOne, useRecordContext, useResourceContext,
   required,
 } from 'react-admin';
 import { useSourceContext } from 'ra-core';
@@ -12,6 +12,7 @@ import { DocumentDatesInput } from './DocumentDatesInput';
 import { SharedListPicker } from './shared';
 import { PersonOrCompanyInput } from './partyInputs';
 import { Box } from '@mui/material';
+import { RowEmailButton, SentMail } from './sendMail';
 
 /*
  * Documents edited in place on the parent record.
@@ -51,7 +52,12 @@ export const RegistrationInputs = ({ otherwise = null }) => {
   );
 };
 
-export const DocumentsInput = () => (
+export const DocumentsInput = () => {
+  const record = useRecordContext();
+  const resource = useResourceContext();
+  const recordTitle = record?.title ?? record?.display_name ?? record?.name;
+  return (
+  <>
   <ArrayInput source="documents" label={false}
               helperText="Removing a row detaches the document. It is not deleted.">
     <AttachDocumentInput />
@@ -65,7 +71,10 @@ export const DocumentsInput = () => (
       <RegistrationInputs />
 
       <FileUploadInput kind="documents" scoped />
-      <FileLink scoped />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, mb: 2 }}>
+        <FileLink scoped sx={{}} />
+        <RowEmailButton recordType={resource} recordId={record?.id} recordTitle={recordTitle} />
+      </Box>
 
       <TextInput source="file_name" label="File name" fullWidth
                  helperText="The name the file had when it was uploaded. Set by the upload." />
@@ -76,4 +85,7 @@ export const DocumentsInput = () => (
       <TextInput source="notes" label="Note" multiline fullWidth />
     </SimpleFormIterator>
   </ArrayInput>
-);
+  <SentMail recordType={resource} recordId={record?.id} />
+  </>
+  );
+};

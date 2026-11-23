@@ -28,9 +28,11 @@ const CONSTRAINTS = {
   ipi_check_digit: { field: 'member_ipi', message: M.ipiDigit },
   contact_ipi_key: { field: 'member_ipi', message: 'Another person already has this IPI name number' },
   organization_ipi_key: { field: 'member_ipi', message: 'Another company already has this IPI name number' },
-  email_format: { field: { user_mail: 'from_address' }, message: 'This is not an email address' },
-  user_mail_port_check: { field: 'smtp_port', message: 'A port is a number from 1 to 65535, usually 587 or 465' },
-  user_mail_security_check: { field: 'smtp_security', message: 'Choose STARTTLS or SSL/TLS' },
+  email_format: { field: { account_mail: 'from_address' }, message: 'This is not an email address' },
+  account_mail_port_check: { field: 'smtp_port', message: 'A port is a number from 1 to 65535, usually 587 or 465' },
+  account_mail_security_check: { field: 'smtp_security', message: 'Choose STARTTLS or SSL/TLS' },
+  account_mail_business_address_check: { field: 'from_address', message: 'Use an address at your own domain. Personal addresses such as Gmail, iCloud or Outlook.com cannot send from the app' },
+  account_mail_service_check: { field: 'smtp_host', message: 'That is a mailbox server (Google Workspace, Microsoft 365 and the like), which cannot send in bulk. Use a sending service such as Amazon SES' },
 };
 
 const fieldFor = (field, resource) =>

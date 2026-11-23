@@ -2,7 +2,7 @@ import {
   List, TextField, DateField, NumberField, ReferenceField, Edit,
   Create, SimpleForm, TextInput, NumberInput, SelectInput,
   ReferenceInput, ReferenceArrayInput,
-  AutocompleteArrayInput,
+  AutocompleteArrayInput, useRecordContext,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { Box } from '@mui/material';
@@ -10,6 +10,7 @@ import { EditToolbar } from './formToolbar';
 import { FileLink } from './FileLink';
 import { DocumentDatesInput } from './DocumentDatesInput';
 import { RegistrationInputs } from './documentsTab';
+import { EmailDocumentButton, SentMail } from './sendMail';
 import { CatalogDatagrid, SharedListPicker, searchFilter, SlugEdit } from './shared';
 
 const filters = [searchFilter];
@@ -40,6 +41,22 @@ const DocumentList = () => (
   </List>
 );
 
+// Sends this document by email, suggesting the people on what it is
+// attached to; what was sent is listed at the foot of the page.
+const DocumentEmail = () => {
+  const record = useRecordContext();
+  if (!record?.id) return null;
+  return (
+    <EmailDocumentButton recordType="document" recordId={record.id} recordTitle={record.title}
+                         documents={[record]} documentId={record.id} sx={{}} />
+  );
+};
+
+const DocumentSentMail = () => {
+  const record = useRecordContext();
+  return record?.id ? <SentMail recordType="document" recordId={record.id} /> : null;
+};
+
 const DocumentForm = () => (
   <SimpleForm toolbar={<EditToolbar />}>
     <TextInput source="title" required fullWidth />
@@ -56,6 +73,7 @@ const DocumentForm = () => (
                  helperText="URL, path, or object key depending on storage type"
                  sx={{ width: { xs: '100%', md: 600 } }} />
       <FileLink sx={{}} />
+      <DocumentEmail />
     </Box>
     <TextInput source="file_name" label="File name"
                helperText="The name the file had when it was uploaded"
@@ -91,6 +109,7 @@ const DocumentForm = () => (
     <TextInput source="mime_type" label="MIME type" helperText="The file's type, filled in on upload" />
     <NumberInput source="byte_size" label="Size (bytes)" helperText="Filled in on upload" />
     <RichTextInput source="notes" />
+    <DocumentSentMail />
   </SimpleForm>
 );
 

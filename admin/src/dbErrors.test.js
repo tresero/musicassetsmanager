@@ -28,11 +28,16 @@ describe('explainDbError', () => {
     expect(explainDbError('contact', refused(msg)).body.errors).toEqual({ isni: M.isniShape });
   });
 
-  test('mail settings mark the field that is wrong', () => {
-    expect(explainDbError('user_mail', refused('new row for relation "user_mail" violates check constraint "user_mail_port_check"')).body.errors)
+  test('the sending service settings mark the field that is wrong', () => {
+    const r = (name) => refused(`new row for relation "account_mail" violates check constraint "${name}"`);
+    expect(explainDbError('account_mail', r('account_mail_port_check')).body.errors)
       .toEqual({ smtp_port: 'A port is a number from 1 to 65535, usually 587 or 465' });
-    expect(explainDbError('user_mail', refused('value for domain music.email_address violates check constraint "email_format"')).body.errors)
+    expect(explainDbError('account_mail', refused('value for domain music.email_address violates check constraint "email_format"')).body.errors)
       .toEqual({ from_address: 'This is not an email address' });
+    expect(explainDbError('account_mail', r('account_mail_business_address_check')).body.errors)
+      .toEqual({ from_address: 'Use an address at your own domain. Personal addresses such as Gmail, iCloud or Outlook.com cannot send from the app' });
+    expect(explainDbError('account_mail', r('account_mail_service_check')).body.errors)
+      .toEqual({ smtp_host: 'That is a mailbox server (Google Workspace, Microsoft 365 and the like), which cannot send in bulk. Use a sending service such as Amazon SES' });
   });
 
   test('a constraint with no field gets the plain message only', () => {

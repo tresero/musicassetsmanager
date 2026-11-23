@@ -1,13 +1,16 @@
 package main
 
-// Email sent from the app as the signed-in user, through their own mail
-// provider (#70). Nothing a user sends goes through the site's mail server:
-// that is only for invites (invite.go).
+// Email sent from the app, through the account's sending service: Amazon
+// SES or one like it, over SMTP (#70). It comes from the account's address,
+// with the user who sent it as Reply-To. Mailbox providers, which cannot send
+// in bulk, are refused by the database, and with no service set up nothing is
+// sent. Nothing goes through the site's own mail server: that is only for
+// invites (invite.go).
 //
-//   POST /upload/mail/test   send the user a test email from their settings
+//   POST /upload/mail/test   send the signed-in user a test email
 //   POST /upload/mail/send   send an email, with documents attached
 //
-// The settings, password included, are in music.user_mail; every send, or
+// The settings, password included, are in music.account_mail; every send, or
 // failed attempt, is logged in music.mail_sent.
 
 import (
@@ -30,6 +33,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +55,16 @@ type mailSettings struct {
 }
 
 type attachment struct {
+	ID         int64
 	Name, Type string
 	Data       []byte
+}
+
+// recordTypes are what an email can be sent from, as music.mail_sent's
+// record_type check allows.
+var recordTypes = map[string]bool{
+	"song": true, "recording": true, "release": true,
+	"contact": true, "organization": true, "document": true,
 }
 
 // noBreaks keeps a header value on one line, so nothing typed can add a
@@ -74,12 +86,16 @@ func crlf(s string) string {
 }
 
 // buildMessage writes the email: plain text, with any attachments as a
-// multipart/mixed message.
-func buildMessage(from *mail.Address, to, cc []*mail.Address, subject, text string, atts []attachment, id string) []byte {
+// multipart/mixed message. Replies go to replyTo, the user who sent it,
+// when given.
+func buildMessage(from, replyTo *mail.Address, to, cc []*mail.Address, subject, text string, atts []attachment, id string) []byte {
 	var b bytes.Buffer
 	domain := from.Address[strings.LastIndex(from.Address, "@")+1:]
 	h := func(k, v string) { fmt.Fprintf(&b, "%s: %s\r\n", k, v) }
 	h("From", from.String())
+	if replyTo != nil {
+		h("Reply-To", replyTo.String())
+	}
 	h("To", addressList(to))
 	if len(cc) > 0 {
 		h("Cc", addressList(cc))
@@ -208,18 +224,20 @@ func smtpSend(ctx context.Context, st mailSettings, from string, rcpt []string, 
 	return c.Quit()
 }
 
-func (s *server) mailSettings(ctx context.Context, user string) (*mailSettings, error) {
+// mailSettings is the account's sending service. Email is sent only
+// through one; without it, nothing is sent.
+func (s *server) mailSettings(ctx context.Context, account string) (*mailSettings, error) {
 	var st mailSettings
 	var name, pass sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 		SELECT from_name, from_address, smtp_host, smtp_port, smtp_security, smtp_username, smtp_password
-		  FROM music.user_mail WHERE user_id::text = $1`, user).
+		  FROM music.account_mail WHERE account_id::text = $1`, account).
 		Scan(&name, &st.FromAddress, &st.Host, &st.Port, &st.Security, &st.Username, &pass)
 	if err != nil {
-		return nil, errors.New("set up your email under My settings first")
+		return nil, errors.New("email is not set up for this account: a sending service is set up under Settings, Email sending")
 	}
 	if !pass.Valid || pass.String == "" {
-		return nil, errors.New("save your mail password under My settings first")
+		return nil, errors.New("the sending service has no password saved yet, under Settings, Email sending")
 	}
 	st.FromName, st.Password = name.String, pass.String
 	return &st, nil
@@ -269,17 +287,25 @@ func (s *server) mailHandle(w http.ResponseWriter, r *http.Request, test bool) {
 		return
 	}
 	ctx := r.Context()
-	st, err := s.mailSettings(ctx, user)
+	st, err := s.mailSettings(ctx, account)
 	if err != nil {
 		mailError(w, err)
 		return
 	}
 	from := &mail.Address{Name: st.FromName, Address: st.FromAddress}
+	var userEmail string
+	if err := s.db.QueryRowContext(ctx, `SELECT email FROM music.user_account WHERE id::text = $1`, user).
+		Scan(&userEmail); err != nil {
+		mailError(w, errors.New("could not find your sign-in"))
+		return
+	}
+	replyTo := &mail.Address{Address: userEmail}
 
 	var req sendReq
 	if test {
-		req = sendReq{To: []string{st.FromAddress}, Subject: "Test email from Music Assets Manager", RecordType: "test",
-			Text: "This is a test from Music Assets Manager. Email you send from the app goes out from this address, through your own mail provider."}
+		req = sendReq{To: []string{userEmail}, Subject: "Test email from Music Assets Manager", RecordType: "test",
+			Text: "This is a test from Music Assets Manager, through your account's sending service. Email sent from the app comes from " +
+				st.FromAddress + ", and replies go to whoever sent it."}
 	} else if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -298,6 +324,9 @@ func (s *server) mailHandle(w http.ResponseWriter, r *http.Request, test bool) {
 	if err == nil && strings.TrimSpace(req.Subject) == "" {
 		err = errors.New("add a subject")
 	}
+	if err == nil && !test && req.RecordType != "" && !recordTypes[req.RecordType] {
+		err = errors.New("unknown kind of record")
+	}
 	if err != nil {
 		mailError(w, err)
 		return
@@ -309,16 +338,17 @@ func (s *server) mailHandle(w http.ResponseWriter, r *http.Request, test bool) {
 		return
 	}
 
-	rcpt := []string{}
+	rcpt, bare := []string{}, []string{}
 	for _, a := range append(append([]*mail.Address{}, to...), cc...) {
 		rcpt = append(rcpt, a.Address)
+		bare = append(bare, strings.ToLower(a.Address))
 	}
-	msg := buildMessage(from, to, cc, req.Subject, req.Text, atts, randHex(16))
+	msg := buildMessage(from, replyTo, to, cc, req.Subject, req.Text, atts, randHex(16))
 	sendErr := smtpSend(ctx, *st, st.FromAddress, rcpt, msg)
 
 	listed := []map[string]any{}
 	for _, a := range atts {
-		listed = append(listed, map[string]any{"name": a.Name, "bytes": len(a.Data)})
+		listed = append(listed, map[string]any{"id": a.ID, "name": a.Name, "bytes": len(a.Data)})
 	}
 	attJSON, _ := json.Marshal(listed)
 	var errText any
@@ -334,17 +364,17 @@ func (s *server) mailHandle(w http.ResponseWriter, r *http.Request, test bool) {
 	}
 	toList, ccList := []string{}, []string{}
 	for _, a := range to {
-		toList = append(toList, a.String())
+		toList = append(toList, plainAddress(a))
 	}
 	for _, a := range cc {
-		ccList = append(ccList, a.String())
+		ccList = append(ccList, plainAddress(a))
 	}
 	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO music.mail_sent (account_id, user_id, from_address, to_addresses, cc_addresses, subject,
-		                             record_type, record_id, attachments, error)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		account, user, from.String(), pq.Array(toList), pq.Array(ccList), noBreaks(req.Subject),
-		recType, recID, string(attJSON), errText); err != nil {
+		INSERT INTO music.mail_sent (account_id, user_id, from_address, to_addresses, cc_addresses, recipients,
+		                             subject, record_type, record_id, attachments, error)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		account, user, plainAddress(from), pq.Array(toList), pq.Array(ccList), pq.Array(bare),
+		noBreaks(req.Subject), recType, recID, string(attJSON), errText); err != nil {
 		log.Printf("mail log: %v", err)
 	}
 	if sendErr != nil {
@@ -371,23 +401,26 @@ func (s *server) documentAttachments(ctx context.Context, account string, ids []
 		return nil, nil
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT storage_kind, storage_uri, coalesce(file_name, title), coalesce(mime_type, '')
+		SELECT id, storage_kind, storage_uri, coalesce(file_name, title), coalesce(mime_type, '')
 		  FROM music.document WHERE account_id = $1 AND id = ANY($2) ORDER BY id`, account, pq.Array(ids))
 	if err != nil {
 		return nil, err
 	}
-	type doc struct{ kind, key, name, ctype string }
+	type doc struct {
+		id                     int64
+		kind, key, name, ctype string
+	}
 	var docs []doc
 	for rows.Next() {
 		var d doc
-		if err := rows.Scan(&d.kind, &d.key, &d.name, &d.ctype); err != nil {
+		if err := rows.Scan(&d.id, &d.kind, &d.key, &d.name, &d.ctype); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		docs = append(docs, d)
 	}
 	rows.Close()
-	if len(docs) != len(ids) {
+	if len(docs) != len(unique(ids)) {
 		return nil, errors.New("a document to attach was not found")
 	}
 	st, err := s.storage(ctx, account)
@@ -436,7 +469,38 @@ func (s *server) documentAttachments(ctx context.Context, account string, ids []
 		if total > maxAttachmentSize {
 			return nil, errors.New("the attachments come to more than 20 MB, which most mail providers refuse")
 		}
-		out = append(out, attachment{Name: d.name, Type: d.ctype, Data: data})
+		out = append(out, attachment{ID: d.id, Name: attachmentName(d.name, d.key), Type: d.ctype, Data: data})
 	}
 	return out, nil
+}
+
+// attachmentName gives a document titled without an extension the stored
+// file's, so the recipient's mail program knows how to open it.
+func attachmentName(name, key string) string {
+	if path.Ext(name) != "" {
+		return name
+	}
+	return name + strings.ToLower(path.Ext(key))
+}
+
+func unique(ids []int64) []int64 {
+	seen := map[int64]bool{}
+	out := []int64{}
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// plainAddress is an address as the log shows it: the name as typed, not
+// encoded for a mail header.
+func plainAddress(a *mail.Address) string {
+	name := strings.TrimSpace(noBreaks(a.Name))
+	if name == "" {
+		return a.Address
+	}
+	return name + " <" + a.Address + ">"
 }
