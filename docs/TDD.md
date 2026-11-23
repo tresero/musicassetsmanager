@@ -289,6 +289,15 @@ admin's.
 
 ## Frontend widgets
 
+- `RowIterator` and `BlockIterator`: records are numbered 1., 2., ...; the card
+  holding the focused field is outlined; a row wider than the form wraps
+  (#72). axe finds no contrast failure on a form with rows.
+- **No sideways scroll:** at 1280, 900, 600 and 360 px, every list and every
+  tab of a song, recording, release, person, company, artist, document,
+  statement and transaction is no wider than the window
+  (`document.documentElement.scrollWidth`). Checked by hand with Playwright
+  on 2026-11-22 except statements and transactions.
+
 - `partyInputs.jsx`: a row needing a person or company cannot be saved without
   one.
 - Required row fields: a writer without a role or a credit without a person or

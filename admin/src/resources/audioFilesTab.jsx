@@ -1,5 +1,5 @@
 import {
-  ArrayInput, SimpleFormIterator, TextInput, ReferenceInput,
+  ArrayInput, TextInput, ReferenceInput,
 } from 'react-admin';
 import { useSourceContext } from 'ra-core';
 import { useWatch } from 'react-hook-form';
@@ -8,7 +8,7 @@ import { AudioUploadInput } from './AudioUploadInput';
 import { FileLink } from './FileLink';
 import { AudioFilePlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
-import { SharedListPicker } from './shared';
+import { SharedListPicker, BlockIterator } from './shared';
 
 const row = {
   display: 'flex',
@@ -16,22 +16,6 @@ const row = {
   alignItems: 'center',
   gap: 2,
   width: '100%',
-};
-
-const blockSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: '1px solid',
-    borderColor: 'divider',
-    paddingTop: 2,
-    paddingBottom: 2,
-  },
-  '& .RaSimpleFormIterator-form': {
-    gap: 1.5,
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
 };
 
 const DETAILS = ['format', 'is_lossless', 'sample_rate', 'bit_depth',
@@ -65,7 +49,7 @@ const AudioDetails = () => {
 export const AudioFilesInput = () => (
   <ArrayInput source="audio_files" label={false}
               helperText="Drop a file on a row; its name, format, sample rate, bit depth, bit rate, channels, and length are read from it. Stems can be dropped one at a time or as a zip. The type decides what the pitch comment offers: any Stem adds Stems Available, and any type other than Full Mix or Stem adds Alts Available.">
-    <SimpleFormIterator sx={blockSx} disableReordering
+    <BlockIterator disableReordering
                         removeButton={<RemoveAndPlay player={<AudioFilePlayer />} />}>
 
       <Box sx={row}>
@@ -92,6 +76,6 @@ export const AudioFilesInput = () => (
       <AudioDetails />
 
       <TextInput source="notes" label="Note" helperText={false} fullWidth />
-    </SimpleFormIterator>
+    </BlockIterator>
   </ArrayInput>
 );

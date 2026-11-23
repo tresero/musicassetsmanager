@@ -1,7 +1,7 @@
 import {
   List, DataTable, TextField, BooleanField, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, BooleanInput,
-  SelectInput, ArrayInput, SimpleFormIterator, ReferenceInput,
+  SelectInput, ArrayInput, ReferenceInput,
   AutocompleteInput, ReferenceArrayInput, AutocompleteArrayInput,
   NullableBooleanInput, useRecordContext, required, useGetOne,
 } from 'react-admin';
@@ -17,7 +17,7 @@ import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
-  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter,
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, RowIterator,
 } from './shared';
 import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
@@ -66,21 +66,6 @@ const artistRoles = [
 
 // Shared by every array on this form: no divider between rows, and
 // fields centered so a Select does not sit below an Autocomplete.
-const iteratorSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: 'none',
-    paddingTop: 1,
-    paddingBottom: 1,
-  },
-  '& .RaSimpleFormIterator-form': {
-    alignItems: 'center',
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
-
 const hiddenColumns = [
   'song_titles', 'bpm', 'tempo', 'key_signature', 'language_name',
   'is_instrumental', 'is_cover', 'multitracks_available', 'parental_warning',
@@ -136,7 +121,7 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Songs">
       <ArrayInput source="songs" label={false}
                   helperText="More than one for a medley or mashup">
-        <SimpleFormIterator inline sx={iteratorSx}>
+        <RowIterator>
           <ReferenceInput source="song_id" reference="song" perPage={500}
                           sort={{ field: 'title', order: 'ASC' }}>
             <AutocompleteInput optionText="title" label="Composition"
@@ -144,7 +129,7 @@ const RecordingForm = () => (
                                validate={required()}
                                sx={{ width: { xs: '100%', md: 380 } }} />
           </ReferenceInput>
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 
@@ -200,7 +185,7 @@ const RecordingForm = () => (
     <TabbedForm.Tab label="Artists">
       <ArrayInput source="artists" label={false}
                   helperText="Who the record is by. Two main artists read as a duet.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+        <RowIterator>
           <ArtistInput validate={required()} />
           <SelectInput source="role" label="Billing" choices={artistRoles}
                        defaultValue="main" helperText={false}
@@ -208,14 +193,14 @@ const RecordingForm = () => (
           <NumberInput source="sequence" label="Order" defaultValue={1}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 100 } }} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Credits">
       <ArrayInput source="credits" label={false}
-                  helperText="One row per person, with all their roles and instruments. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+                  helperText="One row per person, with all their roles and instruments. Leave Performed in blank when they played in the country of recording. Featured % is each band member's cut of the featured-artist royalty on this recording, as registered with SoundExchange; leave it blank for hired players. Points % is a share of master income agreed in lieu of pay.">
+        <RowIterator>
           <PersonOrCompanyInput w={240} required />
           <TextInput source="credited_as" label="Credited as (this recording)"
                      helperText={false}
@@ -242,7 +227,7 @@ const RecordingForm = () => (
           <PerformedCountryInput />
           <TextInput source="notes" label="Note" helperText={false}
                      sx={{ width: { xs: '100%', md: 220 } }} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
       <FeaturedTotal />
     </TabbedForm.Tab>
@@ -284,13 +269,13 @@ const RecordingForm = () => (
 
       <ArrayInput source="owners" label="Master owners"
                   helperText="Who owns the master, and in what share. Controlled means you can license that share, by owning it or by agreement. The printed P line is built from these.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+        <RowIterator>
           <PersonOrCompanyInput required />
           <NumberInput source="share" label="Share %" step={0.0001}
                        helperText={false}
                        sx={{ width: { xs: '100%', md: 110 } }} />
           <BooleanInput source="controlled" label="Controlled" helperText={false} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
 
       <TextField source="p_line" label="P line" emptyText="Add an owner to build the P line" />
@@ -315,14 +300,13 @@ const RecordingForm = () => (
 );
 
 // Where a credited performer played. Blank means the country of recording,
-// named in the help text so the default is visible on every row.
+// shown in the empty field so the default is visible on every row.
 const PerformedCountryInput = () => {
   const recorded = useWatch({ name: 'recorded_country' });
   const { data } = useGetOne('country', { id: recorded }, { enabled: !!recorded });
   return (
-    <CountryInput source="performed_country" label="Performed in"
-                  helperText={data ? `Blank: ${data.name}, the country of recording`
-                                   : 'Blank: the country of recording'}
+    <CountryInput source="performed_country" label="Performed in" helperText={false}
+                  placeholder={data ? `${data.name} (recorded there)` : 'Country of recording'}
                   sx={{ width: { xs: '100%', md: 220 } }} />
   );
 };

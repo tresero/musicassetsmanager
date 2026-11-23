@@ -4,6 +4,7 @@ import {
   required, AutocompleteInput, AutocompleteArrayInput, SearchInput,
   ReferenceInput, useChoicesContext, ChoicesContextProvider, DateInput,
   useRecordContext,
+  SimpleFormIterator,
 } from 'react-admin';
 import { Alert, Button, Stack, TextField as MuiTextField } from '@mui/material';
 import { useFormContext, useWatch } from 'react-hook-form';
@@ -101,14 +102,19 @@ export const PinFirst = ({ pin, by = 'id', children }) => {
 
 // A country picker with the user's default country (My settings) first. With
 // prefill, a new record starts on it; a saved record left blank stays blank.
-export const CountryInput = ({ source, label = 'Country', helperText, prefill = false, sx }) => {
+// placeholder shows what a blank field means, such as an inherited country;
+// the label stays raised so it is visible.
+export const CountryInput = ({ source, label = 'Country', helperText, prefill = false, placeholder, sx }) => {
   const country = useDefaultCountry();
+  const textField = placeholder
+    ? { placeholder, slotProps: { inputLabel: { shrink: true } } } : undefined;
   return (
     <ReferenceInput source={source} reference="country" perPage={500}
                     sort={{ field: 'name', order: 'ASC' }}>
       <PinFirst pin={[country]}>
         <AutocompleteInput optionText="name" label={label} helperText={helperText}
-                           defaultValue={prefill ? country : undefined} sx={sx} />
+                           defaultValue={prefill ? country : undefined}
+                           TextFieldProps={textField} sx={sx} />
       </PinFirst>
     </ReferenceInput>
   );
@@ -242,3 +248,80 @@ export const CopyrightInputs = ({ numberHelp }) => {
     </Stack>
   );
 };
+
+// Child rows edited in a form: writers, credits, owners, emails and the
+// like, one record per row. Each record is a card, so a row whose fields wrap
+// onto a second line still reads as one record:
+// - its border is grey 600 (#757575), 4.6:1 on white, above the 3:1 WCAG 2.2
+//   asks of a boundary you need to see (1.4.11); MUI's divider is about 1.3:1;
+// - the card holding the focused field gets a primary outline, so a keyboard
+//   user sees which record they are in (2.4.7, 2.4.13);
+// - records are numbered in text, so the order is not shown by layout alone
+//   and a screen reader announces it with the list item (1.3.1).
+// RowIterator keeps a record's fields on one line, wrapping at the form's
+// edge; BlockIterator is for records with more fields than fit a line, such
+// as audio files, deals and distributions. Both take SimpleFormIterator's
+// props.
+const cardSx = (padding) => ({
+  '& .RaSimpleFormIterator-list': {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+  },
+  '& .RaSimpleFormIterator-line': {
+    border: '1px solid',
+    borderColor: 'grey.600',
+    borderRadius: 1,
+    bgcolor: 'background.paper',
+    paddingTop: padding,
+    paddingBottom: padding,
+    paddingLeft: 1.5,
+    paddingRight: 1,
+  },
+  '& .RaSimpleFormIterator-line:focus-within': {
+    outline: '2px solid',
+    outlineColor: 'primary.main',
+    outlineOffset: 1,
+  },
+  '& .RaSimpleFormIterator-index': {
+    fontWeight: 'bold',
+    minWidth: '2em',
+    alignSelf: 'center',
+  },
+  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+});
+
+const rowsSx = {
+  ...cardSx(1),
+  // The fields sit in a Stack (direction row) with no wrap of its own; flex 1
+  // makes it as wide as the form, so it wraps at the form's edge.
+  '& .RaSimpleFormIterator-form': {
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    flex: 1,
+    minWidth: 0,
+  },
+};
+
+const blockSx = {
+  ...cardSx(2),
+  '& .RaSimpleFormIterator-form': {
+    gap: 1.5,
+    flex: 1,
+    minWidth: 0,
+  },
+};
+
+const withSx = (base, sx) => [base, ...(Array.isArray(sx) ? sx : [sx])].filter(Boolean);
+const number = (index) => `${index + 1}.`;
+
+export const RowIterator = ({ sx, ...props }) => (
+  <SimpleFormIterator inline getItemLabel={number} sx={withSx(rowsSx, sx)} {...props} />
+);
+
+export const BlockIterator = ({ sx, ...props }) => (
+  <SimpleFormIterator getItemLabel={number} sx={withSx(blockSx, sx)} {...props} />
+);

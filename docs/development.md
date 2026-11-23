@@ -101,6 +101,16 @@ them.
 Non-`id` primary keys need an entry in the `primaryKeys` map in
 `dataProvider.js`.
 
+Child rows are edited with `RowIterator` or `BlockIterator` from
+`resources/shared`, so every row editor wraps and spaces the same way.
+
+The theme in `App.jsx` keeps pages to the window's width: react-admin's
+layout otherwise grows to fit its widest piece (`minWidth: fit-content`), so
+one wide tab bar or table makes the whole page scroll sideways. It also makes
+form tabs scrollable, gives tables their own horizontal scroll, and lets
+toolbars wrap. A new wide piece needs its own scroll or wrap, not a fixed
+width.
+
 Deploy is `npm run build` then a hard reload. There's no server process.
 
 Every create and update trims its text first (`src/trim.js`), so write
@@ -156,3 +166,5 @@ triggers.
 |---|---|
 | 2026-11-22 | Tests section; refused saves mark their field (`dbErrors.js`); code inputs |
 | 2026-11-22 | Saves trim text (`trim.js`) |
+| 2026-11-22 | `RowIterator` and `BlockIterator` for child rows |
+| 2026-11-22 | Pages fit the window: theme overrides in `App.jsx` |

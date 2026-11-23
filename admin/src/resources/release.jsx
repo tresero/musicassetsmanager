@@ -1,7 +1,7 @@
 import {
   List, DataTable, DateField, Edit, Create,
   TabbedForm, TextInput, NumberInput, DateInput, SelectInput, ArrayInput,
-  SimpleFormIterator, ReferenceInput, AutocompleteInput, useRecordContext,
+  ReferenceInput, AutocompleteInput, useRecordContext,
   useSimpleFormIteratorItem, useGetOne, minValue, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
@@ -13,7 +13,7 @@ import { DocumentsInput } from './documentsTab';
 import { UpcInput } from './codeInputs';
 import { RecordingInputPlayer, RemoveAndPlay } from './AudioPlayer';
 import { formatDuration } from './DurationInput';
-import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter } from './shared';
+import { CatalogDataTable, SharedListPicker, CopyrightInputs, registrationText, searchFilter, RowIterator, BlockIterator } from './shared';
 import { ListActions } from './listActions';
 
 const filters = [searchFilter];
@@ -31,20 +31,6 @@ const artistRoles = [
 
 const recordingLabel = (r) =>
   r ? (r.version_label && r.version_label !== 'Release' ? `${r.title} (${r.version_label})` : r.title) : '';
-
-const iteratorSx = {
-  '& .RaSimpleFormIterator-line': { borderBottom: 'none', paddingTop: 1, paddingBottom: 1 },
-  '& .RaSimpleFormIterator-form': { alignItems: 'center' },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': { marginTop: 0, marginBottom: 0 },
-};
-
-const blockSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: '1px solid', borderColor: 'divider', paddingTop: 2, paddingBottom: 2,
-  },
-  '& .RaSimpleFormIterator-form': { gap: 1.5 },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': { marginTop: 0, marginBottom: 0 },
-};
 
 // Rows whose fields carry help text align to the top, so uneven help text
 // lengths don't push the fields out of line.
@@ -164,21 +150,21 @@ const ReleaseForm = () => (
     <TabbedForm.Tab label="Artists">
       <ArrayInput source="artists" label={false}
                   helperText="Who the release is by, like Sin Camisas. Billing is Main for the act and Featured for a guest, shown as feat. Two main artists read as a duet; Order sets which is named first.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+        <RowIterator>
           <ArtistInput validate={required()} />
           <SelectInput source="role" label="Billing" choices={artistRoles}
                        defaultValue="main" helperText={false}
                        sx={{ width: { xs: '100%', md: 160 } }} />
           <NumberInput source="sequence" label="Order" defaultValue={1} helperText={false}
                        sx={{ width: { xs: '100%', md: 100 } }} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Tracks">
       <ArrayInput source="tracks" label={false}
                   helperText="Each recording in playing order; use the arrows to reorder. Track numbers follow the order, counting from 1 on each disc, so two tracks can never share one. Disc stays 1 unless it's a multi-disc release. Time is the recording's length, set on the recording; None means it has none yet. Play uses the recording's Full Mix.">
-        <SimpleFormIterator inline sx={iteratorSx}
+        <RowIterator
                             removeButton={<RemoveAndPlay player={<RecordingInputPlayer />} />}>
           <TrackNumber />
           <ReferenceInput source="recording_id" reference="recording" perPage={500}
@@ -192,14 +178,14 @@ const ReleaseForm = () => (
           <NumberInput source="disc_number" label="Disc" defaultValue={1} min={1} step={1}
                        validate={minValue(1, 'Discs are numbered from 1')} helperText={false}
                        sx={{ width: { xs: '100%', md: 90 } }} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Distribution">
       <ArrayInput source="distributions" label={false}
                   helperText="Each distributor that has carried this release, kept as history when it moves. Status at the top of Details follows from these dates.">
-        <SimpleFormIterator sx={blockSx} disableReordering>
+        <BlockIterator disableReordering>
           <Box sx={row}>
             <CompanyInput source="distributor_id" label="Distributor" w={280} validate={required()}
                           helperText="Who delivered it to stores, like Priam Digital or CD Baby" />
@@ -223,7 +209,7 @@ const ReleaseForm = () => (
           </Box>
           <TextInput source="notes" label="Note" fullWidth
                      helperText="Anything about this distribution, such as why it was moved" />
-        </SimpleFormIterator>
+        </BlockIterator>
       </ArrayInput>
     </TabbedForm.Tab>
 

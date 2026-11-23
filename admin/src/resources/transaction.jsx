@@ -2,7 +2,7 @@ import {
   List, Datagrid, TextField, DateField, FunctionField, NumberField,
   Edit, Create, TabbedForm, SimpleForm, Toolbar, SaveButton, DeleteButton,
   TextInput, DateInput, NumberInput, BooleanInput, SelectInput, RadioButtonGroupInput,
-  ReferenceInput, AutocompleteInput, ArrayInput, SimpleFormIterator, FormDataConsumer,
+  ReferenceInput, AutocompleteInput, ArrayInput, FormDataConsumer,
   SearchInput, TopToolbar, CreateButton, ExportButton,
   required, minValue, useRecordContext,
 } from 'react-admin';
@@ -10,7 +10,7 @@ import { useWatch } from 'react-hook-form';
 import { Stack, Typography } from '@mui/material';
 import { PersonOrCompanyInput } from './partyInputs';
 import { QuickCreateName } from './quickCreate';
-import { CurrencyInput } from './shared';
+import { CurrencyInput, RowIterator } from './shared';
 import { DocumentsInput } from './documentsTab';
 import { useCan, useAccountCurrency } from '../permissions';
 
@@ -158,7 +158,7 @@ const ShareText = ({ split }) =>
 const SplitsTab = () => (
   <ArrayInput source="splits" label={false}
               helperText="Leave empty for overhead: costs or income for the catalog as a whole. Each row's share is its weight over the total; shares show after saving.">
-    <SimpleFormIterator inline disableReordering>
+    <RowIterator disableReordering>
       <SelectInput source="target" label="For a" choices={splitTargets} defaultValue="song"
                    validate={required()} helperText={false} />
       <FormDataConsumer>
@@ -179,7 +179,7 @@ const SplitsTab = () => (
       <FormDataConsumer>
         {({ scopedFormData }) => <ShareText split={scopedFormData} />}
       </FormDataConsumer>
-    </SimpleFormIterator>
+    </RowIterator>
   </ArrayInput>
 );
 

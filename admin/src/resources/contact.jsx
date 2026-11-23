@@ -1,7 +1,7 @@
 import {
   List, TextField, BooleanField, ReferenceField, Edit, Create,
   TabbedForm, TextInput, NumberInput, BooleanInput, ArrayInput,
-  SimpleFormIterator, ReferenceInput, AutocompleteInput, required,
+  ReferenceInput, AutocompleteInput, required,
 } from 'react-admin';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
@@ -9,28 +9,13 @@ import { CompanyInput } from './partyInputs';
 import { DocumentsInput } from './documentsTab';
 import { byCode, proOptionText, proInputText } from './vocab';
 import { IsniInput, IpiInput } from './codeInputs';
-import { CatalogDatagrid, searchFilter } from './shared';
+import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
 import { useDefaultCallingCode } from '../permissions';
 
 const filters = [searchFilter];
 
 // No divider between rows, and fields centered so a Select does not sit
 // below an Autocomplete.
-const iteratorSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: 'none',
-    paddingTop: 1,
-    paddingBottom: 1,
-  },
-  '& .RaSimpleFormIterator-form': {
-    alignItems: 'center',
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
-
 const ContactList = () => (
   <List filters={filters} sort={{ field: 'sort_name', order: 'ASC' }} perPage={50}>
     <CatalogDatagrid rowClick="edit">
@@ -73,20 +58,20 @@ const ContactForm = () => {
 
       <TabbedForm.Tab label="Email">
         <ArrayInput source="emails" label={false}>
-          <SimpleFormIterator inline sx={iteratorSx}>
+          <RowIterator>
             <TextInput source="email" type="email" label="Address" helperText={false}
                        validate={required()}
                        sx={{ width: { xs: '100%', md: 320 } }} />
             <BooleanInput source="is_primary" label="Primary" helperText={false} />
             <TextInput source="note" label="Note" helperText={false}
                        sx={{ width: { xs: '100%', md: 240 } }} />
-          </SimpleFormIterator>
+          </RowIterator>
         </ArrayInput>
       </TabbedForm.Tab>
 
       <TabbedForm.Tab label="Phone">
         <ArrayInput source="phones" label={false}>
-          <SimpleFormIterator inline sx={iteratorSx}>
+          <RowIterator>
             <NumberInput source="country_code" label="CC" defaultValue={callingCode}
                          helperText={false}
                          sx={{ width: { xs: '100%', md: 90 } }} />
@@ -98,18 +83,18 @@ const ContactForm = () => {
             <BooleanInput source="is_primary" label="Primary" helperText={false} />
             <TextInput source="note" label="Note" helperText={false}
                        sx={{ width: { xs: '100%', md: 240 } }} />
-          </SimpleFormIterator>
+          </RowIterator>
         </ArrayInput>
       </TabbedForm.Tab>
 
       <TabbedForm.Tab label="Companies">
         <ArrayInput source="organizations" label={false}>
-          <SimpleFormIterator inline sx={iteratorSx}>
+          <RowIterator>
             <CompanyInput w={280} validate={required()} />
             <TextInput source="title" label="Title" helperText={false}
                        sx={{ width: { xs: '100%', md: 220 } }} />
             <BooleanInput source="is_primary" label="Primary" helperText={false} />
-          </SimpleFormIterator>
+          </RowIterator>
         </ArrayInput>
       </TabbedForm.Tab>
 

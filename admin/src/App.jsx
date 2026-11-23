@@ -56,6 +56,27 @@ const theme = {
     ...defaultTheme.components,
     MuiTextField:   { defaultProps: { size: 'small', variant: 'outlined' } },
     MuiFormControl: { defaultProps: { size: 'small' } },
+    // A form's tabs scroll within their bar on a narrow screen instead of
+    // widening the whole page (react-admin's layout grows to fit its widest
+    // content).
+    MuiTabs: { defaultProps: { variant: 'scrollable', scrollButtons: 'auto', allowScrollButtonsMobile: true } },
+    // React Admin's layout is at least as wide as its widest content
+    // (minWidth: fit-content), so one wide piece, such as a form's tab bar,
+    // widens the whole page and it scrolls sideways. Fit the window instead;
+    // wide pieces scroll within themselves.
+    RaLayout: {
+      styleOverrides: {
+        root: { minWidth: 0, '& .RaLayout-content': { minWidth: 0 } },
+      },
+    },
+    // A table wider than the window scrolls sideways within its own box, and
+    // the list around it stays the window's width.
+    RaList: { styleOverrides: { root: { '& .RaList-main': { minWidth: 0 } } } },
+    RaDataTable: { styleOverrides: { root: { overflowX: 'auto', maxWidth: '100%' } } },
+    RaDatagrid: { styleOverrides: { root: { overflowX: 'auto', maxWidth: '100%' } } },
+    // A toolbar's buttons (a list's Columns, filters, Create and Export) wrap
+    // onto another line rather than widening the page.
+    RaTopToolbar: { styleOverrides: { root: { flexWrap: 'wrap' } } },
     // React Admin hides each list row's remove button until hover.
     RaSimpleFormIterator: {
       styleOverrides: {

@@ -1,5 +1,5 @@
 import {
-  ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
+  ArrayInput, TextInput, NumberInput, BooleanInput,
   SelectInput, ReferenceInput, AutocompleteInput,
   required,
 } from 'react-admin';
@@ -7,22 +7,7 @@ import { useSourceContext } from 'ra-core';
 import { useFormContext } from 'react-hook-form';
 import { PersonInput } from '../../partyInputs';
 import { byCode, proOptionText, proInputText, useRoleId } from '../../vocab';
-import { PinFirst } from '../../shared';
-
-const iteratorSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: 'none',
-    paddingTop: 1,
-    paddingBottom: 1,
-  },
-  '& .RaSimpleFormIterator-form': {
-    alignItems: 'center',
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
+import { PinFirst, RowIterator } from '../../shared';
 
 /*
  * Picking a writer fills the row's PRO from the person's record. It stays
@@ -49,7 +34,7 @@ const WritersFields = () => {
   const composerLyricist = useRoleId('ComposerLyricist');
   return (
     <ArrayInput source="writers" label={false}>
-      <SimpleFormIterator inline sx={iteratorSx}>
+      <RowIterator>
         <WriterInput />
 
         <ReferenceInput source="role_id" reference="role" filter={writerRoleFilter}
@@ -78,7 +63,7 @@ const WritersFields = () => {
 
         <TextInput source="notes" label="Note" helperText={false}
                    sx={{ width: { xs: '100%', md: 220 } }} />
-      </SimpleFormIterator>
+      </RowIterator>
     </ArrayInput>
   );
 };

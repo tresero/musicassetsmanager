@@ -1,12 +1,12 @@
 import {
-  ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
+  ArrayInput, TextInput, NumberInput, BooleanInput,
   SelectInput, ReferenceInput,
   required,
 } from 'react-admin';
 import { PersonOrCompanyInput } from '../../partyInputs';
 import { ForWriterInput } from '../../ForWriterInput';
 import { PublisherProField } from '../../PublisherProField';
-import { PinFirst } from '../../shared';
+import { PinFirst, RowIterator } from '../../shared';
 import { useRoleId } from '../../vocab';
 
 // Publisher and Sub-Publisher head the role list, found by DDEX code so the
@@ -18,7 +18,7 @@ const PublishersFields = () => {
   return (
     <ArrayInput source="publishers" label={false}
                 helperText="A company, or a person who holds their own publishing.">
-      <SimpleFormIterator inline>
+      <RowIterator>
         <PersonOrCompanyInput companyFirst companyLabel="Publisher" personLabel="or Person"
                               required />
         <PublisherProField />
@@ -36,7 +36,7 @@ const PublishersFields = () => {
         <BooleanInput source="controlled" label="Controlled" helperText={false} />
         <TextInput source="notes" label="Note" helperText={false}
                    sx={{ width: 220 }} />
-      </SimpleFormIterator>
+      </RowIterator>
     </ArrayInput>
   );
 };

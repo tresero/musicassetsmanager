@@ -3,6 +3,7 @@ import {
   useRecordContext, useResourceContext, useNotify, useRedirect,
   useGetResourceLabel, useRefresh,
 } from 'react-admin';
+import { Box } from '@mui/material';
 import { useCan } from '../permissions';
 
 /*
@@ -55,11 +56,11 @@ export const EditToolbar = () => {
   };
 
   return (
-    <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', gap: 8 }}>
+    <Toolbar sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {canEdit && <SaveButton label="Save & continue" type="button" mutationOptions={stay} />}
         {canEdit && <SaveButton label="Save & close" type="button" mutationOptions={leave} />}
-      </div>
+      </Box>
       {saved && canDelete && (
         <DeleteButton
           mutationMode="pessimistic"

@@ -1,10 +1,11 @@
 import {
-  ArrayInput, SimpleFormIterator, TextInput, NumberInput, BooleanInput,
+  ArrayInput, TextInput, NumberInput, BooleanInput,
   DateInput, ReferenceInput, AutocompleteInput,
 } from 'react-admin';
 import { Box } from '@mui/material';
 import { QuickCreateName, QuickCreateContact } from './quickCreate';
 import { PersonOrCompanyInput } from './partyInputs';
+import { BlockIterator } from './shared';
 
 const row = {
   display: 'flex',
@@ -14,26 +15,10 @@ const row = {
   width: '100%',
 };
 
-const blockSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: '1px solid',
-    borderColor: 'divider',
-    paddingTop: 2,
-    paddingBottom: 2,
-  },
-  '& .RaSimpleFormIterator-form': {
-    gap: 1.5,
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
-
 export const RepresentationsInput = () => (
   <ArrayInput source="representations" label={false}
               helperText="Publishers and sync agents holding rights to license this master. Leave Ends blank for a deal with no end date.">
-    <SimpleFormIterator sx={blockSx} disableReordering>
+    <BlockIterator disableReordering>
 
       <Box sx={row}>
         <PersonOrCompanyInput companyFirst companyLabel="Agent or library" personLabel="or Person"
@@ -61,6 +46,6 @@ export const RepresentationsInput = () => (
       </Box>
 
       <TextInput source="notes" label="Note" helperText={false} fullWidth />
-    </SimpleFormIterator>
+    </BlockIterator>
   </ArrayInput>
 );

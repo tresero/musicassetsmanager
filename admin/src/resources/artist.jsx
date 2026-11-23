@@ -1,13 +1,13 @@
 import {
   List, TextField, NumberField, Edit, Create, TabbedForm,
-  TextInput, SelectInput, DateInput, ArrayInput, SimpleFormIterator, required,
+  TextInput, SelectInput, DateInput, ArrayInput, required,
 } from 'react-admin';
 import { useWatch } from 'react-hook-form';
 import { RichTextInput } from 'ra-input-rich-text';
 import { EditToolbar } from './formToolbar';
 import { PersonInput } from './partyInputs';
 import { IsniInput } from './codeInputs';
-import { CatalogDatagrid, searchFilter } from './shared';
+import { CatalogDatagrid, searchFilter, RowIterator } from './shared';
 
 const filters = [searchFilter];
 
@@ -15,21 +15,6 @@ const artistKinds = [
   { id: 'person', name: 'Person' },
   { id: 'group',  name: 'Group' },
 ];
-
-const iteratorSx = {
-  '& .RaSimpleFormIterator-line': {
-    borderBottom: 'none',
-    paddingTop: 1,
-    paddingBottom: 1,
-  },
-  '& .RaSimpleFormIterator-form': {
-    alignItems: 'center',
-  },
-  '& .RaSimpleFormIterator-form .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
 
 const ArtistList = () => (
   <List filters={filters} sort={{ field: 'sort_key', order: 'ASC' }} perPage={50}>
@@ -77,7 +62,7 @@ const ArtistForm = () => (
     <TabbedForm.Tab label="Members">
       <ArrayInput source="members" label={false}
                   helperText="The people behind this identity, and when they were in it. A solo act under their own name has one member. Hired players belong on recording credits, not here.">
-        <SimpleFormIterator inline sx={iteratorSx}>
+        <RowIterator>
           <PersonInput w={280} validate={required()} />
           <DateInput source="begin_date" label="Joined" helperText={false}
                      sx={{ width: { xs: '100%', md: 170 } }} />
@@ -85,7 +70,7 @@ const ArtistForm = () => (
                      sx={{ width: { xs: '100%', md: 170 } }} />
           <TextInput source="notes" label="Note" helperText={false}
                      sx={{ width: { xs: '100%', md: 240 } }} />
-        </SimpleFormIterator>
+        </RowIterator>
       </ArrayInput>
     </TabbedForm.Tab>
   </TabbedForm>

@@ -438,6 +438,13 @@ a document or a release, does not sort.
 - The Songs and Recordings lists can be filtered by one stop and easy clear, and
   recordings by whether they have a pitch contact.
 - Row remove buttons are always visible.
+- Rows of child records (writers, credits, owners, tracks, files and the like)
+  are numbered cards: a long row wraps instead of scrolling sideways, and the
+  card being edited is outlined, so it is clear by keyboard which record is
+  in focus (#72).
+- Pages fit the window down to phone width: forms stack their fields, a
+  form's tabs and a list's wide table scroll within themselves, and toolbars
+  wrap, so the page itself never scrolls sideways.
 
 ## Revision history
 
@@ -492,3 +499,5 @@ a document or a release, does not sort.
 | 2026-11-22 | ISWC, ISRC, UPC, ISNI and IPI fields drop separators and mark a wrong format or check digit in red; a refused save marks its field; search finds codes typed with separators (#18). |
 | 2026-11-22 | Every save trims text at both ends (#17). |
 | 2026-11-22 | Country of performance on each credit, defaulting to the country of recording (#42). |
+| 2026-11-22 | Child rows are numbered, outlined cards that wrap (#72). |
+| 2026-11-22 | Pages fit the window down to phone width. |
