@@ -158,8 +158,11 @@ explicitly.
 declarative non-overlapping validity periods. The obvious use is contract terms
 and licence windows, instead of writing triggers.
 
-`RETURNING OLD` and `RETURNING NEW` replace a lot of what used to need audit
-triggers.
+`RETURNING OLD` and `RETURNING NEW` give an update's before and after values
+to the statement that asks for them. They don't replace audit triggers: an
+edit in pgAdmin or a SQL fix asks for nothing, so the change log (#78) is
+written by row triggers.
+
 ## Revision History
 
 | Date | Revision |
@@ -168,3 +171,4 @@ triggers.
 | 2026-11-22 | Saves trim text (`trim.js`) |
 | 2026-11-22 | `RowIterator` and `BlockIterator` for child rows |
 | 2026-11-22 | Pages fit the window: theme overrides in `App.jsx` |
+| 2026-11-23 | `RETURNING OLD`/`NEW` don't replace audit triggers; the change log (#78) uses row triggers |
