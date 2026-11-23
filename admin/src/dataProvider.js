@@ -1,6 +1,6 @@
 import { fetchUtils } from 'react-admin';
 import postgrestRestProvider, { defaultSchema } from '@raphiniert/ra-data-postgrest';
-import { searchQuery } from './search';
+import { searchFilters } from './search';
 import { explainDbError } from './dbErrors';
 import { trimText } from './trim';
 
@@ -38,11 +38,9 @@ const OLD_SEARCH_KEYS = ['title@ilike', 'name@ilike', 'sort_name@ilike', 'search
 
 const toSearch = (params) => {
   if (!params?.filter) return params;
-  const { q, ...filter } = params.filter;
+  const filter = { ...params.filter };
   OLD_SEARCH_KEYS.forEach((key) => delete filter[key]);
-  const query = typeof q === 'string' ? searchQuery(q) : '';
-  if (query) filter['search@fts(fold)'] = query;
-  return { ...params, filter };
+  return { ...params, filter: searchFilters(filter) };
 };
 
 // Every save trims its text first (trim.js), and a save the database

@@ -109,6 +109,12 @@ admin's.
   merging two documents keeps the kept one's claimant, or takes the other's
   when the kept one has none.
 
+## Recording lyrics (#48)
+
+- Copy from song fills an empty Lyrics tab from the song, copies a medley's
+  songs under their titles, and asks before replacing lyrics already entered
+  (checked by hand in a browser; the widget test waits on #81).
+
 ## Help text (#35)
 
 - A shared list picker's help ends with "Not listed? Ask us to add it to the
@@ -353,3 +359,4 @@ admin's.
 | 2026-11-23 | Artists from people (#30) |
 | 2026-11-23 | Help text (#35) |
 | 2026-11-23 | Accounts kept apart (#33) and most of change history (#78) written as database tests |
+| 2026-11-23 | Recording lyrics (#48) |

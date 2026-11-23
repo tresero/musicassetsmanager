@@ -17,14 +17,16 @@ import { RepresentationsInput } from './representationsTab';
 import { PitchCommentInput } from './PitchCommentInput';
 import { versionLabels, tempos, freeText, parentalWarnings } from './vocab';
 import {
-  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, RowIterator, StartHere,
+  CatalogDataTable, SharedListPicker, CountryInput, LanguageInput, CopyrightInputs, registrationText, searchFilter, lyricsFilter, RowIterator, StartHere,
 } from './shared';
 import { ChangeHistory } from './changeHistory';
+import { RecordingLyricsInput } from './recordingLyrics';
 import { useDefaultParentalWarning } from '../permissions';
 import { ListActions } from './listActions';
 
 const filters = [
   searchFilter,
+  lyricsFilter,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
   <NullableBooleanInput source="has_pitch_contact" label="Has pitch contact" />,
@@ -260,6 +262,10 @@ const RecordingForm = () => (
                           notListed="Not listed? Add it to Keywords on the Details tab, or ask us to add it to the list." />
       </ReferenceArrayInput>
       <PitchCommentInput />
+    </TabbedForm.Tab>
+
+    <TabbedForm.Tab label="Lyrics">
+      <RecordingLyricsInput />
     </TabbedForm.Tab>
 
     <TabbedForm.Tab label="Audio">

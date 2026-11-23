@@ -97,6 +97,12 @@ recording, falling back to an active exclusive agent and then to the default
 contact in Settings. The tab shows the comment with a count and a Copy button,
 and a recording can carry its own text instead.
 
+**Lyrics**: the lyrics as recorded, when they differ from the song's: verses
+cut, ad libs, another language. Left blank, the song's lyrics stand for the
+recording. **Copy from song** fills them in from the song to edit from there
+(a medley copies each song's under its title), and asks before replacing
+lyrics already entered (#48).
+
 **Audio**: the master and its alternates, timed cuts, and stems, each typed and
 described, and a Multitracks available flag set by hand, since multitrack
 sessions are not uploaded. A Stem file makes the pitch comment say Stems
@@ -470,6 +476,11 @@ a document or a release, does not sort.
   the like) says what to do when a value is missing: ask for it to be added,
   or, for genres, moods and themes, put it in the recording's Keywords. The
   site admin is told to type it and choose Create instead.
+- The Songs and Recordings lists have a **Lyrics contain** filter, under Add
+  filter: every word typed must start a word of the lyrics, accents and
+  formatting ignored. A recording is searched by its own lyrics, else its
+  songs'. The main search box leaves lyrics out, since common words would
+  match nearly every song (#48).
 - An empty Songs, Recordings or Releases list says to set up Storage and
   Pitch settings before adding the catalog, to those who can (#35).
 
@@ -533,3 +544,4 @@ a document or a release, does not sort.
 | 2026-11-23 | Public domain source: one stop checks an arrangement's shares (#11). |
 | 2026-11-23 | A new solo artist is linked to its person when added (#30). |
 | 2026-11-23 | Help text across the forms; what to do when a list value is missing; first steps on an empty catalog (#35). |
+| 2026-11-23 | Lyrics on recordings with Copy from song, and a Lyrics contain filter (#48). |

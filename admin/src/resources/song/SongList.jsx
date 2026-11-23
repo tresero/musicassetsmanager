@@ -1,11 +1,12 @@
 import {
   List, DataTable, BooleanField, DateField, NullableBooleanInput,
 } from 'react-admin';
-import { CatalogDataTable, registrationText, searchFilter, StartHere } from '../shared';
+import { CatalogDataTable, registrationText, searchFilter, lyricsFilter, StartHere } from '../shared';
 import { ListActions } from '../listActions';
 
 const filters = [
   searchFilter,
+  lyricsFilter,
   <NullableBooleanInput source="one_stop" label="One stop" />,
   <NullableBooleanInput source="easy_clear" label="Easy clear" />,
 ];

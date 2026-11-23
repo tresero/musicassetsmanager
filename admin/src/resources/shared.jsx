@@ -178,6 +178,8 @@ export const CatalogDataTable = ({ bulkActionButtons, ...props }) => {
 // The search box at the top of a list. It sends q, which dataProvider turns
 // into a search of the view's search value.
 export const searchFilter = <SearchInput key="q" source="q" alwaysOn />;
+// Lyrics contain (#48): every word, matched at the start, in the lyrics only.
+export const lyricsFilter = <TextInput key="lyrics" source="lyrics" label="Lyrics contain" />;
 
 // The registration that applies to a song, recording or release, from its
 // computed copyright_status, as one line for lists and exports.

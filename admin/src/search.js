@@ -23,3 +23,14 @@ export const searchQuery = (q) => {
   if (/^[0-9]{8,14}$/.test(digits) && /[\s./-]/.test(q.trim())) return either(digits, words(q));
   return q.split(/\s+/).map(term).filter(Boolean).join(' & ');
 };
+
+// Text filters searched in full text: the search box (q) against a record's
+// search column, and Lyrics contain (#48) against its lyrics_search column.
+const TEXT_SEARCHES = { q: 'search', lyrics: 'lyrics_search' };
+
+export const searchFilters = (filter) => Object.entries(filter).reduce((out, [key, value]) => {
+  const column = TEXT_SEARCHES[key];
+  if (!column) return { ...out, [key]: value };
+  const query = typeof value === 'string' ? searchQuery(value.trim()) : '';
+  return query ? { ...out, [`${column}@fts(fold)`]: query } : out;
+}, {});

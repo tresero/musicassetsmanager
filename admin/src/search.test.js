@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { searchQuery } from './search';
+import { searchQuery, searchFilters } from './search';
 
 describe('searchQuery', () => {
   test('plain words each match the start of a word', () => {
@@ -26,5 +26,20 @@ describe('searchQuery', () => {
 
   test('a hyphenated word without digits is left as words', () => {
     expect(searchQuery('hip-hop')).toBe('hip:* & hop:*');
+  });
+});
+
+describe('searchFilters', () => {
+  test('the search box and Lyrics contain become full text searches', () => {
+    expect(searchFilters({ q: 'smi cora', lyrics: 'bajo la luna', one_stop: true })).toEqual({
+      'search@fts(fold)': 'smi:* & cora:*',
+      'lyrics_search@fts(fold)': 'bajo:* & la:* & luna:*',
+      one_stop: true,
+    });
+  });
+
+  test('empty text adds no search', () => {
+    expect(searchFilters({ q: '  ', lyrics: '' })).toEqual({});
+    expect(searchFilters({})).toEqual({});
   });
 });

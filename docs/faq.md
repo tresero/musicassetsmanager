@@ -142,6 +142,17 @@ A recording is one stop when its controlled master shares total 100, no
 exclusive deal is active with anyone else, and every song it records is one
 stop. Its **Master** tab says which of these is missing.
 
+### Why doesn't the search box find a line from the lyrics?
+
+The search box looks at names and codes: titles, writers, ISWCs and the like.
+Lyrics are left out on purpose, since a word like "la" or "amor" is in nearly
+every lyric and would bury the song you were looking for. To search lyrics,
+open the Songs or Recordings list, choose **Add filter > Lyrics contain**, and
+type a few words of the line.
+
+To show it: open **Songs**, choose **Add filter > Lyrics contain**, and type
+two words from a chorus.
+
 ### What is the difference between one stop and easy clear?
 
 One stop is worked out from the shares; you can't set it. Easy clear is a box
@@ -228,3 +239,4 @@ To show it:
 | 2026-11-15 | Copyright: album registrations and mismatched numbers. |
 | 2026-11-23 | Songs: public domain source, versions of a tune, Based on, crediting the original writer, one stop and easy clear. |
 | 2026-11-23 | Artists: a featured artist who is already in People. |
+| 2026-11-23 | Searching lyrics. |
