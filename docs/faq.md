@@ -84,6 +84,37 @@ the catalog as a whole, as Not in catalog income does.
 To show it: **Money > Transactions > New transaction**, fill in the details,
 leave **For** empty, and save. The list shows Overhead under For.
 
+## Files
+
+### What files do I have to upload, and where do they go?
+
+None. Every file is optional: the catalog works from the information you
+enter. Files are for keeping everything about a work in one place, backed up
+in your account's storage, and for finding what you have when someone asks.
+
+| File | Where it goes |
+|---|---|
+| The master, alternates, instrumentals, TV mixes and timed cuts | The recording's **Audio** tab |
+| Stems | The recording's **Stems** tab, one file each |
+| The multitrack session | The recording's **Multitracks** tab, one file per track |
+| Lyrics | The song's **Lyrics** tab, as text; the recording's, when it sings them differently |
+| Split sheets, agreements, licenses, registrations, cue sheets | The **Documents** tab of the song, recording, release, person or company they are about |
+| Artwork, lead sheets, track sheets | The **Documents** tab, typed Cover Art, Lead Sheet or Track Sheet |
+
+A file uploaded twice is stored once, so attaching the same agreement to ten
+songs takes no extra space.
+
+### Can a publisher or music supervisor download files from here?
+
+Not yet. Only people with a login to your account can open or download
+files. To send stems or a session, open the recording's **Stems** or
+**Multitracks** tab, click **Download all as zip**, and send the zip the way
+you usually do. Share links, which let someone without a login download what
+you choose for a limited time, are planned.
+
+To show it: open a recording with stems, go to **Stems**, and click
+**Download all as zip**.
+
 ## Songs
 
 ### What does Public domain source mean?
@@ -243,3 +274,4 @@ To show it:
 | 2026-11-23 | Artists: a featured artist who is already in People. |
 | 2026-11-23 | Searching lyrics. |
 | 2026-11-23 | Close matches when lyrics are typed with a typo. |
+| 2026-11-23 | Files: what to upload and where; downloads for people without a login. |
