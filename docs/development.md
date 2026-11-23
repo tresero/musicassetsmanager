@@ -153,8 +153,17 @@ The plan is in #37; the tests each feature still needs are in `docs/TDD.md`.
   (`search.js`), the database error mapping (`dbErrors.js`), trimming
   (`trim.js`) and the change history wording (`changes.js`).
 - **Upload service:** `cd upload && go test ./...`.
-- **Database:** not yet. pgTAP against a scratch database Jon creates, never
-  production.
+- **Database:** pgTAP, run with `pg_prove`, against the scratch database
+  `music_test`, never production. `db/tests/run.sh` reloads it from
+  `db/schema.sql` and `db/seed/reference.sql` (the roles are shared by every
+  database on the server, so `db/roles.sql` is not needed) and runs every
+  `db/tests/*.sql`. Each file runs in a transaction that is rolled back, and
+  includes `db/tests/setup.psql`: two accounts, a and b, each with an Owner;
+  a has one of every catalog record, b a few of its own. `tests.id('a_song')`
+  gives a record's id, `tests.sign_in('b')` acts as b's Owner the way
+  PostgREST does, and `tests.sign_out()` returns to the owner, who sees past
+  row security. A known bug is a test marked `todo` with its issue number.
+  Refresh `db/schema.sql` before running the tests after a migration.
 
 ## Gotchas
 
@@ -196,3 +205,4 @@ written by row triggers.
 | 2026-11-22 | Pages fit the window: theme overrides in `App.jsx` |
 | 2026-11-23 | `RETURNING OLD`/`NEW` don't replace audit triggers; the change log (#78) uses row triggers |
 | 2026-11-23 | Change history triggers for child tables (#78) |
+| 2026-11-23 | Database tests: pgTAP in `db/tests/`, run with `db/tests/run.sh` |

@@ -2,18 +2,12 @@
 
 The tests each feature needs, written down as the feature is built and checked
 by hand, until the test suite in #37 exists to hold them. When a test is
-written, remove it from here. Database tests run against a scratch database
+written, remove it from here. Database tests are in `db/tests/`. Database tests run against a scratch database
 loaded from `db/schema.sql`, `db/roles.sql` and `db/seed/reference.sql`, never
 production.
 
 "Another Owner" below means the Owner of an account that is not the site
 admin's.
-
-## Accounts kept apart (#33)
-
-- A second account can neither see nor change the first account's rows:
-  through lists, single records, writes by ID, child rows and links.
-- A record cannot link to a record in another account.
 
 ## IPI and ISNI per account (#49)
 
@@ -141,19 +135,9 @@ admin's.
 
 ## Change history (#78), `music.log_change` and `api.change_log`
 
-- An edit through a form leaves one entry per changed row, holding only the
-  changed columns; saving a form unchanged leaves none.
-- A change made in SQL with no signed-in user is logged with no user, in the
-  record's account.
-- Deleting a song lists it under `api.deleted_record` with its writers and
-  publishers; deleting a recording lists its credits with their roles and
-  instruments.
-- A second account reads none of the first account's entries, and no app
-  user can insert, change or delete an entry.
-- Deleting an account works and removes its entries.
-- Every table that holds a song's, recording's, release's, person's,
-  company's or artist's rows has the three `change_log_*` triggers (a query
-  over `pg_trigger` against the list in `docs/development.md`).
+- Deleting a recording lists its credits with their roles and instruments.
+- Deleting an account whose songs are on recordings works and removes its
+  entries: a to-do test in `db/tests/change_log.sql` until #80 is fixed.
 
 ## Codes (#18)
 
@@ -368,3 +352,4 @@ admin's.
 | 2026-11-23 | Public domain arrangements (#11) |
 | 2026-11-23 | Artists from people (#30) |
 | 2026-11-23 | Help text (#35) |
+| 2026-11-23 | Accounts kept apart (#33) and most of change history (#78) written as database tests |
