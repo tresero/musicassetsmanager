@@ -236,10 +236,13 @@ func (s *server) mailSettings(ctx context.Context, account string) (*mailSetting
 	if err != nil {
 		return nil, errors.New("email is not set up for this account: a sending service is set up under Settings, Email sending")
 	}
-	if !pass.Valid || pass.String == "" {
+	// Trimmed like the storage secret: a password pasted with a space or line
+	// break around it is refused by the server.
+	password := strings.TrimSpace(pass.String)
+	if password == "" {
 		return nil, errors.New("the sending service has no password saved yet, under Settings, Email sending")
 	}
-	st.FromName, st.Password = name.String, pass.String
+	st.FromName, st.Password = name.String, password
 	return &st, nil
 }
 
