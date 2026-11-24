@@ -13,7 +13,7 @@ import { sendTestMail } from './uploadClient';
 // Microsoft 365) are refused by the database: they cannot send in bulk.
 const PRESETS = [
   { label: 'Amazon SES', smtp_host: 'email-smtp.us-east-1.amazonaws.com', smtp_port: 587, smtp_security: 'starttls',
-    hint: 'Change us-east-1 to the region your domain is verified in. Create the username and password under SMTP settings in the SES console.' },
+    hint: 'Change us-east-1 to the region your domain is verified in. Create the username and password under SMTP settings in the SES console. An IAM user\'s access key ID also works as the username, with an SMTP password made from its secret key (see "converting existing AWS credentials" in the SES guide); the secret key itself is not the password.' },
   { label: 'Postmark', smtp_host: 'smtp.postmarkapp.com', smtp_port: 587, smtp_security: 'starttls',
     hint: 'Use a server API token as both username and password, from a Broadcasts stream for bulk.' },
   { label: 'Mailgun', smtp_host: 'smtp.mailgun.org', smtp_port: 587, smtp_security: 'starttls',
@@ -72,6 +72,7 @@ const AccountMailPage = () => {
   const [password, setPasswordValue] = useState('');
   const [busy, setBusy] = useState(null);
   const [hint, setHint] = useState(null);
+  const [passwordMissing, setPasswordMissing] = useState(false);
 
   if (isPending) return <Loading />;
   const row = data?.[0];
@@ -84,14 +85,21 @@ const AccountMailPage = () => {
     smtp_username: row?.smtp_username ?? '',
   };
 
-  const done = {
-    onSuccess: () => { refetch(); notify('Email sending saved'); },
-    onError: (err) => notify(err?.message || 'Could not save', { type: 'error' }),
-  };
-  const save = (form) => {
+  // The settings are saved first, then the password on its own, since the
+  // password can only be set once the settings exist.
+  const save = async (form) => {
+    if (!row?.password_set && !password) { setPasswordMissing(true); return; }
     const changes = Object.fromEntries(FIELDS.map((k) => [k, form[k] ?? null]));
-    if (row) update('account_mail', { id: row.id, data: changes, previousData: row }, done);
-    else create('account_mail', { data: changes }, done);
+    try {
+      if (row) await update('account_mail', { id: row.id, data: changes, previousData: row }, { returnPromise: true });
+      else await create('account_mail', { data: changes }, { returnPromise: true });
+      if (password) { await setPassword(password); setPasswordValue(''); }
+      notify('Email sending saved');
+    } catch (err) {
+      notify(err?.message || 'Could not save', { type: 'error' });
+    } finally {
+      refetch();
+    }
   };
 
   const run = async (label, fn, ok) => {
@@ -136,24 +144,22 @@ const AccountMailPage = () => {
               </Box>
               <TextInput source="smtp_username" label="SMTP username" validate={required()}
                          helperText="From the service's SMTP settings" />
-              <Box><SaveButton label="Save" disabled={creating || updating} /></Box>
+              <TextField type="password" label="SMTP password" value={password} autoComplete="new-password"
+                         onChange={(e) => { setPasswordValue(e.target.value); setPasswordMissing(false); }}
+                         error={passwordMissing} required={!row?.password_set} slotProps={{ htmlInput: { required: false } }}
+                         helperText={passwordMissing ? 'Enter the SMTP password'
+                           : row?.password_set ? 'Saved. Leave blank to keep it, or enter a new one.'
+                             : 'From the service\'s SMTP settings. It is never shown again once saved.'} />
+              <Box><SaveButton label="Save" disabled={creating || updating} alwaysEnable={!!password} /></Box>
             </Stack>
           </Form>
 
           {row && (
             <>
-              <Typography variant="subtitle2" sx={{ pt: 1 }}>
-                SMTP password {row.password_set ? '(saved)' : '(not saved yet)'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                It is never shown again once saved.
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                <TextField type="password" size="small" label="SMTP password" value={password} autoComplete="new-password"
-                           onChange={(e) => setPasswordValue(e.target.value)} sx={{ minWidth: 260 }} />
-                <Button disabled={!password || !!busy}
-                        onClick={() => run('password', () => setPassword(password).then(() => setPasswordValue('')), 'Password saved')}>
-                  Save password
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', pt: 1 }}>
+                <Button variant="outlined" disabled={!row.password_set || !!busy}
+                        onClick={() => run('test', sendTestMail, 'Test email sent to your sign-in address. Check your inbox.')}>
+                  {busy === 'test' ? 'Sending…' : 'Send me a test email'}
                 </Button>
                 {row.password_set && (
                   <Button color="error" disabled={!!busy}
@@ -162,14 +168,8 @@ const AccountMailPage = () => {
                   </Button>
                 )}
               </Box>
-              <Box>
-                <Button variant="outlined" disabled={!row.password_set || !!busy}
-                        onClick={() => run('test', sendTestMail, 'Test email sent to your sign-in address. Check your inbox.')}>
-                  {busy === 'test' ? 'Sending…' : 'Send me a test email'}
-                </Button>
-              </Box>
               {!row.password_set && (
-                <Alert severity="info">Save the password, then send yourself a test email.</Alert>
+                <Alert severity="info">No password is saved, so nothing can be sent. Enter it above and save.</Alert>
               )}
             </>
           )}
