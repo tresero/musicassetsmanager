@@ -15798,6 +15798,7 @@ GRANT SELECT(account_id) ON TABLE music.user_account TO mamupload;
 --
 
 GRANT SELECT(email) ON TABLE music.user_account TO app_user;
+GRANT SELECT(email) ON TABLE music.user_account TO mamupload;
 
 --
 -- Name: COLUMN user_account.created_at; Type: ACL; Schema: music; Owner: -

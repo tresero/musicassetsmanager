@@ -2,7 +2,7 @@
 -- settings, used by everyone in the account, its password never readable.
 BEGIN;
 \ir setup.psql
-SELECT plan(18);
+SELECT plan(19);
 
 -- A second user in account a, an Editor, who cannot edit settings.
 INSERT INTO music.user_account (id, account_id, email, password_hash, role_id)
@@ -57,6 +57,12 @@ SELECT ok(NOT has_column_privilege('claude_ro', 'music.account_mail', 'smtp_pass
 SELECT ok(has_column_privilege('mamupload', 'music.account_mail', 'smtp_password', 'SELECT')
           AND has_table_privilege('mamupload', 'music.mail_sent', 'INSERT'),
           'the upload service reads the password to send, and logs what it sent');
+
+RESET ROLE;
+SET LOCAL ROLE mamupload;
+SELECT lives_ok($$SELECT email FROM music.user_account LIMIT 1$$,
+                'the upload service reads the sender''s address, for Reply-To and the test email');
+RESET ROLE;
 
 SELECT * FROM finish();
 ROLLBACK;
