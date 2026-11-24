@@ -3,9 +3,10 @@ import {
   Form, SaveButton, TextInput, NumberInput, SelectInput, Title, required, email,
   useGetList, useCreate, useUpdate, useNotify, Loading,
 } from 'react-admin';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { sendTestMail } from './uploadClient';
+import { looksLikeAwsSecret, sesRegion, sesSmtpPassword } from '../sesPassword';
 
 // Sending services, reached over SMTP. Each one's own SMTP credentials go in
 // Username and Password: SES's are made under SMTP settings in the SES
@@ -13,7 +14,7 @@ import { sendTestMail } from './uploadClient';
 // Microsoft 365) are refused by the database: they cannot send in bulk.
 const PRESETS = [
   { label: 'Amazon SES', smtp_host: 'email-smtp.us-east-1.amazonaws.com', smtp_port: 587, smtp_security: 'starttls',
-    hint: 'Change us-east-1 to the region your domain is verified in. Create the username and password under SMTP settings in the SES console. An IAM user\'s access key ID also works as the username, with an SMTP password made from its secret key (see "converting existing AWS credentials" in the SES guide); the secret key itself is not the password.' },
+    hint: 'Change us-east-1 to the region your domain is verified in. Create the username and password under SMTP settings in the SES console, or use an IAM user\'s access key ID as the username and its secret access key as the password: it is converted to the SMTP password before saving. The IAM user needs permission for ses:SendRawEmail.' },
   { label: 'Postmark', smtp_host: 'smtp.postmarkapp.com', smtp_port: 587, smtp_security: 'starttls',
     hint: 'Use a server API token as both username and password, from a Broadcasts stream for bulk.' },
   { label: 'Mailgun', smtp_host: 'smtp.mailgun.org', smtp_port: 587, smtp_security: 'starttls',
@@ -45,6 +46,23 @@ const Presets = ({ onHint }) => {
       <Typography variant="body2" color="text.secondary">Fill in for:</Typography>
       {PRESETS.map((p) => <Button key={p.label} size="small" onClick={() => pick(p)}>{p.label}</Button>)}
     </Box>
+  );
+};
+
+// The password field. For Amazon SES, an IAM secret access key typed here is
+// turned into the SMTP password in the browser, and only that is saved.
+const PasswordInput = ({ value, onChange, missing, saved }) => {
+  const region = sesRegion(useWatch({ name: 'smtp_host' }));
+  const converting = region && looksLikeAwsSecret(value);
+  return (
+    <TextField type="password" label="SMTP password" value={value} autoComplete="new-password"
+               onChange={(e) => onChange(e.target.value)}
+               error={missing} required={!saved} slotProps={{ htmlInput: { required: false } }}
+               helperText={missing ? 'Enter the SMTP password'
+                 : converting ? `An AWS secret access key: it will be converted to the SMTP password for ${region}, and only that is saved.`
+                   : saved ? 'Saved. Leave blank to keep it, or enter a new one.'
+                     : region ? 'The SMTP password, or the IAM user\'s secret access key. It is never shown again once saved.'
+                       : 'From the service\'s SMTP settings. It is never shown again once saved.'} />
   );
 };
 
@@ -93,7 +111,11 @@ const AccountMailPage = () => {
     try {
       if (row) await update('account_mail', { id: row.id, data: changes, previousData: row }, { returnPromise: true });
       else await create('account_mail', { data: changes }, { returnPromise: true });
-      if (password) { await setPassword(password); setPasswordValue(''); }
+      if (password) {
+        const region = sesRegion(form.smtp_host);
+        await setPassword(region && looksLikeAwsSecret(password) ? await sesSmtpPassword(password, region) : password);
+        setPasswordValue('');
+      }
       notify('Email sending saved');
     } catch (err) {
       notify(err?.message || 'Could not save', { type: 'error' });
@@ -144,12 +166,8 @@ const AccountMailPage = () => {
               </Box>
               <TextInput source="smtp_username" label="SMTP username" validate={required()}
                          helperText="From the service's SMTP settings" />
-              <TextField type="password" label="SMTP password" value={password} autoComplete="new-password"
-                         onChange={(e) => { setPasswordValue(e.target.value); setPasswordMissing(false); }}
-                         error={passwordMissing} required={!row?.password_set} slotProps={{ htmlInput: { required: false } }}
-                         helperText={passwordMissing ? 'Enter the SMTP password'
-                           : row?.password_set ? 'Saved. Leave blank to keep it, or enter a new one.'
-                             : 'From the service\'s SMTP settings. It is never shown again once saved.'} />
+              <PasswordInput value={password} missing={passwordMissing} saved={row?.password_set}
+                             onChange={(v) => { setPasswordValue(v); setPasswordMissing(false); }} />
               <Box><SaveButton label="Save" disabled={creating || updating} alwaysEnable={!!password} /></Box>
             </Stack>
           </Form>
